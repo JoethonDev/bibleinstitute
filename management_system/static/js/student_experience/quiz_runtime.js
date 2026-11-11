@@ -2,6 +2,25 @@
     "use strict";
 
     const form = document.getElementById("quiz-form");
+    if (form) {
+        // Progressive enhancement: the no-JS textarea answer remains active
+        // until JavaScript upgrades it to a hidden structured field filled by
+        // the ordering/matching controls.
+        form.querySelectorAll("[data-structured-fallback]").forEach((fallback) => {
+            if (fallback.dataset.structuredUpgraded === "1") return;
+            fallback.dataset.structuredUpgraded = "1";
+            const hidden = document.createElement("input");
+            hidden.type = "hidden";
+            hidden.name = fallback.getAttribute("name") || "";
+            hidden.value = "";
+            hidden.setAttribute("data-structured-answer", "");
+            hidden.setAttribute("data-structured-type", fallback.dataset.structuredType || "");
+            fallback.removeAttribute("name");
+            fallback.hidden = true;
+            fallback.disabled = true;
+            fallback.parentNode.insertBefore(hidden, fallback);
+        });
+    }
     if (!form || !form.dataset.snapshotUrl) return;
 
     const timerNode = document.querySelector("#timer span");

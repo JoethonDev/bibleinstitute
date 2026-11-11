@@ -41,7 +41,7 @@
     <script defer src="{% static 'js/alpine/stores/notifications.js' %}?v={{ static_asset_version }}"></script>
     <script defer src="{% static 'js/notification_center.js' %}?v={{ static_asset_version }}"></script>
     <!-- Alpine.js -->
-    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.13.3/dist/cdn.min.js"></script>
+    <script defer src="{% static 'vendor/alpine/alpine-3.13.3.min.js' %}?v={{ static_asset_version }}"></script>
 
     <!-- HTMX configuration. morphIgnore protects Alpine directives (x-*, @*, :*)
          and data-* component attributes from HTMX 4 attribute preservation
@@ -76,8 +76,21 @@
 
     {% block cdn %}{% endblock %}
     {% block style %}{% endblock %}
+    <link rel="stylesheet" href="{% static 'pwa/actions.css' %}?v={{ static_asset_version }}">
+    {% if pwa_enabled %}
+    <link rel="manifest" href="{% url 'pwa-manifest' %}?lang={{ request.LANGUAGE_CODE }}">
+    <meta name="theme-color" content="#1f4f56">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="{% translate 'Bible Institute' %}">
+    <link rel="apple-touch-icon" href="{% static 'pwa/icons/apple-touch-icon.png' %}">
+    <script defer src="{% static 'pwa/register.js' %}?v={{ static_asset_version }}"></script>
+    <script defer src="{% static 'pwa/offline-library.js' %}?v={{ static_asset_version }}"></script>
+    <script defer src="{% static 'pwa/push.js' %}?v={{ static_asset_version }}"></script>
+    <meta name="csrf-token" content="{{ csrf_token }}">
+    {% endif %}
 </head>
-<body class="d-flex flex-column">
+<body class="d-flex flex-column"{% if pwa_enabled %} data-pwa-enabled="true" data-pwa-account="{{ request.user.pk }}"{% endif %}>
     <header>
         <div class="institute-topbar ps-site-topbar">
           <div class="container d-flex flex-wrap justify-content-between align-items-center gap-2">
@@ -117,7 +130,7 @@
               {% endif %}
               {% if user.is_authenticated %}
               <li class="nav-item"><a class="nav-link ps-site-nav-link" href="{% url 'courses' %}">{% translate "Courses" %}</a></li>
-              <li class="nav-item"><a class="nav-link ps-site-nav-link" href="{% url 'download-app' %}">{% translate "Download our app" %}</a></li>
+              <li class="nav-item"><a class="nav-link ps-site-nav-link" href="{% url 'download-app' %}">{% translate "Install the app" %}</a></li>
               {% if show_graduation_gallery %}
               <li class="nav-item"><a class="nav-link ps-site-nav-link" href="{% url 'graduates' %}">{% translate "Graduates" %}</a></li>
               {% endif %}
@@ -153,7 +166,7 @@
                 </select>
               </form>
               {% if user.is_authenticated %}
-                <form method="post" action="{% url 'logout' %}" class="ps-inline-form">{% csrf_token %}<button type="submit" class="sd-btn sd-btn--gold-outline btn-sm"><i class="fas fa-right-from-bracket"></i> {% translate "Logout" %}</button></form>
+                <form method="post" action="{% url 'logout' %}" class="ps-inline-form" data-pwa-logout>{% csrf_token %}<button type="submit" class="sd-btn sd-btn--gold-outline btn-sm"><i class="fas fa-right-from-bracket"></i> {% translate "Logout" %}</button></form>
               {% else %}
                 <a class="sd-btn sd-btn--gold-outline btn-sm" href="{% url 'user_login' %}">{% translate "Login" %}</a>
                 <a class="sd-btn sd-btn--teal btn-sm" href="{% url 'signup' %}">{% translate "Sign Up" %}</a>

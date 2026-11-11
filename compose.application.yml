@@ -2,6 +2,41 @@
 # Infrastructure services (postgres, redis, nginx) live in
 # compose.infrastructure.yml on the same external lms_network.
 
+x-app-environment: &app-environment
+  DJANGO_DEBUG: ${DJANGO_DEBUG:-False}
+  DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:-localhost,127.0.0.1,[::1]}
+  POSTGRES_DB: ${POSTGRES_DB:-lms_database}
+  POSTGRES_USER: ${POSTGRES_USER:-lms_user}
+  POSTGRES_HOST: postgres
+  POSTGRES_PORT: 5432
+  SQLITE_SOURCE_PATH: /app/db.sqlite3
+  REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+  REDIS_CACHE_URL: ${REDIS_CACHE_URL:-redis://redis:6379/1}
+  CELERY_BROKER_URL: ${CELERY_BROKER_URL:-redis://redis:6379/0}
+  CELERY_RESULT_BACKEND: ${CELERY_RESULT_BACKEND:-redis://redis:6379/0}
+  WEB_CONCURRENCY: ${WEB_CONCURRENCY:-2}
+  WEB_THREADS: ${WEB_THREADS:-8}
+  GUNICORN_TIMEOUT: ${GUNICORN_TIMEOUT:-1800}
+  STATIC_ASSET_VERSION: ${STATIC_ASSET_VERSION:-dev}
+  FFPROBE_BINARY: ${FFPROBE_BINARY:-ffprobe}
+
+# Only the web slots and the general Celery worker need browser push/passkey
+# configuration. The media and admin workers keep the base environment so the
+# VAPID private key is not exposed to workers that never send browser push.
+x-app-push-environment: &app-push-environment
+  <<: *app-environment
+  WEB_PUSH_ENABLED: ${WEB_PUSH_ENABLED:-false}
+  WEB_PUSH_VAPID_PUBLIC_KEY: ${WEB_PUSH_VAPID_PUBLIC_KEY:-}
+  WEB_PUSH_VAPID_SUBJECT: ${WEB_PUSH_VAPID_SUBJECT:-}
+  WEB_PUSH_TIMEOUT_SECONDS: ${WEB_PUSH_TIMEOUT_SECONDS:-15}
+  WEB_PUSH_BATCH_SIZE: ${WEB_PUSH_BATCH_SIZE:-100}
+  WEBAUTHN_ENABLED: ${WEBAUTHN_ENABLED:-false}
+  WEBAUTHN_RP_ID: ${WEBAUTHN_RP_ID:-localhost}
+  WEBAUTHN_RP_NAME: ${WEBAUTHN_RP_NAME:-Bible Institute Coptic}
+  WEBAUTHN_EXPECTED_ORIGIN: ${WEBAUTHN_EXPECTED_ORIGIN:-http://localhost:8000}
+  WEBAUTHN_CHALLENGE_TTL_SECONDS: ${WEBAUTHN_CHALLENGE_TTL_SECONDS:-300}
+  PWA_MEDIA_MAX_BYTES: ${PWA_MEDIA_MAX_BYTES:-0}
+
 x-app-base: &app-base
   build:
     context: .
@@ -11,23 +46,7 @@ x-app-base: &app-base
     - path: .env
       required: false
       format: raw
-  environment:
-    DJANGO_DEBUG: ${DJANGO_DEBUG:-False}
-    DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:-localhost,127.0.0.1,[::1]}
-    POSTGRES_DB: ${POSTGRES_DB:-lms_database}
-    POSTGRES_USER: ${POSTGRES_USER:-lms_user}
-    POSTGRES_HOST: postgres
-    POSTGRES_PORT: 5432
-    SQLITE_SOURCE_PATH: /app/db.sqlite3
-    REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
-    REDIS_CACHE_URL: ${REDIS_CACHE_URL:-redis://redis:6379/1}
-    CELERY_BROKER_URL: ${CELERY_BROKER_URL:-redis://redis:6379/0}
-    CELERY_RESULT_BACKEND: ${CELERY_RESULT_BACKEND:-redis://redis:6379/0}
-    WEB_CONCURRENCY: ${WEB_CONCURRENCY:-2}
-    WEB_THREADS: ${WEB_THREADS:-8}
-    GUNICORN_TIMEOUT: ${GUNICORN_TIMEOUT:-1800}
-    STATIC_ASSET_VERSION: ${STATIC_ASSET_VERSION:-dev}
-    FFPROBE_BINARY: ${FFPROBE_BINARY:-ffprobe}
+  environment: *app-environment
   volumes:
     - lms_static_data:/app/collectstatic
   networks:
@@ -37,6 +56,7 @@ services:
   # -- Blue web slot ----------------------------------------------
   lms-app-blue:
     <<: *app-base
+    environment: *app-push-environment
     command:
       - gunicorn
       - learning_platform.wsgi:application
@@ -64,6 +84,7 @@ services:
   # -- Green web slot ---------------------------------------------
   lms-app-green:
     <<: *app-base
+    environment: *app-push-environment
     command:
       - gunicorn
       - learning_platform.wsgi:application
@@ -91,6 +112,7 @@ services:
   # -- Celery worker ----------------------------------------------
   celery:
     <<: *app-base
+    environment: *app-push-environment
     command:
       - celery
       - -A

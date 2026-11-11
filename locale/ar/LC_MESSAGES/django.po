@@ -16208,3 +16208,374 @@ msgstr[2] "اجتماعان"
 msgstr[3] "%(count)s اجتماعات"
 msgstr[4] "%(count)s اجتماعاً"
 msgstr[5] "%(count)s اجتماع"
+
+#: management_system/pwa_views.py
+msgid "Install the student app"
+msgstr "تثبيت تطبيق الطالب"
+
+#: management_system/pwa_views.py
+msgid "Student app"
+msgstr "تطبيق الطالب"
+
+#: management_system/pwa_views.py
+msgid "Install the Bible Institute app"
+msgstr "تثبيت تطبيق معهد الكتاب المقدس"
+
+#: management_system/pwa_views.py
+msgid "Install this website on your phone or computer for a full-screen app experience, saved audio and PDFs, and browser notifications. No separate download is needed."
+msgstr "ثبّت هذا الموقع على هاتفك أو حاسوبك للحصول على تجربة تطبيق كاملة الشاشة، وملفات صوت وPDF محفوظة، وإشعارات المتصفح. لا حاجة إلى تنزيل منفصل."
+
+#: management_system/pwa_views.py
+msgid "Install app"
+msgstr "تثبيت التطبيق"
+
+#: management_system/pwa_views.py
+msgid "Notification settings"
+msgstr "إعدادات الإشعارات"
+
+#: management_system/pwa_views.py
+msgid "If the install button does not appear, use your browser menu and choose Install app or Add to Home Screen."
+msgstr "إذا لم يظهر زر التثبيت، استخدم قائمة المتصفح واختر تثبيت التطبيق أو إضافة إلى الشاشة الرئيسية."
+
+#: management_system/pwa_views.py
+msgid "Android and desktop Chrome or Edge"
+msgstr "أندرويد وكروم أو إيدج على الحاسوب"
+
+#: management_system/pwa_views.py
+msgid "Open this page in Chrome or Edge."
+msgstr "افتح هذه الصفحة في كروم أو إيدج."
+
+#: management_system/pwa_views.py
+msgid "Tap Install app above, or open the browser menu and choose Install app."
+msgstr "اضغط تثبيت التطبيق أعلاه، أو افتح قائمة المتصفح واختر تثبيت التطبيق."
+
+#: management_system/pwa_views.py
+msgid "Open the installed app and sign in with your student account."
+msgstr "افتح التطبيق المثبت وسجّل الدخول بحساب الطالب."
+
+#: management_system/pwa_views.py
+msgid "iPhone and iPad"
+msgstr "آيفون وآيباد"
+
+#: management_system/pwa_views.py
+msgid "Open this page in Safari."
+msgstr "افتح هذه الصفحة في سفاري."
+
+#: management_system/pwa_views.py
+msgid "Tap Share, then Add to Home Screen."
+msgstr "اضغط مشاركة، ثم إضافة إلى الشاشة الرئيسية."
+
+#: management_system/pwa_views.py
+msgid "Open the new Home Screen app and sign in. Browser notifications require iOS or iPadOS 16.4 or later."
+msgstr "افتح التطبيق من الشاشة الرئيسية وسجّل الدخول. تتطلب إشعارات المتصفح iOS أو iPadOS 16.4 أو أحدث."
+
+#: management_system/pwa_views.py
+msgid "What works offline"
+msgstr "ما يعمل دون اتصال"
+
+#: management_system/pwa_views.py
+msgid "Only audio and PDF files you explicitly save from a lesson are available offline. They are encrypted on this device and unlock with your screen lock or biometrics. Lessons you did not save, quizzes, calendar, results, forms and messages remain online-only."
+msgstr "تتاح دون اتصال ملفات الصوت وPDF التي تحفظها صراحةً من الدرس فقط. وهي مشفرة على هذا الجهاز وتُفتح بقفل الشاشة أو البصمة. الدروس غير المحفوظة والاختبارات والتقويم والنتائج والنماذج والرسائل تحتاج إلى اتصال."
+
+#: management_system/pwa_views.py
+msgid "Saving offline media can be disabled by the institute. Existing saved files remain readable while you still have access to the lesson."
+msgstr "يمكن للمعهد تعطيل حفظ الوسائط دون اتصال. تبقى الملفات المحفوظة قابلة للقراءة ما دام لديك حق الوصول إلى الدرس."
+
+#: management_system/pwa_views.py
+msgid "Sign in with a passkey"
+msgstr "تسجيل الدخول بمفتاح مرور"
+
+#: management_system/pwa_views.py
+msgid "Passkeys"
+msgstr "مفاتيح المرور"
+
+#: management_system/pwa_views.py
+msgid "Use Face ID, fingerprint, Windows Hello or your device PIN to sign in without a password. Your biometric data never leaves your device."
+msgstr "استخدم Face ID أو البصمة أو Windows Hello أو رمز جهازك لتسجيل الدخول دون كلمة مرور. لا تغادر بياناتك الحيوية جهازك."
+
+#: management_system/pwa_views.py
+msgid "Sign in again before adding or removing a passkey."
+msgstr "سجّل الدخول مجدداً قبل إضافة مفتاح مرور أو إزالته."
+
+#: management_system/pwa_views.py
+msgid "Sign in again before adding a passkey."
+msgstr "سجّل الدخول مجدداً قبل إضافة مفتاح مرور."
+
+#: management_system/pwa_views.py
+msgid "Sign in again before removing a passkey."
+msgstr "سجّل الدخول مجدداً قبل إزالة مفتاح مرور."
+
+#: management_system/pwa_views.py
+msgid "Passkey name"
+msgstr "اسم مفتاح المرور"
+
+#: management_system/pwa_views.py
+msgid "Add a passkey"
+msgstr "إضافة مفتاح مرور"
+
+#: management_system/pwa_views.py
+msgid "Last used"
+msgstr "آخر استخدام"
+
+#: management_system/pwa_views.py
+msgid "Remove"
+msgstr "إزالة"
+
+#: management_system/pwa_views.py
+msgid "Save offline"
+msgstr "حفظ دون اتصال"
+
+#: management_system/pwa_views.py
+msgid "Browser notifications"
+msgstr "إشعارات المتصفح"
+
+#: management_system/pwa_views.py
+msgid "Get lesson, quiz and announcement alerts on this device. You can turn them off at any time."
+msgstr "احصل على تنبيهات الدروس والاختبارات والإعلانات على هذا الجهاز. يمكنك إيقافها في أي وقت."
+
+#: management_system/pwa_views.py
+msgid "Enable notifications"
+msgstr "تفعيل الإشعارات"
+
+#: management_system/pwa_views.py
+msgid "Disable notifications"
+msgstr "إيقاف الإشعارات"
+
+#: management_system/pwa_views.py
+msgid "Downloaded media"
+msgstr "الوسائط المحملة"
+
+#: management_system/pwa_views.py
+msgid "Offline library"
+msgstr "مكتبة دون اتصال"
+
+#: management_system/pwa_views.py
+msgid "Your saved audio and PDF files"
+msgstr "ملفات الصوت وPDF المحفوظة"
+
+#: management_system/pwa_views.py
+msgid "These files are stored encrypted on this device. Unlock once with your device screen lock or biometrics to listen or read without internet."
+msgstr "تُخزَّن هذه الملفات مشفرة على هذا الجهاز. افتحها مرة واحدة بقفل الشاشة أو البصمة للاستماع أو القراءة دون إنترنت."
+
+#: management_system/pwa_views.py
+msgid "Unlock downloads"
+msgstr "فتح التنزيلات"
+
+#: management_system/pwa_views.py
+msgid "Saved files"
+msgstr "الملفات المحفوظة"
+
+#: management_system/pwa_views.py
+msgid "Storage used"
+msgstr "المساحة المستخدمة"
+
+#: management_system/pwa_views.py
+msgid "Offline support"
+msgstr "دعم دون اتصال"
+
+#: management_system/pwa_views.py
+msgid "Checking..."
+msgstr "جارٍ التحقق..."
+
+#: management_system/pwa_views.py
+msgid "Unlock required"
+msgstr "يلزم الفتح"
+
+#: management_system/pwa_views.py
+msgid "Confirm with your device screen lock or biometrics before opening saved files."
+msgstr "أكّد بقفل الشاشة أو البصمة قبل فتح الملفات المحفوظة."
+
+#: management_system/pwa_views.py
+msgid "No saved files yet"
+msgstr "لا توجد ملفات محفوظة بعد"
+
+#: management_system/pwa_views.py
+msgid "Open a lesson audio or PDF and choose Save offline."
+msgstr "افتح صوت درس أو PDF واختر حفظ دون اتصال."
+
+#: management_system/pwa_views.py
+msgid "Browse lessons"
+msgstr "تصفح الدروس"
+
+#: management_system/pwa_views.py
+msgid "Saved audio and PDF"
+msgstr "صوت وPDF محفوظان"
+
+#: management_system/pwa_views.py
+msgid "Add to your home screen"
+msgstr "أضف إلى الشاشة الرئيسية"
+
+#: management_system/pwa_views.py
+msgid "Install steps"
+msgstr "خطوات التثبيت"
+
+#: management_system/pwa_views.py
+msgid "Choose your device."
+msgstr "اختر جهازك."
+
+#: management_system/pwa_views.py
+msgid "Android, Chrome or Edge"
+msgstr "أندرويد أو كروم أو إيدج"
+
+#: management_system/pwa_views.py
+msgid "Open this page, tap Install app, or choose Install app from the browser menu."
+msgstr "افتح هذه الصفحة واضغط تثبيت التطبيق أو اختر تثبيت التطبيق من قائمة المتصفح."
+
+#: management_system/pwa_views.py
+msgid "Open the installed app and use your existing student account."
+msgstr "افتح التطبيق المثبت واستخدم حساب الطالب الحالي."
+
+#: management_system/pwa_views.py
+msgid "Save what you need"
+msgstr "احفظ ما تحتاجه"
+
+#: management_system/pwa_views.py
+msgid "Open a lesson audio or PDF and choose Save offline before going offline."
+msgstr "افتح صوت درس أو PDF واختر حفظ دون اتصال قبل الانقطاع."
+
+#: management_system/pwa_views.py
+msgid "Only audio and PDF files you explicitly save are available offline. They are encrypted on this device and unlock with your screen lock or biometrics. Lessons you did not save, quizzes, calendar and forms stay online-only."
+msgstr "تتاح دون اتصال ملفات الصوت وPDF التي تحفظها صراحةً فقط. وهي مشفرة على هذا الجهاز وتُفتح بقفل الشاشة أو البصمة. الدروس غير المحفوظة والاختبارات والتقويم والنماذج تحتاج إلى اتصال."
+
+#: management_system/pwa_views.py
+msgid "Optional browser alerts."
+msgstr "تنبيهات متصفح اختيارية."
+
+#: management_system/pwa_views.py
+msgid "Turn on lesson, quiz and announcement alerts from the notifications page. iPhone and iPad require iOS or iPadOS 16.4 or later after adding the app to the Home Screen."
+msgstr "فعّل تنبيهات الدروس والاختبارات والإعلانات من صفحة الإشعارات. يتطلب آيفون وآيباد iOS أو iPadOS 16.4 أو أحدث بعد إضافة التطبيق إلى الشاشة الرئيسية."
+
+#: management_system/pwa_views.py
+msgid "Your saved audio and PDFs are available on this device even without internet."
+msgstr "ملفات الصوت وPDF المحفوظة متاحة على هذا الجهاز حتى دون إنترنت."
+
+#: management_system/pwa_views.py
+msgid "Open Downloaded media"
+msgstr "فتح الوسائط المحملة"
+
+#: management_system/pwa_views.py
+msgid "You have a new notification."
+msgstr "لديك إشعار جديد."
+
+#: management_system/pwa_views.py
+msgid "Only student accounts can save offline media."
+msgstr "يمكن لحسابات الطلاب فقط حفظ الوسائط دون اتصال."
+
+#: management_system/pwa_views.py
+msgid "Saving offline media is disabled."
+msgstr "حفظ الوسائط دون اتصال معطّل."
+
+#: management_system/pwa_views.py
+msgid "This file is too large to save offline."
+msgstr "هذا الملف كبير جداً للحفظ دون اتصال."
+
+#: management_system/pwa_views.py
+msgid "Only student accounts can use offline media."
+msgstr "يمكن لحسابات الطلاب فقط استخدام الوسائط دون اتصال."
+
+#: management_system/pwa_views.py
+msgid "Items must be a list."
+msgstr "يجب أن تكون العناصر قائمة."
+
+#: management_system/pwa_views.py
+msgid "Web push is not enabled."
+msgstr "إشعارات الويب غير مفعّلة."
+
+#: management_system/pwa_views.py
+msgid "Web push is available to student accounts."
+msgstr "إشعارات الويب متاحة لحسابات الطلاب."
+
+#: management_system/pwa_views.py
+msgid "Too many subscription attempts."
+msgstr "محاولات اشتراك كثيرة."
+
+#: management_system/pwa_views.py
+msgid "Subscription is incomplete."
+msgstr "الاشتراك غير مكتمل."
+
+#: management_system/pwa_views.py
+msgid "Subscription endpoint is invalid."
+msgstr "رابط الاشتراك غير صالح."
+
+#: management_system/pwa_views.py
+msgid "Passkeys are not enabled."
+msgstr "مفاتيح المرور غير مفعّلة."
+
+#: management_system/pwa_views.py
+msgid "Too many passkey attempts."
+msgstr "محاولات كثيرة لمفاتيح المرور."
+
+#: management_system/pwa_views.py
+msgid "That passkey is not registered."
+msgstr "مفتاح المرور هذا غير مسجل."
+
+#: management_system/pwa_views.py
+msgid "This account is not active."
+msgstr "هذا الحساب غير نشط."
+
+#: management_system/pwa_views.py
+msgid "This account already has the maximum number of passkeys."
+msgstr "بلغ هذا الحساب الحد الأقصى لمفاتيح المرور."
+
+#: management_system/pwa_views.py
+msgid "Enter a name for this passkey."
+msgstr "أدخل اسماً لمفتاح المرور."
+
+#: management_system/pwa_views.py
+msgid "The passkey response is invalid."
+msgstr "استجابة مفتاح المرور غير صالحة."
+
+#: management_system/pwa_views.py
+msgid "This passkey is already registered."
+msgstr "مفتاح المرور مسجل بالفعل."
+
+#: management_system/pwa_views.py
+msgid "The passkey could not be verified."
+msgstr "تعذر التحقق من مفتاح المرور."
+
+#: management_system/pwa_views.py
+msgid "The passkey response was rejected."
+msgstr "رُفضت استجابة مفتاح المرور."
+
+#: management_system/pwa_views.py
+msgid "The passkey challenge is invalid."
+msgstr "تحدي مفتاح المرور غير صالح."
+
+#: management_system/pwa_views.py
+msgid "The passkey challenge has expired."
+msgstr "انتهت صلاحية تحدي مفتاح المرور."
+
+#: management_system/pwa_views.py
+msgid "That passkey was not found."
+msgstr "لم يتم العثور على مفتاح المرور."
+
+#: management_system/pwa_views.py
+msgid "The passkey is invalid."
+msgstr "مفتاح المرور غير صالح."
+
+msgid "Add the Bible Institute to your home screen. No separate download is needed."
+msgstr "أضف معهد الكتاب المقدس إلى الشاشة الرئيسية. لا حاجة إلى تنزيل منفصل."
+
+msgid "Install this website for a full-screen app, saved audio and PDFs, and browser notifications. It uses the same student account and stays up to date automatically."
+msgstr "ثبّت هذا الموقع للحصول على تطبيق كامل الشاشة، وصوت وPDF محفوظين، وإشعارات المتصفح. يستخدم حساب الطالب نفسه ويبقى محدثاً تلقائياً."
+
+msgid "Installable web app"
+msgstr "تطبيق ويب قابل للتثبيت"
+
+msgid "Lessons, quizzes and institute updates."
+msgstr "الدروس والاختبارات وتحديثات المعهد."
+
+msgid "Open this page in Safari, tap Share, then Add to Home Screen."
+msgstr "افتح هذه الصفحة في سفاري، واضغط مشاركة، ثم إضافة إلى الشاشة الرئيسية."
+
+msgid "Type the items in order, separated by |"
+msgstr "اكتب العناصر بالترتيب مفصولة بـ |"
+
+msgid "Without JavaScript, type the items in the correct order separated by |."
+msgstr "دون JavaScript، اكتب العناصر بالترتيب الصحيح مفصولة بـ |."
+
+msgid "Type each pair as Left = Right, one per line"
+msgstr "اكتب كل زوج على صورة اليسار = اليمين، كل زوج في سطر"
+
+msgid "Without JavaScript, type each pair as Left = Right on its own line."
+msgstr "دون JavaScript، اكتب كل زوج على صورة اليسار = اليمين في سطر مستقل."

@@ -12,8 +12,11 @@ https://docs.djangoproject.com/en/5.1/ref/settings/
 
 from pathlib import Path
 from urllib.parse import urlsplit
+import base64
+import binascii
 import ipaddress as _ipaddress
 import os
+import re
 import socket
 from celery.schedules import crontab
 from dotenv import load_dotenv
@@ -229,6 +232,7 @@ TEMPLATES = [
                 'management_system.context_processors.localized_alternate_urls',
                 'management_system.context_processors.graduation_gallery_visibility',
                 'management_system.context_processors.student_banners',
+                'management_system.context_processors.pwa_settings',
             ],
         },
     },
@@ -281,6 +285,7 @@ CELERY_IMPORTS = (
     "management_system.telegram_tasks",
     "management_system.media_tasks",
     "management_system.mobile_push_tasks",
+    "management_system.web_push_tasks",
     "management_system.mobile_otp_tasks",
     "management_system.announcement_tasks",
     "management_system.gallery_tasks",
@@ -328,6 +333,11 @@ CELERY_BEAT_SCHEDULE = {
     "process-mobile-push-receipts": {
         "task": "management_system.mobile_push_tasks.process_mobile_push_receipts",
         "schedule": 30.0,
+        "kwargs": {"limit": 1000},
+    },
+    "dispatch-due-web-push": {
+        "task": "management_system.web_push_tasks.dispatch_due_web_push",
+        "schedule": 15.0,
         "kwargs": {"limit": 1000},
     },
     "reconcile-daily-attendance": {
@@ -381,6 +391,140 @@ EXPO_PUSH_RECEIPT_BATCH_SIZE = 1000
 MOBILE_PUSH_LESSON_TTL_SECONDS = int(os.getenv("MOBILE_PUSH_LESSON_TTL_SECONDS", str(24 * 60 * 60)))
 if MOBILE_PUSH_LESSON_TTL_SECONDS <= 0:
     raise ImproperlyConfigured("MOBILE_PUSH_LESSON_TTL_SECONDS must be positive.")
+
+# Browser Web Push is a separate channel from Expo. The VAPID private key is
+# server-only; the public key is the only value sent to the browser.
+WEB_PUSH_ENABLED = _env_bool("WEB_PUSH_ENABLED", False)
+WEB_PUSH_VAPID_PUBLIC_KEY = os.getenv("WEB_PUSH_VAPID_PUBLIC_KEY", "").strip()
+WEB_PUSH_VAPID_PRIVATE_KEY = os.getenv("WEB_PUSH_VAPID_PRIVATE_KEY", "").strip()
+WEB_PUSH_VAPID_SUBJECT = os.getenv("WEB_PUSH_VAPID_SUBJECT", "").strip()
+WEB_PUSH_TIMEOUT_SECONDS = float(os.getenv("WEB_PUSH_TIMEOUT_SECONDS", "15"))
+WEB_PUSH_BATCH_SIZE = max(1, min(int(os.getenv("WEB_PUSH_BATCH_SIZE", "100")), 500))
+WEB_PUSH_MAX_ATTEMPTS = 3
+WEB_PUSH_DELIVERY_LEASE_SECONDS = 300
+
+
+def _decode_base64url(value: str) -> bytes:
+    padded = value + "=" * (-len(value) % 4)
+    try:
+        return base64.urlsafe_b64decode(padded.encode("ascii"))
+    except (ValueError, binascii.Error, UnicodeEncodeError) as exc:
+        raise ImproperlyConfigured("Invalid base64url configuration value.") from exc
+
+
+def _validate_web_push_settings() -> None:
+    if not WEB_PUSH_ENABLED:
+        return
+    if not WEB_PUSH_VAPID_PUBLIC_KEY or not WEB_PUSH_VAPID_PRIVATE_KEY:
+        raise ImproperlyConfigured(
+            "WEB_PUSH_ENABLED requires WEB_PUSH_VAPID_PUBLIC_KEY and "
+            "WEB_PUSH_VAPID_PRIVATE_KEY."
+        )
+    public_bytes = _decode_base64url(WEB_PUSH_VAPID_PUBLIC_KEY)
+    if len(public_bytes) != 65 or public_bytes[0] != 0x04:
+        raise ImproperlyConfigured(
+            "WEB_PUSH_VAPID_PUBLIC_KEY must be an uncompressed P-256 public key."
+        )
+    try:
+        from py_vapid import Vapid
+
+        vapid = Vapid.from_string(WEB_PUSH_VAPID_PRIVATE_KEY)
+        from cryptography.hazmat.primitives import serialization
+
+        derived_public = vapid.public_key.public_bytes(
+            serialization.Encoding.X962,
+            serialization.PublicFormat.UncompressedPoint,
+        )
+        if derived_public != public_bytes:
+            raise ImproperlyConfigured(
+                "WEB_PUSH_VAPID_PUBLIC_KEY does not match the private key."
+            )
+    except ImproperlyConfigured:
+        raise
+    except Exception as exc:
+        raise ImproperlyConfigured(
+            "WEB_PUSH_VAPID_PRIVATE_KEY is not a valid P-256 private key."
+        ) from exc
+    if WEB_PUSH_VAPID_SUBJECT:
+        subject = urlsplit(WEB_PUSH_VAPID_SUBJECT)
+        valid_mailto = (
+            subject.scheme == "mailto"
+            and ":" in WEB_PUSH_VAPID_SUBJECT
+            and "@" in WEB_PUSH_VAPID_SUBJECT
+        )
+        valid_https = (
+            subject.scheme == "https"
+            and bool(subject.hostname)
+            and not subject.username
+            and not subject.password
+            and not subject.query
+            and not subject.fragment
+        )
+        if not (valid_mailto or valid_https):
+            raise ImproperlyConfigured(
+                "WEB_PUSH_VAPID_SUBJECT must be a mailto: or HTTPS contact URI."
+            )
+    if WEB_PUSH_TIMEOUT_SECONDS <= 0:
+        raise ImproperlyConfigured("WEB_PUSH_TIMEOUT_SECONDS must be positive.")
+
+
+_validate_web_push_settings()
+
+# Browser passkeys / WebAuthn. Disabled by default so an unconfigured
+# environment never presents a login method it cannot verify.
+WEBAUTHN_ENABLED = _env_bool("WEBAUTHN_ENABLED", False)
+WEBAUTHN_RP_ID = os.getenv("WEBAUTHN_RP_ID", "localhost").strip().lower()
+WEBAUTHN_RP_NAME = os.getenv(
+    "WEBAUTHN_RP_NAME", "Bible Institute Coptic"
+).strip()
+WEBAUTHN_EXPECTED_ORIGIN = os.getenv(
+    "WEBAUTHN_EXPECTED_ORIGIN", "http://localhost:8000"
+).strip().rstrip("/")
+WEBAUTHN_CHALLENGE_TTL_SECONDS = int(
+    os.getenv("WEBAUTHN_CHALLENGE_TTL_SECONDS", "300")
+)
+
+
+def _validate_webauthn_settings() -> None:
+    if not re.fullmatch(r"[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?", WEBAUTHN_RP_ID):
+        raise ImproperlyConfigured(
+            "WEBAUTHN_RP_ID must be a hostname without a scheme or port."
+        )
+    origin = urlsplit(WEBAUTHN_EXPECTED_ORIGIN)
+    if (
+        origin.scheme not in {"http", "https"}
+        or not origin.hostname
+        or origin.username
+        or origin.password
+        or origin.query
+        or origin.fragment
+        or origin.path not in {"", "/"}
+    ):
+        raise ImproperlyConfigured(
+            "WEBAUTHN_EXPECTED_ORIGIN must be an exact origin without a path."
+        )
+    origin_host = origin.hostname.lower()
+    if origin_host != WEBAUTHN_RP_ID and not origin_host.endswith(
+        f".{WEBAUTHN_RP_ID}"
+    ):
+        raise ImproperlyConfigured(
+            "WEBAUTHN_RP_ID must equal or be a parent domain of the expected origin."
+        )
+    if WEBAUTHN_CHALLENGE_TTL_SECONDS <= 0:
+        raise ImproperlyConfigured(
+            "WEBAUTHN_CHALLENGE_TTL_SECONDS must be positive."
+        )
+
+
+if WEBAUTHN_ENABLED:
+    _validate_webauthn_settings()
+
+# Offline media is encrypted in the browser. 0 disables the application-level
+# per-file cap; the browser/OS storage quota remains the hard limit.
+PWA_MEDIA_MAX_BYTES = max(
+    0,
+    int(os.getenv("PWA_MEDIA_MAX_BYTES", "0")),
+)
 
 # Server-side media processing limits. Native FFmpeg runs only in the
 # dedicated media worker; these values are also exposed in the worker's

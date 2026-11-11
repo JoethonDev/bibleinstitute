@@ -1,0 +1,56 @@
+/* Standalone PWA shell styles: no CDN dependencies, safe offline. */
+:root{
+  --pwa-ink:#163c46; --pwa-paper:#fffdf8; --pwa-cream:#f6f1e6;
+  --pwa-line:#e4dccd; --pwa-muted:#65777c; --pwa-teal:#1f4f56;
+  --pwa-gold:#b4863d; --pwa-danger:#9a2f2f; --pwa-success:#2f7a52;
+}
+*{box-sizing:border-box}
+html,body{margin:0;min-height:100%;background:var(--pwa-cream);color:var(--pwa-ink)}
+body{font-family:system-ui,-apple-system,"Segoe UI",Tahoma,sans-serif;line-height:1.6}
+a{color:var(--pwa-teal)}
+button{font:inherit}
+[hidden]{display:none!important}
+.pwa-header{display:flex;align-items:center;justify-content:space-between;gap:1rem;padding:14px clamp(16px,4vw,32px);background:rgba(255,253,248,.94);border-bottom:1px solid var(--pwa-line);position:sticky;top:0;z-index:5}
+.pwa-brand{display:flex;align-items:center;gap:10px;color:var(--pwa-ink);text-decoration:none}
+.pwa-brand img{border-radius:10px}
+.pwa-brand span{display:grid;line-height:1.2}
+.pwa-brand strong{font-size:.95rem}
+.pwa-brand small{font-size:.72rem;color:var(--pwa-muted)}
+.pwa-back{font-size:.82rem;text-decoration:none;border:1px solid var(--pwa-line);border-radius:999px;padding:8px 12px;background:var(--pwa-paper)}
+.pwa-main{width:min(760px,calc(100% - 32px));margin:0 auto;padding:24px 0 72px;display:grid;gap:16px}
+.pwa-card{background:var(--pwa-paper);border:1px solid var(--pwa-line);border-radius:18px;padding:clamp(18px,4vw,28px);box-shadow:0 12px 35px rgba(22,60,70,.06)}
+.pwa-eyebrow{margin:0 0 6px;color:var(--pwa-gold);font-weight:800;letter-spacing:.12em;text-transform:uppercase;font-size:.68rem}
+.pwa-card h1,.pwa-card h2{margin:0 0 8px;line-height:1.25}
+.pwa-card h1{font-size:clamp(1.6rem,5vw,2.2rem)}
+.pwa-card p{color:var(--pwa-muted);margin:0 0 14px}
+.pwa-actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:14px}
+.pwa-btn{display:inline-flex;align-items:center;justify-content:center;min-height:42px;padding:9px 15px;border:1px solid var(--pwa-line);border-radius:999px;background:var(--pwa-paper);color:var(--pwa-ink);font-weight:700;font-size:.85rem;cursor:pointer;text-decoration:none}
+.pwa-btn:hover{background:#f1eadc}
+.pwa-btn:disabled{opacity:.55;cursor:not-allowed}
+.pwa-btn--primary{background:var(--pwa-teal);border-color:var(--pwa-teal);color:#fff}
+.pwa-btn--primary:hover{background:#173f46}
+.pwa-btn--small{min-height:34px;padding:5px 11px;font-size:.76rem}
+.pwa-btn--danger{color:var(--pwa-danger);border-color:#e7c8c8}
+.pwa-status{min-height:1.4em;font-size:.82rem;color:var(--pwa-muted);margin:10px 0 0!important}
+.pwa-storage{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:16px 0 0;padding:0}
+.pwa-storage div{background:#fbf6ec;border:1px solid var(--pwa-line);border-radius:12px;padding:10px}
+.pwa-storage dt{font-size:.68rem;color:var(--pwa-muted);text-transform:uppercase;letter-spacing:.06em}
+.pwa-storage dd{margin:3px 0 0;font-weight:800;font-size:.9rem}
+.pwa-list{display:grid;gap:10px}
+.pwa-item{display:flex;align-items:center;gap:12px;background:var(--pwa-paper);border:1px solid var(--pwa-line);border-radius:16px;padding:14px}
+.pwa-item-icon{width:42px;height:42px;border-radius:10px;background:#e9f0ec;color:var(--pwa-teal);display:grid;place-items:center;font-size:.65rem;font-weight:900;flex:none}
+.pwa-item-copy{min-width:0;display:grid;flex:1}
+.pwa-item-copy strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.9rem}
+.pwa-item-copy small{color:var(--pwa-muted);font-size:.72rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pwa-item-actions{display:flex;gap:6px;flex:none}
+.pwa-empty{text-align:center;padding:36px 22px;border:1px dashed var(--pwa-line);border-radius:18px;background:rgba(255,253,248,.6)}
+.pwa-empty h2{font-size:1.1rem;margin:0 0 4px}
+.pwa-empty p{color:var(--pwa-muted);margin:0 0 14px}
+.pwa-error{border-inline-start:4px solid var(--pwa-danger);background:#fff2f2;border-radius:10px;padding:10px 12px;color:var(--pwa-danger);font-size:.82rem}
+@media (max-width:520px){
+  .pwa-storage{grid-template-columns:1fr}
+  .pwa-item{align-items:flex-start;flex-wrap:wrap}
+  .pwa-item-actions{width:100%;justify-content:flex-end}
+  .pwa-header{padding:12px 16px}
+  .pwa-brand small{display:none}
+}

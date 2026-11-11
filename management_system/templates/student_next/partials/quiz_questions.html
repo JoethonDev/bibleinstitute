@@ -36,7 +36,8 @@
           <label class="sn-field-label" for="question-{{ counter }}-answer">{% translate "Your answer" %}</label>
           <textarea class="sn-field-input sn-field-input--textarea" id="question-{{ counter }}-answer" name="questions[{{ counter }}][answer]" rows="5"></textarea>
         {% elif question.type == "order_events" %}
-          <input type="hidden" name="questions[{{ counter }}][answer]" value="" data-structured-answer data-structured-type="order_events">
+          <textarea class="sn-field-input sn-field-input--textarea" name="questions[{{ counter }}][answer]" rows="4" data-structured-fallback data-structured-type="order_events" placeholder="{% translate 'Type the items in order, separated by |' %}"></textarea>
+          <p class="sn-field-hint">{% translate "Without JavaScript, type the items in the correct order separated by |." %}</p>
           <div class="sn-order" data-order-item-list>
             {% for item in question.exam_items %}
               <div class="sn-order-row" data-order-item-row data-order-label="{{ item }}">
@@ -50,7 +51,8 @@
             {% endfor %}
           </div>
         {% elif question.type == "match_related" %}
-          <input type="hidden" name="questions[{{ counter }}][answer]" value="" data-structured-answer data-structured-type="match_related">
+          <textarea class="sn-field-input sn-field-input--textarea" name="questions[{{ counter }}][answer]" rows="4" data-structured-fallback data-structured-type="match_related" placeholder="{% translate 'Type each pair as Left = Right, one per line' %}"></textarea>
+          <p class="sn-field-hint">{% translate "Without JavaScript, type each pair as Left = Right on its own line." %}</p>
           <div class="sn-match">
             {% for pair in question.exam_pairs %}
               <label class="sn-match-row" data-match-item-row>

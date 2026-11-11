@@ -1,0 +1,66 @@
+{% load static i18n %}<!doctype html>
+<html lang="{{ request.LANGUAGE_CODE|default:'ar' }}" dir="{% if request.LANGUAGE_CODE == 'en' %}ltr{% else %}rtl{% endif %}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#1f4f56">
+  <title>{% translate "Downloaded media" %} | {% translate "Bible Institute" %}</title>
+  <link rel="icon" type="image/png" href="{% static 'pwa/icons/icon-192.png' %}">
+  <link rel="stylesheet" href="{% static 'pwa/pwa.css' %}?v={{ static_asset_version }}">
+</head>
+<body class="pwa-shell" data-account-id="{{ offline_account_id|default:'' }}" data-max-bytes="{{ offline_max_bytes }}" data-validate-url="{% url 'pwa-validate-offline' %}" data-shell-url="{% url 'offline-library' %}">
+  <header class="pwa-header">
+    <a class="pwa-brand" href="{% url 'courses' %}">
+      <img src="{% static 'pwa/icons/icon-192.png' %}" alt="" width="36" height="36">
+      <span><strong>{% translate "Bible Institute" %}</strong><small>{% translate "Downloaded media" %}</small></span>
+    </a>
+    <a class="pwa-back" href="{% url 'courses' %}">{% translate "My learning" %}</a>
+  </header>
+
+  <main class="pwa-main" id="offline-library-root">
+    <section class="pwa-card pwa-intro">
+      <p class="pwa-eyebrow">{% translate "Offline library" %}</p>
+      <h1>{% translate "Your saved audio and PDF files" %}</h1>
+      <p>{% translate "These files are stored encrypted on this device. Unlock once with your device screen lock or biometrics to listen or read without internet." %}</p>
+      <div class="pwa-actions">
+        <button type="button" class="pwa-btn pwa-btn--primary" data-offline-unlock>{% translate "Unlock downloads" %}</button>
+        <button type="button" class="pwa-btn" data-offline-refresh>{% translate "Refresh" %}</button>
+      </div>
+      <p class="pwa-status" data-offline-status role="status" aria-live="polite"></p>
+      <dl class="pwa-storage">
+        <div><dt>{% translate "Saved files" %}</dt><dd data-offline-count>0</dd></div>
+        <div><dt>{% translate "Storage used" %}</dt><dd data-offline-usage>-</dd></div>
+        <div><dt>{% translate "Offline support" %}</dt><dd data-offline-support>{% translate "Checking..." %}</dd></div>
+      </dl>
+    </section>
+
+    <section class="pwa-card" data-offline-locked hidden>
+      <h2>{% translate "Unlock required" %}</h2>
+      <p>{% translate "Confirm with your device screen lock or biometrics before opening saved files." %}</p>
+      <button type="button" class="pwa-btn pwa-btn--primary" data-offline-unlock>{% translate "Unlock downloads" %}</button>
+    </section>
+
+    <section class="pwa-list" data-offline-list aria-live="polite"></section>
+    <div class="pwa-empty" data-offline-empty hidden>
+      <h2>{% translate "No saved files yet" %}</h2>
+      <p>{% translate "Open a lesson audio or PDF and choose Save offline." %}</p>
+      <a class="pwa-btn" href="{% url 'courses' %}">{% translate "Browse lessons" %}</a>
+    </div>
+    <template id="offline-item-template">
+      <article class="pwa-item">
+        <span class="pwa-item-icon" data-item-icon></span>
+        <div class="pwa-item-copy">
+          <strong data-item-title></strong>
+          <small data-item-meta></small>
+        </div>
+        <div class="pwa-item-actions">
+          <button type="button" class="pwa-btn pwa-btn--small" data-item-open>{% translate "Open" %}</button>
+          <button type="button" class="pwa-btn pwa-btn--small pwa-btn--danger" data-item-remove>{% translate "Remove" %}</button>
+        </div>
+      </article>
+    </template>
+  </main>
+
+  <script defer src="{% static 'pwa/offline-library.js' %}?v={{ static_asset_version }}"></script>
+</body>
+</html>

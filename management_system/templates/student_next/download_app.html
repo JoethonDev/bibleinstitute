@@ -1,24 +1,23 @@
 {% extends "student_next/base.html" %}
 {% load i18n %}
-{% block title %}{% translate "Bible Institute app" %} - {% translate "Bible Institute" %}{% endblock %}
+{% block title %}{% translate "Install the student app" %} - {% translate "Bible Institute" %}{% endblock %}
 {% block body %}
 {% include "student_next/partials/alerts.html" %}
 <header class="sn-page-head">
-  <div class="sn-page-head-main"><div class="sn-eyebrow">{% translate "Bible Institute app" %}</div><h1 class="sn-page-title">{% translate "Your courses, in your pocket" %}</h1><p class="sn-page-desc">{% translate "Take lessons, quizzes and notifications with you on Android." %}</p></div>
+  <div class="sn-page-head-main"><div class="sn-eyebrow">{% translate "Student app" %}</div><h1 class="sn-page-title">{% translate "Install the app" %}</h1><p class="sn-page-desc">{% translate "Add the Bible Institute to your home screen. No separate download is needed." %}</p></div>
   <div class="sn-page-actions"><a class="sn-btn sn-btn--ghost" href="{% url 'courses' %}"><svg class="sn-ico" aria-hidden="true"><use href="#i-arrow-left"></use></svg>{% translate "Back to My learning" %}</a></div>
 </header>
+
 <section class="sn-app-hero">
   <div class="sn-app-hero-copy">
-    <span class="sn-kicker"><svg class="sn-ico" aria-hidden="true"><use href="#i-android"></use></svg>{% translate "Android app" %}</span>
+    <span class="sn-kicker"><svg class="sn-ico" aria-hidden="true"><use href="#i-android"></use></svg>{% translate "Installable web app" %}</span>
     <h2>{% translate "Study anywhere." %}<br>{% translate "Stay connected." %}</h2>
-    <p>{% translate "The official Bible Institute app keeps your lessons, quiz alerts and student record close at hand." %}</p>
-    {% if release %}
-    <div class="sn-app-meta"><span><svg class="sn-ico" aria-hidden="true"><use href="#i-android"></use></svg>{% translate "Android app" %}</span><span><svg class="sn-ico" aria-hidden="true"><use href="#i-download"></use></svg>{{ release.file_size|filesizeformat }}</span><span><svg class="sn-ico" aria-hidden="true"><use href="#i-info"></use></svg>{% blocktrans with version=release.version_name %}Version {{ version }}{% endblocktrans %}</span></div>
-    <div class="sn-app-actions"><a class="sn-btn sn-btn--gold" href="{% url 'download-app-file' %}"><svg class="sn-ico" aria-hidden="true"><use href="#i-download"></use></svg>{% translate "Download the app" %}</a><a class="sn-btn sn-btn--ghost" href="#installation"><svg class="sn-ico" aria-hidden="true"><use href="#i-list"></use></svg>{% translate "Installation steps" %}</a></div>
-    <small>{% blocktrans with date=release.created_at|date:"j M Y" %}Updated {{ date }} - Your account and data stay the same.{% endblocktrans %}</small>
-    {% else %}
-    <div class="sn-alert sn-alert--info" role="status"><span class="sn-alert-icon"><svg class="sn-ico" aria-hidden="true"><use href="#i-info"></use></svg></span><div class="sn-alert-copy"><b>{% translate "No app release is available" %}</b><p>{% translate "Please check again later or contact the academic office." %}</p></div></div>
-    {% endif %}
+    <p>{% translate "Install this website for a full-screen app, saved audio and PDFs, and browser notifications. It uses the same student account and stays up to date automatically." %}</p>
+    <div class="sn-app-actions">
+      <button type="button" class="sn-btn sn-btn--gold" data-pwa-install><svg class="sn-ico" aria-hidden="true"><use href="#i-download"></use></svg>{% translate "Install app" %}</button>
+      <a class="sn-btn sn-btn--ghost" href="{% url 'offline-library' %}"><svg class="sn-ico" aria-hidden="true"><use href="#i-book-open"></use></svg>{% translate "Downloaded media" %}</a>
+    </div>
+    <small>{% translate "If the install button does not appear, use your browser menu and choose Install app or Add to Home Screen." %}</small>
   </div>
   <div class="sn-phone" aria-label="{% translate 'Student app preview' %}">
     <div class="sn-phone-bar"></div><div class="sn-phone-screen">
@@ -30,27 +29,22 @@
     </div>
   </div>
 </section>
+
 <div class="sn-layout-main-aside">
   <div class="sn-stack">
-    {% if release and release.release_notes %}
-    <section class="sn-section"><div class="sn-section-head"><div class="sn-section-head-main"><h2><svg class="sn-ico" aria-hidden="true"><use href="#i-sparkle"></use></svg>{% translate "What's new" %}</h2><p>{% translate "Release notes for the current build." %}</p></div></div><div class="sn-release-notes"><div class="sn-release-row"><span><svg class="sn-ico" aria-hidden="true"><use href="#i-list"></use></svg></span><div><b>{% blocktrans with version=release.version_name %}Version {{ version }}{% endblocktrans %}</b><p>{{ release.release_notes|linebreaksbr }}</p></div></div></div></section>
-    {% endif %}
-    <section class="sn-section" id="installation"><div class="sn-section-head"><div class="sn-section-head-main"><h2><svg class="sn-ico" aria-hidden="true"><use href="#i-download"></use></svg>{% translate "Install the app" %}</h2><p>{% translate "Android may ask for permission before installing." %}</p></div></div>
+    <section class="sn-section" id="installation"><div class="sn-section-head"><div class="sn-section-head-main"><h2><svg class="sn-ico" aria-hidden="true"><use href="#i-download"></use></svg>{% translate "Install steps" %}</h2><p>{% translate "Choose your device." %}</p></div></div>
       <div class="sn-steps">
-        <div class="sn-step"><span>1</span><div><b>{% translate "Download the file" %}</b><p>{% translate "Tap Download the app and wait for the APK file to finish downloading." %}</p></div></div>
-        <div class="sn-step"><span>2</span><div><b>{% translate "Find the download" %}</b><p>{% translate "Open your browser downloads or the Files app and select the downloaded file." %}</p></div></div>
-        <div class="sn-step"><span>3</span><div><b>{% translate "Allow installation" %}</b><p>{% translate "If Android asks, allow your browser or Files app to install this app, then continue." %}</p></div></div>
-        <div class="sn-step"><span>4</span><div><b>{% translate "Sign in" %}</b><p>{% translate "Open Bible Institute and use your existing website account." %}</p></div></div>
+        <div class="sn-step"><span>1</span><div><b>{% translate "Android, Chrome or Edge" %}</b><p>{% translate "Open this page, tap Install app, or choose Install app from the browser menu." %}</p></div></div>
+        <div class="sn-step"><span>2</span><div><b>{% translate "iPhone and iPad" %}</b><p>{% translate "Open this page in Safari, tap Share, then Add to Home Screen." %}</p></div></div>
+        <div class="sn-step"><span>3</span><div><b>{% translate "Sign in" %}</b><p>{% translate "Open the installed app and use your existing student account." %}</p></div></div>
+        <div class="sn-step"><span>4</span><div><b>{% translate "Save what you need" %}</b><p>{% translate "Open a lesson audio or PDF and choose Save offline before going offline." %}</p></div></div>
       </div>
     </section>
-    <section class="sn-section"><div class="sn-callout sn-callout--gold"><svg class="sn-ico" aria-hidden="true"><use href="#i-shield"></use></svg><div><b>{% translate "Before you install" %}</b><p>{% translate "Android may show a warning for apps installed outside Google Play. Install only the official file linked from this student page." %}</p></div></div></section>
+    <section class="sn-section"><div class="sn-callout sn-callout--gold"><svg class="sn-ico" aria-hidden="true"><use href="#i-shield"></use></svg><div><b>{% translate "What works offline" %}</b><p>{% translate "Only audio and PDF files you explicitly save are available offline. They are encrypted on this device and unlock with your screen lock or biometrics. Lessons you did not save, quizzes, calendar and forms stay online-only." %}</p></div></section>
   </div>
   <aside class="sn-aside">
-    {% if release %}
-    <section class="sn-card sn-aside-card"><div class="sn-section-head"><div class="sn-section-head-main"><h2><svg class="sn-ico" aria-hidden="true"><use href="#i-file-check"></use></svg>{% translate "Current release" %}</h2><p>{% translate "The latest official Android build." %}</p></div></div><div class="sn-card-body"><div class="sn-release-detail"><div><span>{% translate "Version" %}</span><b>{{ release.version_name }}</b></div><div><span>{% translate "Released" %}</span><b>{{ release.created_at|date:"j M Y" }}</b></div><div><span>{% translate "File size" %}</span><b>{{ release.file_size|filesizeformat }}</b></div><div><span>{% translate "Platform" %}</span><b>{% translate "Android" %}</b></div></div></div></section>
-    {% endif %}
-    <section class="sn-card sn-aside-card"><div class="sn-section-head"><div class="sn-section-head-main"><h2><svg class="sn-ico" aria-hidden="true"><use href="#i-user"></use></svg>{% translate "One account" %}</h2><p>{% translate "Website and app together." %}</p></div></div><div class="sn-card-body"><p class="sn-small-copy">{% translate "The app uses the same student account as the website. Your courses, grades and notifications remain connected to your account." %}</p><div class="sn-card-actions"><a class="sn-btn sn-btn--ghost sn-btn--sm" href="{% url 'courses' %}"><svg class="sn-ico" aria-hidden="true"><use href="#i-book-open"></use></svg>{% translate "Open My learning" %}</a></div></div></section>
-    <section class="sn-card sn-aside-card"><div class="sn-section-head"><div class="sn-section-head-main"><h2><svg class="sn-ico" aria-hidden="true"><use href="#i-help"></use></svg>{% translate "Need help?" %}</h2></div></div><div class="sn-card-body"><p class="sn-small-copy">{% translate "If the download does not start or Android blocks the file, contact the academic office." %}</p></div></section>
+    <section class="sn-card sn-aside-card"><div class="sn-section-head"><div class="sn-section-head-main"><h2><svg class="sn-ico" aria-hidden="true"><use href="#i-bell"></use></svg>{% translate "Notifications" %}</h2><p>{% translate "Optional browser alerts." %}</p></div></div><div class="sn-card-body"><p class="sn-small-copy">{% translate "Turn on lesson, quiz and announcement alerts from the notifications page. iPhone and iPad require iOS or iPadOS 16.4 or later after adding the app to the Home Screen." %}</p><div class="sn-card-actions"><a class="sn-btn sn-btn--ghost sn-btn--sm" href="{% url 'student-notifications' %}">{% translate "Notification settings" %}</a></div></div></section>
+    <section class="sn-card sn-aside-card"><div class="sn-section-head"><div class="sn-section-head-main"><h2><svg class="sn-ico" aria-hidden="true"><use href="#i-book-open"></use></svg>{% translate "Downloaded media" %}</h2></div></div><div class="sn-card-body"><p class="sn-small-copy">{% translate "Your saved audio and PDFs are available on this device even without internet." %}</p><div class="sn-card-actions"><a class="sn-btn sn-btn--ghost sn-btn--sm" href="{% url 'offline-library' %}">{% translate "Open Downloaded media" %}</a></div></div></section>
   </aside>
 </div>
 {% endblock %}

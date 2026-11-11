@@ -8,16 +8,27 @@
   <meta name="robots" content="noindex, nofollow">
   <title>{% block title %}{% translate "Bible Institute Student" %}{% endblock %}</title>
   <link rel="icon" type="image/png" href="{% static 'login-logo.png' %}?v={{ static_asset_version }}">
+  <link rel="manifest" href="{% url 'pwa-manifest' %}?lang={{ request.LANGUAGE_CODE }}">
+  <meta name="theme-color" content="#1f4f56">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="{% translate 'Bible Institute' %}">
+  <link rel="apple-touch-icon" href="{% static 'pwa/icons/apple-touch-icon.png' %}">
+  <meta name="csrf-token" content="{{ csrf_token }}">
+  <link rel="stylesheet" href="{% static 'pwa/actions.css' %}?v={{ static_asset_version }}">
   <link rel="stylesheet" href="{% static 'css/student_next.css' %}?v={{ static_asset_version }}">
   <script src="{% url 'javascript-catalog' %}"></script>
   <script defer src="{% static 'vendor/htmx/htmx-4.0.0.min.js' %}?v={{ static_asset_version }}"></script>
   {% block alpine_components %}{% endblock %}
-  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.13.3/dist/cdn.min.js"></script>
+  <script defer src="{% static 'vendor/alpine/alpine-3.13.3.min.js' %}?v={{ static_asset_version }}"></script>
   <script defer src="{% static 'js/student_next/shell.js' %}?v={{ static_asset_version }}"></script>
   <script defer src="{% static 'js/student_next/notification_center.js' %}?v={{ static_asset_version }}"></script>
+  <script defer src="{% static 'pwa/register.js' %}?v={{ static_asset_version }}"></script>
+  <script defer src="{% static 'pwa/offline-library.js' %}?v={{ static_asset_version }}"></script>
+  <script defer src="{% static 'pwa/push.js' %}?v={{ static_asset_version }}"></script>
   {% block extra_head %}{% endblock %}
 </head>
-<body class="sn-body sn-student sn-page-{{ student_page }}">
+<body class="sn-body sn-student sn-page-{{ student_page }}" data-pwa-enabled="true" data-pwa-account="{{ request.user.pk }}">
   <a class="sn-skip" href="#main">{% translate "Skip to content" %}</a>
   {% include "student_next/partials/icon_sprite.html" %}
   <header class="sn-topbar">
@@ -62,7 +73,7 @@
             {% if request.user.first_name or request.user.last_name %}{{ request.user.first_name|slice:":1"|upper }}{{ request.user.last_name|slice:":1"|upper }}{% else %}{{ request.user.username|slice:":1"|upper }}{% endif %}
           </span>
         </a>
-        <form method="post" action="{% url 'logout' %}" class="sn-logout-form">
+        <form method="post" action="{% url 'logout' %}" class="sn-logout-form" data-pwa-logout>
           {% csrf_token %}
           <button class="sn-icon-btn" type="submit" aria-label="{% translate 'Log out' %}" title="{% translate 'Log out' %}">
             <svg class="sn-ico" aria-hidden="true"><use href="#i-log-out"></use></svg>

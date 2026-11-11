@@ -113,6 +113,17 @@ CELERY_CONCURRENCY|2
 WEB_CONCURRENCY|2
 WEB_THREADS|8
 GUNICORN_TIMEOUT|1800
+WEB_PUSH_ENABLED|false
+WEB_PUSH_VAPID_PUBLIC_KEY|
+WEB_PUSH_VAPID_SUBJECT|
+WEB_PUSH_TIMEOUT_SECONDS|15
+WEB_PUSH_BATCH_SIZE|100
+WEBAUTHN_ENABLED|false
+WEBAUTHN_RP_ID|localhost
+WEBAUTHN_RP_NAME|Bible Institute Coptic
+WEBAUTHN_EXPECTED_ORIGIN|http://localhost:8000
+WEBAUTHN_CHALLENGE_TTL_SECONDS|300
+PWA_MEDIA_MAX_BYTES|0
 SETTINGS
     chmod 600 "$COMPOSE_TMP"
     mv "$COMPOSE_TMP" .compose.env
@@ -155,6 +166,19 @@ write_value DJANGO_TRUSTED_PROXY_IPS "${LMS_NETWORK_SUBNET:-172.31.240.0/24}"
 write_value DJANGO_SITE_DOMAIN "https://$domain"
 write_value MONITORING_DOMAIN "monitor.$domain"
 write_value DEPLOY_HEALTHCHECK_URL "https://${domain}/"
+# PWA defaults are derived from the primary domain unless the operator has
+# already supplied an explicit value in .env. Push/passkey secrets stay in .env;
+# .compose.env receives only domain facts and the public VAPID key.
+write_value WEBAUTHN_RP_ID "$(value_from_tmp WEBAUTHN_RP_ID "$domain")"
+write_value WEBAUTHN_EXPECTED_ORIGIN "$(value_from_tmp WEBAUTHN_EXPECTED_ORIGIN "https://$domain")"
+write_value WEB_PUSH_VAPID_SUBJECT "$(value_from_tmp WEB_PUSH_VAPID_SUBJECT "https://$domain")"
+write_value WEBAUTHN_RP_NAME "$(value_from_tmp WEBAUTHN_RP_NAME "Bible Institute Coptic")"
+write_value WEBAUTHN_ENABLED "$(value_from_tmp WEBAUTHN_ENABLED "false")"
+write_value WEB_PUSH_ENABLED "$(value_from_tmp WEB_PUSH_ENABLED "false")"
+write_value WEB_PUSH_TIMEOUT_SECONDS "$(value_from_tmp WEB_PUSH_TIMEOUT_SECONDS "15")"
+write_value WEB_PUSH_BATCH_SIZE "$(value_from_tmp WEB_PUSH_BATCH_SIZE "100")"
+write_value WEBAUTHN_CHALLENGE_TTL_SECONDS "$(value_from_tmp WEBAUTHN_CHALLENGE_TTL_SECONDS "300")"
+write_value PWA_MEDIA_MAX_BYTES "$(value_from_tmp PWA_MEDIA_MAX_BYTES "0")"
 echo ""
 
 # -- 2. PostgreSQL ------------------------------------------------------

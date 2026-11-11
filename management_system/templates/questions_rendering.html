@@ -104,7 +104,8 @@
                                 </div>
                             {% elif mode == "exam" or mode == "preview" %}
                                 <label class="fw-semibold mb-2 sd-chip sd-question-label"><i class="fas fa-arrow-up-wide-short"></i> {% translate "Order Events" %}</label>
-                                <input type="hidden" name="questions[{{ counter }}][answer]" value="" data-structured-answer data-structured-type="order_events">
+                                <textarea class="form-control mb-2" name="questions[{{ counter }}][answer]" rows="4" data-structured-fallback data-structured-type="order_events" placeholder="{% translate 'Type the items in order, separated by |' %}"></textarea>
+                                <small class="form-text text-muted mb-2">{% translate "Without JavaScript, type the items in the correct order separated by |." %}</small>
                                 <div class="structured-list mb-2 w-100" data-order-item-list>
                                 {% for item in question.exam_items %}
                                     <div class="sd-order-row" data-order-item-row data-order-label="{{ item }}">
@@ -166,7 +167,8 @@
                                 </div>
                             {% elif mode == "exam" or mode == "preview" %}
                                 <label class="fw-semibold mb-2 sd-chip sd-question-label"><i class="fas fa-link"></i> {% translate "Match Related" %}</label>
-                                <input type="hidden" name="questions[{{ counter }}][answer]" value="" data-structured-answer data-structured-type="match_related">
+                                <textarea class="form-control mb-2" name="questions[{{ counter }}][answer]" rows="4" data-structured-fallback data-structured-type="match_related" placeholder="{% translate 'Type each pair as Left = Right, one per line' %}"></textarea>
+                                <small class="form-text text-muted mb-2">{% translate "Without JavaScript, type each pair as Left = Right on its own line." %}</small>
                                 {% for pair in question.exam_pairs %}
                                     <div class="sd-match-row" data-match-item-row data-match-left="{{ pair.left }}">
                                         <span class="sd-match-key">{{ pair.left }}</span>

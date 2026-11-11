@@ -92,20 +92,21 @@ def user_has_management_role(user) -> bool:
     return bool(user.role and user.role.role in MANAGEMENT_ROLES)
 
 
-def get_student_quiz_status(quiz, user, current_time=None):
+def get_student_quiz_status(quiz, user, current_time=None, *, opening=None, opening_loaded=False):
     """
     Return the student's current quiz mode using the same rule set everywhere.
     """
     current_time = ensure_aware(current_time or now())
     grade = Grade.objects.filter(user=user, quiz=quiz).first()
-    opening = QuizStudentOpening.objects.filter(quiz=quiz, student=user).first()
+    if not opening_loaded and opening is None:
+        opening = QuizStudentOpening.objects.filter(quiz=quiz, student=user).first()
     snapshot = QuizAnswerSnapshot.objects.filter(quiz=quiz, user=user).first()
     mode, grade = quiz_attempt_status_from(
         quiz,
         grade,
         opening,
         current_time,
-        is_quiz_in_user_window(quiz, user),
+        None if grade is not None else is_quiz_in_user_window(quiz, user),
         snapshot,
     )
     return mode, grade, snapshot

@@ -21,7 +21,7 @@ def build_quiz_presentation_context(quiz_context: dict, *, user=None) -> dict:
     context["question_count"] = (
         len(questions)
         if mode in {"exam", "view", "closed_unsolved"}
-        else quiz.questions.count()
+        else getattr(quiz, "question_total", None) or quiz.questions.count()
     )
     score_percent = (
         round(100 * (context["total_grade"] or 0) / quiz.total_grade)

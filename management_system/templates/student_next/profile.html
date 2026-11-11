@@ -1,5 +1,5 @@
 {% extends "student_next/base.html" %}
-{% load i18n %}
+{% load i18n static %}
 {% translate "Profile completeness" as profile_health_label %}
 {% block title %}{% translate "Your student record" %} - {% translate "Bible Institute" %}{% endblock %}
 {% block body %}
@@ -186,7 +186,9 @@
         </div>
       </section>
       {% endif %}
+      {% include "partials/passkey_security.html" %}
     </aside>
   </div>
 </div>
+<script defer src="{% static 'pwa/passkeys.js' %}?v={{ static_asset_version }}"></script>
 {% endblock %}

@@ -40,6 +40,9 @@ session logs and old proposals are in [the archive](docs/archive/README.md).
 | [management_system/academic_access.py](management_system/academic_access.py) | Read/write offering eligibility and canonical enrollment predicates. |
 | [management_system/calendar_grid.py](management_system/calendar_grid.py) | Canonical month-grid day shape and event agenda shared by admin and student calendars. |
 | [management_system/student_experience](management_system/student_experience) | Authenticated student mode resolver, new-shell adapter, bounded page contexts, profile builder and quiz presentation builder; reuses canonical student access/progress data. |
+| [management_system/pwa_views.py](management_system/pwa_views.py), pwa_urls.py | Student PWA install/manifest/service-worker, offline-library page, authorized encrypted-audio/PDF save endpoint, Web Push subscription API and passkey HTTP endpoints. |
+| [management_system/passkey_auth.py](management_system/passkey_auth.py) | WebAuthn challenge store, registration/assertion verification, credential lifecycle and fresh-auth policy. |
+| [management_system/web_push.py](management_system/web_push.py), web_push_tasks.py | Bounded browser Web Push materialization/delivery/retry; Expo delivery stays in mobile_push.py. |
 | [management_system/management/commands/student_experience_mode.py](management_system/management/commands/student_experience_mode.py) | Operator command for per-account override and global student UI rollout; admins can also use the Users detail card or the global Site & Apps page. |
 | management_system/academic_*.py | Enrollment/decisions, copy, formula normalization and academic evaluation/promotion. See reuse map. |
 | [management_system/utils](management_system/utils) | Validators, attendance/report/query/localization/storage helpers. The adjacent all-comment utils.py is not this active package. |
@@ -61,8 +64,8 @@ session logs and old proposals are in [the archive](docs/archive/README.md).
 
 ## 3. Academic model meaning
 
-The complete [model catalog](docs/reference/MODEL_MAP.md) covers all 62 current
-model classes, declared fields, 127 relationships, enums and named constraints/
+The complete [model catalog](docs/reference/MODEL_MAP.md) covers the current
+model classes, declared fields, relationships, enums and named constraints/
 indexes without reading a database. Use it for exact field navigation; inspect
 models.py clean/save/constraints and the domain owner before writing.
 
@@ -145,6 +148,10 @@ covered_message_ids, sending bot_config),
   MobileAppRelease, MobileAppUpdatePolicy, MobileDownloadPolicy and StudentBanner.
   `StudentBanner.severity` (critical/warning/info) drives the new-mode alert
   stack; legacy mode keeps the rotating three-banner strip.
+- Browser PWA/passkeys: WebPushSubscription, WebPushDelivery, WebAuthnCredential.
+  These are separate from MobilePushDevice/PushDelivery and
+  MobileBiometricCredential; Expo receipts and native biometric credentials are
+  unchanged.
 
 ## 4. Reuse before implementation
 
@@ -197,7 +204,9 @@ approved or efficient. Prefer the owners above; inspect callers before reuse.
 | Media management/automation | views.py media_job_*; automation_urls.py/automation_api.py | media_processing/storage/tasks and MediaProcessingJob; client reference manual. `_media_job_ui_state`/`_serialize_media_job` expose the persisted row (status, phase, percent, outputs, attachment, staging, cleanup) and apply the Redis progress hash only for the current attempt of an active job; the drawer renders that same state with the row's can_* action gates. |
 | Attendance | views.py scanner/scan_preview/record_attendance/correction | capability, token, meeting scope, utils.attendance, policy and schedule. The scanner page posts `/scan/<token>/<action>/` with fetch while the camera keeps running: entrance is the default mode, an exit toggle arms exit for one scan then resets, and the JSON answer carries the resolved student and course for the in-page banner. A decoded code is cached client-side for five seconds; the server still owns duplicate rejection. |
 | Reporting/exports | views.py export_* / report dashboard | utils.reports, report_export.py, xlsx_export.py and matrix modules; whole-scope evaluation and report workbook exports run on the J01 ledger with owner/admin private-artifact downloads, while CSV stays a bounded streaming response. |
-| Announcements/Telegram/push | notification_views.py, telegram_views.py; gallery_views.py for gallery | student_notifications.py and announcement fan-out; notification_history.py for saved per-recipient content/outcomes; notification_redelivery.py for admin retry/resend ledger work; telegram/broadcasts.py and channel-specific provider tasks. Recheck source/recipient eligibility at enqueue and delayed provider boundaries. |
+| Announcements/Telegram/push | notification_views.py, telegram_views.py; gallery_views.py for gallery | student_notifications.py and announcement fan-out; notification_history.py for saved per-recipient content/outcomes; notification_redelivery.py for admin retry/resend ledger work; telegram/broadcasts.py and channel-specific provider tasks. Recheck source/recipient eligibility at enqueue and delayed provider boundaries. Browser Web Push reuses StudentNotification and has its own `web_push.py` sender, VAPID settings and bounded delivery ledger. |
+| Student PWA/offline media | pwa_views.py, pwa_urls.py, pwa/pwa_urls templates and static/pwa | Root manifest/service-worker, student-only install shell, encrypted IndexedDB/Cache Storage library, local WebAuthn unlock, full audio/PDF save through media_delivery plus MobileDownloadPolicy, and online access-revalidation. Dynamic pages and authenticated HTML stay network-only. |
+| Passkeys | passkey_auth.py, passkey sections in login/profile | WebAuthn options/verification for all browser roles, discoverable resident credentials, one-use cached challenges, fresh-auth gate for add/revoke, password recovery unchanged. |
 | App releases/banners | portal_views.py | MobileAppRelease/UpdatePolicy/DownloadPolicy/StudentBanner, portal templates, API version/download response contracts. |
 
 Root routes in [learning_platform/urls.py](learning_platform/urls.py): localized
@@ -229,6 +238,18 @@ route modules for exact names/payloads.
   keep their legacy templates as the default until the per-account or global
   mode is changed. `StudentExperienceMiddleware` is the single public-page
   navigation guard for new-mode students.
+- Student PWA assets are standalone and offline-safe: `static/pwa/` owns the
+  manifest icons, `pwa.css`, registration, passkey/push clients and the
+  encrypted offline library. `/manifest.webmanifest` and `/service-worker.js`
+  are root routes; the worker caches only public shell assets and returns the
+  generic offline shell for `/offline-library/`. No authenticated HTML, API
+  response, form, quiz, cookie or signed media URL is cached.
+- Alpine 3.13.3 is vendored at
+  `static/vendor/alpine/alpine-3.13.3.min.js`; base, new-student and admin
+  shells load the local file. Student structured ordering/matching answers
+  keep a no-JS textarea fallback (`|`-separated order, `Left = Right` match
+  lines); the shared quiz runtime upgrades it to the hidden JSON field only
+  after JavaScript loads.
 - Admin static CSS: `static/css/admin_workspace.css` loads last on admin pages
   only and owns the `aw-*` tokens/components under the `body.aw-admin` theme
   owner (including overlays); `app_admin.css` keeps the legacy `ad-*` layer for

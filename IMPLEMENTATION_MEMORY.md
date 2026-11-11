@@ -8,6 +8,101 @@ Earlier detailed evidence is preserved in the
 and the [5 November archive](docs/archive/2026-11-05/history/IMPLEMENTATION_MEMORY.md).
 Historical open/done statements there are superseded by the current disposition.
 
+## PWA, offline library, Web Push and passkeys (11 November 2026)
+
+Implemented `docs/pending/PWA_OFFLINE_LIBRARY_PUSH_PASSKEY_SPEC.md`:
+
+- Root `/manifest.webmanifest`, `/service-worker.js` and localized
+  `/offline-library/`, `/pwa/offline-shell/` routes. The service worker caches
+  only public shell assets and serves a generic offline shell; every other
+  navigation/API/media request is network-only. Student shell, login page and
+  app page register the PWA. The old APK/Download-the-app UI is removed from
+  both student shells; the release record and admin history remain, but no
+  student link points at the APK.
+- Audio/PDF offline saves use `management_system.pwa_views.pwa_save_media`,
+  which reuses `media_delivery.resolve_media_link`,
+  `open_audio_download`/`open_book_document`, and
+  `MobileDownloadPolicy.in_app_download_enabled`. The browser encrypts bytes
+  with a non-extractable AES-GCM key in IndexedDB, stores only ciphertext in a
+  per-account Cache Storage bucket, and requires a local WebAuthn user
+  verification before reads. Metadata stays in IndexedDB; `/offline-library/`
+  revalidates access online and removes revoked entries. Logout clears local
+  media and deactivates server push subscriptions; account switches clear the
+  prior partition.
+- Browser Web Push is independent of Expo: `WebPushSubscription` and
+  `WebPushDelivery`, VAPID settings, authenticated subscribe/unsubscribe/status
+  endpoints, a generic lock-screen payload, and a 15-second Celery beat task.
+  `StudentNotification` stays the logical source; no grades/content are sent.
+- Passkeys use Duo Labs `webauthn`: discoverable resident credentials, one-use
+  cached challenges, exact RP ID/origin verification, user verification,
+  signature/counter checks, multiple named credentials per account and a
+  fresh-auth gate for add/revoke. The login page offers passkey sign-in for all
+  browser roles; profile/account security has enrollment and revocation. The
+  password path and password recovery are unchanged.
+- Dependencies approved by the user: `pywebpush==2.5.0` and
+  `webauthn==3.0.1`; settings/env/compose fields added. Migration
+  `0120_pwa_push_passkey` is additive and was applied/reversed/re-applied on a
+  disposable PostgreSQL 16 database.
+- Query budgets were re-measured on a disposable PostgreSQL dataset with
+  100,002 users and 120,003 notifications: notifications fell from 8 to 6
+  total statements (3 view statements, target <=4) and the cursor fragment
+  from 7 to 4 (1 view statement, target <=3); quiz ready/result fell from
+  18/17 to 10/10 (7 view statements, target <=10). Evidence:
+  `docs/pending/STUDENT_VIEW_QUERY_BUDGET_EVIDENCE.md`. Migration `0121`
+  adds student/history indexes.
+- Structured ordering/matching answers no longer require JavaScript: the
+  exam templates render textarea fallbacks (`A | B` order, `Left = Right`
+  lines); the shared runtime upgrades them to the hidden JSON field when JS
+  runs. No-JS submission was graded 10/10 on the seeded quiz.
+- Alpine 3.13.3 is vendored locally at
+  `static/vendor/alpine/alpine-3.13.3.min.js`; the old jsDelivr URLs were
+  removed from all three shells. Browser verification showed Alpine 3.13.3
+  active and zero CDN requests.
+- `PWA_MEDIA_MAX_BYTES=0` means no application-level per-file cap; the browser
+  and operating-system storage quota remains the hard limit. Offline files are
+  still stored only on the device (encrypted Cache Storage plus IndexedDB
+  metadata/key), and the browser is asked for persistent storage. The current
+  encryption path buffers one complete file before encryption.
+- `deploy/setup_env.sh` copies the non-secret PWA/WebAuthn settings and the
+  public VAPID key into `.compose.env`; the private VAPID key remains only in
+  `.env`. `compose.application.yml` no longer overrides the private key from
+  Compose interpolation, so it reaches the app through the `.env` service
+  env_file and is not blanked when `.compose.env` is used.
+
+Query-budget evidence (disposable PostgreSQL 16, 100,002 users, 120,003
+notifications for one student):
+
+| Path | Before | After | Median | View statements | Target |
+|---|---:|---:|---:|---:|---:|
+| `/en/notifications/` | 8 | 6 | 35.6 ms | 3 | <=4 |
+| `?fragment=1` cursor | 7 | 4 | 9.1 ms | 1 | <=3 |
+| notification panel | 5 | 5 | 27.4 ms | 2 | n/a |
+| quiz ready | 18 | 10 | 16.0 ms | 7 | <=10 |
+| quiz result | 17 | 10 | 15.7 ms | 7 | <=10 |
+
+Total counts include session, auth user and role; the notification page also
+includes one shell banner. The plan budgets are view statements. Migration
+`0121_notification_student_indexes` adds `(student, -created_at, -id)` and
+`(student, notification_type, -created_at)` indexes. `EXPLAIN ANALYZE` on the
+adversarial 120k-one-student count used a parallel sequential scan at 23.3 ms
+(4163 shared buffers); the 20-row page used the new student index at 0.039 ms
+(4 buffers). The full disposable audit report is under
+`%TEMP%\student-audit\`; the tracked summary is in
+`docs/pending/STUDENT_VIEW_IMPLEMENTATION_AUDIT.md`.
+- Verification: `manage.py check`, `makemigrations --check`, template compile,
+  JS syntax, `msgfmt -c`, `audit_text_encoding`, disposable PostgreSQL
+  migration rehearsal, browser service-worker/manifest checks, encrypted
+  offline save with a synthetic push/media route and virtual authenticator,
+  offline navigation/decryption, passkey registration/login, and mocked Web
+  Push delivery all pass. Real provider delivery, production HTTPS origins,
+  iOS Safari, and real R2 media still require device/staging verification.
+
+Known limits: audio/PDF decryption is best-effort device protection, not DRM;
+the APK backend route still exists but is not linked; VAPID keys must be
+generated per environment before enabling push; passkey endpoints require the
+exact configured origin and RP ID; no PostgreSQL `EXPLAIN` was needed because
+the new delivery/credential reads are bounded by limit/index.
+
 ## Repair unit (11 November 2026) - opt-in new student UI
 
 Repaired the new `student_next` experience after the audit above. The global mode

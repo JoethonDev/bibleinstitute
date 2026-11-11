@@ -43,6 +43,7 @@
         </div>
       </div>
       {% if part.download_url %}<a class="sn-btn sn-btn--ghost sn-btn--sm" href="{{ part.download_url }}"><svg class="sn-ico" aria-hidden="true"><use href="#i-download"></use></svg>{% translate "Download audio" %}</a>{% endif %}
+      {% include "partials/pwa_save_button.html" with offering_id=offering_id lesson_id=lesson_id file_index=part.file_index title=part.name media_type="audio" %}
     </div>
     <p class="sn-media-caption"><svg class="sn-ico" aria-hidden="true"><use href="#i-info"></use></svg>{% translate "Listen on the go. The download is available for offline study." %}</p>
     {% else %}
@@ -63,6 +64,7 @@
       </div>
       <div class="pdf-stage sn-pdf-stage" tabindex="0" aria-label="{% translate 'PDF page' %}"><canvas class="pdf-canvas"></canvas></div>
     </div>
+    {% include "partials/pwa_save_button.html" with offering_id=offering_id lesson_id=lesson_id file_index=part.file_index title=part.name media_type="pdf" %}
     <p class="sn-media-caption"><svg class="sn-ico" aria-hidden="true"><use href="#i-info"></use></svg>{% translate "The handout uses the same viewer controls as the rest of your lessons." %}</p>
     {% endif %}
   </article>

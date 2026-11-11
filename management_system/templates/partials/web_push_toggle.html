@@ -1,0 +1,16 @@
+{% load i18n %}
+<div class="pwa-push-card" data-push-root
+     data-status-url="{% url 'web-push-status' %}"
+     data-subscribe-url="{% url 'web-push-subscribe' %}"
+     data-unsubscribe-url="{% url 'web-push-unsubscribe' %}"
+     data-vapid-public-key="{{ web_push_vapid_public_key }}">
+  <div class="pwa-push-copy">
+    <strong>{% translate "Browser notifications" %}</strong>
+    <span>{% translate "Get lesson, quiz and announcement alerts on this device. You can turn them off at any time." %}</span>
+  </div>
+  <div class="pwa-push-actions">
+    <button type="button" class="pwa-install-button" data-push-enable>{% translate "Enable notifications" %}</button>
+    <button type="button" class="pwa-save-button" data-push-disable hidden>{% translate "Disable notifications" %}</button>
+  </div>
+  <p class="pwa-install-note" data-push-status role="status" aria-live="polite"></p>
+</div>

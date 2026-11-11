@@ -44,6 +44,17 @@
                             </button>
                         </div>
                     </form>
+                    {% if webauthn_enabled %}
+                    <div class="text-center mt-3" data-passkey-login
+                         data-options-url="{% url 'passkey-login-options' %}"
+                         data-verify-url="{% url 'passkey-login-verify' %}"
+                         data-next="{{ request.GET.next|default:'' }}">
+                      <button type="button" class="sd-btn sd-btn--teal-outline btn-sm" data-passkey-login-button hidden>
+                        <i class="fas fa-fingerprint me-2"></i>{% translate "Sign in with a passkey" %}
+                      </button>
+                      <p class="ps-muted-text small mt-2 mb-0" data-passkey-login-status role="status" aria-live="polite"></p>
+                    </div>
+                    {% endif %}
                     <p class="text-center mt-3 mb-0">
                         <a href="{% url 'password_reset' %}">{% translate "Forgot password?" %}</a>
                     </p>
@@ -53,4 +64,5 @@
     </div>
 </div>
 </section>
+<script defer src="{% static 'pwa/passkeys.js' %}?v={{ static_asset_version }}"></script>
 {% endblock %}

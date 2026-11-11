@@ -8,6 +8,7 @@
     <div class="sn-page-head-main"><div class="sn-eyebrow">{% translate "Notifications" %}</div><h1 class="sn-page-title">{% translate "Stay up to date" %}</h1><p class="sn-page-desc">{% translate "Lesson updates, quiz openings, and institute announcements." %}</p></div>
     {% if unread_count %}<div class="sn-page-actions"><form method="post" action="{{ read_all_url }}" data-notification-read-all>{% csrf_token %}<button type="submit" class="sn-btn sn-btn--ghost"><svg class="sn-ico" aria-hidden="true"><use href="#i-check"></use></svg>{% translate "Mark all as read" %}</button></form></div>{% endif %}
   </header>
+  {% if web_push_enabled %}{% include "partials/web_push_toggle.html" %}{% endif %}
   <div class="sn-notif-toolbar">
     <nav class="sn-filter-tabs" aria-label="{% translate 'Notification filter' %}">
       {% for tab in filter_tabs %}

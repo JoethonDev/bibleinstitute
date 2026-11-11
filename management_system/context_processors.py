@@ -60,6 +60,24 @@ def graduation_gallery_visibility(request):
     return {"show_graduation_gallery": _memoized(request, "_show_graduation_gallery", compute)}
 
 
+def pwa_settings(request):
+    """Expose browser capability switches and the public VAPID key only."""
+    user = getattr(request, "user", None)
+    is_student = bool(
+        user
+        and user.is_authenticated
+        and getattr(getattr(user, "role", None), "role", None) == "student"
+    )
+    return {
+        "pwa_enabled": is_student,
+        "web_push_enabled": bool(is_student and settings.WEB_PUSH_ENABLED),
+        "web_push_vapid_public_key": (
+            settings.WEB_PUSH_VAPID_PUBLIC_KEY if is_student else ""
+        ),
+        "webauthn_enabled": bool(settings.WEBAUTHN_ENABLED),
+    }
+
+
 def student_banners(request):
     """Expose the latest active banner strips for signed-in student pages."""
 

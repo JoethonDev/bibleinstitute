@@ -1022,14 +1022,26 @@ def student_notification_data(
     *,
     kind: str | None = None,
     unread: bool = False,
+    total_count: int | None = None,
+    unread_count: int | None = None,
 ) -> tuple[Page, int]:
+    """Return one inbox page and the total unread count.
+
+    The new student inbox computes all tab counts once; passing those totals
+    removes two redundant COUNT statements from the page request.
+    """
     queryset = filtered_student_notifications_queryset(
         user,
         kind=kind,
         unread=unread,
     ).order_by("-created_at", "-pk")
-    page_obj = Paginator(queryset, PAGE_SIZE).get_page(page)
-    return page_obj, unread_notification_count(user)
+    paginator = Paginator(queryset, PAGE_SIZE)
+    if total_count is not None:
+        paginator.count = max(0, int(total_count))
+    page_obj = paginator.get_page(page)
+    if unread_count is None:
+        unread_count = unread_notification_count(user)
+    return page_obj, unread_count
 
 
 def student_notification_cursor_page(

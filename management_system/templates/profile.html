@@ -374,8 +374,11 @@
             </div>
             {% endif %}
 
+            {% include "partials/passkey_security.html" %}
+
         </div>
     </div>
 </div>
 </div>
+<script defer src="{% static 'pwa/passkeys.js' %}?v={{ static_asset_version }}"></script>
 {% endblock %}

@@ -43,6 +43,8 @@ from .utils.helpers import (
     render_page,
 )
 from .utils.student_data import (
+    PAGE_SIZE as STUDENT_NOTIFICATION_PAGE_SIZE,
+    filtered_student_notifications_queryset,
     localized_notification_text,
     student_notification_cursor_page,
     student_notification_data,
@@ -275,14 +277,15 @@ def student_notifications(request):
                 unread=only_unread if student_next else False,
             )
         else:
-            first_page, unused_unread_count = student_notification_data(
-                request.user,
-                1,
-                kind=filter_kind if student_next else None,
-                unread=only_unread if student_next else False,
+            first_rows = list(
+                filtered_student_notifications_queryset(
+                    request.user,
+                    kind=filter_kind if student_next else None,
+                    unread=only_unread if student_next else False,
+                ).order_by("-created_at", "-pk")[: STUDENT_NOTIFICATION_PAGE_SIZE + 1]
             )
-            notifications = list(first_page.object_list)
-            has_more = first_page.has_next()
+            notifications = first_rows[:STUDENT_NOTIFICATION_PAGE_SIZE]
+            has_more = len(first_rows) > STUDENT_NOTIFICATION_PAGE_SIZE
         if student_next:
             return render(
                 request,
@@ -318,11 +321,22 @@ def student_notifications(request):
         page_number = max(1, int(request.GET.get("page", 1)))
     except (TypeError, ValueError):
         page_number = 1
+    filter_counts = _student_inbox_counts(request) if student_next else None
     page_obj, unread_count = student_notification_data(
         request.user,
         page_number,
         kind=filter_kind if student_next else None,
         unread=only_unread if student_next else False,
+        total_count=(
+            filter_counts.get(selected_filter)
+            if student_next and filter_counts
+            else None
+        ),
+        unread_count=(
+            filter_counts.get("unread")
+            if student_next and filter_counts
+            else None
+        ),
     )
     notifications = list(page_obj.object_list)
     next_url = _notification_cursor_url(
@@ -351,7 +365,7 @@ def student_notifications(request):
             "selected_filter": selected_filter,
             "filter_tabs": _student_inbox_filter_values(
                 selected_filter,
-                _student_inbox_counts(request),
+                filter_counts,
             ),
         })
         return render_student_page(

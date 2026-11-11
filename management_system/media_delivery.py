@@ -69,6 +69,14 @@ class AudioDownload:
 
 
 @dataclass(frozen=True)
+class AudioDownloadStream:
+    body: Any
+    content_type: str
+    content_length: int | None
+    filename: str
+
+
+@dataclass(frozen=True)
 class BookDocumentStream:
     body: Any
     status_code: int
@@ -306,6 +314,44 @@ def resolve_audio_download(
         logger.exception("Error generating downloadable audio URL for lesson %s", media.lesson.pk)
         raise MediaAccessError("unavailable", _("Download is temporarily unavailable."))
     return AudioDownload(url=download_url)
+
+
+def open_audio_download(
+    *,
+    media: MediaLink,
+    cloud_client,
+    bucket_name: str,
+) -> AudioDownloadStream:
+    """Open the complete downloadable audio object for a same-origin PWA save."""
+    if media.file_type != "audio":
+        raise MediaAccessError("invalid_media", _("Invalid media file."))
+    manifest_key = media.media_key
+    download_key = media.link.get("download_id") or downloadable_audio_key(manifest_key)
+    valid, errors = validate_downloadable_audio_key(download_key or "")
+    if (
+        not valid
+        or is_private_storage_key(download_key)
+        or download_key != downloadable_audio_key(manifest_key)
+    ):
+        logger.warning(
+            "Invalid downloadable audio metadata for lesson %s link %s: %s",
+            media.lesson.pk,
+            media.file_index,
+            errors,
+        )
+        raise MediaAccessError("invalid_media", _("Invalid media file."))
+    filename = re.sub(r"[^A-Za-z0-9._-]+", "_", posixpath.basename(download_key)) or "audio.mp3"
+    try:
+        response = cloud_client.get_object(Bucket=bucket_name, Key=download_key)
+    except Exception:  # noqa: BLE001 - provider boundary
+        logger.exception("Error opening downloadable audio for lesson %s", media.lesson.pk)
+        raise MediaAccessError("unavailable", _("Download is temporarily unavailable."))
+    return AudioDownloadStream(
+        body=response["Body"],
+        content_type="audio/mpeg",
+        content_length=response.get("ContentLength"),
+        filename=filename,
+    )
 
 
 def build_manifest_playlist(

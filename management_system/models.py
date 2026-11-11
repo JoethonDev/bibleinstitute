@@ -7,7 +7,9 @@ from django.db.models import Case, F, Q, Value, When
 from django.utils import timezone
 from django.utils.timezone import now
 from datetime import date, datetime, time, timedelta
+import hashlib
 import json
+import re
 import uuid
 from django.utils.translation import gettext_lazy as _
 from django.utils import translation
@@ -908,6 +910,14 @@ class StudentNotification(models.Model):
                 name="student_notif_push_due_idx",
             ),
             models.Index(fields=["-created_at", "-id"], name="notif_history_recent_idx"),
+            models.Index(
+                fields=["student", "-created_at", "-id"],
+                name="notif_history_student_idx",
+            ),
+            models.Index(
+                fields=["student", "notification_type", "-created_at"],
+                name="notif_history_student_type_idx",
+            ),
             models.Index(fields=["notification_type", "entity_id", "offering_id"], name="notif_history_event_idx"),
             GinIndex(OpClass(SearchNormalize("title_ar"), name="gin_trgm_ops"), name="notif_history_title_ar_idx"),
             GinIndex(OpClass(SearchNormalize("title_en"), name="gin_trgm_ops"), name="notif_history_title_en_idx"),
@@ -979,6 +989,168 @@ class PushDelivery(models.Model):
 
     def __str__(self):
         return f"Push delivery {self.notification_id}/{self.device_id}"
+
+
+class WebPushSubscription(models.Model):
+    """One browser PushSubscription for a signed-in account and language."""
+
+    class Language(models.TextChoices):
+        ARABIC = "ar", _("Arabic")
+        ENGLISH = "en", _("English")
+
+    user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name="web_push_subscriptions",
+    )
+    endpoint = models.TextField()
+    endpoint_hash = models.CharField(max_length=64)
+    p256dh = models.CharField(max_length=255)
+    auth = models.CharField(max_length=255)
+    language = models.CharField(
+        max_length=2,
+        choices=Language.choices,
+        default=Language.ARABIC,
+    )
+    user_agent = models.CharField(max_length=255, blank=True, default="")
+    is_active = models.BooleanField(default=True)
+    disabled_at = models.DateTimeField(null=True, blank=True)
+    last_success_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["user", "endpoint_hash"],
+                name="web_push_subscription_user_endpoint_unique",
+            ),
+            models.CheckConstraint(
+                condition=(
+                    models.Q(is_active=True, disabled_at__isnull=True)
+                    | models.Q(is_active=False, disabled_at__isnull=False)
+                ),
+                name="web_push_subscription_active_state_consistent",
+            ),
+        ]
+        indexes = [
+            models.Index(
+                fields=["user", "is_active"],
+                name="web_push_user_active_idx",
+            ),
+            models.Index(
+                fields=["is_active", "language"],
+                name="web_push_active_language_idx",
+            ),
+        ]
+
+    def save(self, *args, **kwargs):
+        self.endpoint_hash = hashlib.sha256(
+            (self.endpoint or "").encode("utf-8")
+        ).hexdigest()
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.user.username} web push ({self.language})"
+
+
+class WebPushDelivery(models.Model):
+    """Per-subscription Web Push state for one durable notification."""
+
+    class Status(models.TextChoices):
+        QUEUED = "queued", _("Queued")
+        SENDING = "sending", _("Sending")
+        DELIVERED = "delivered", _("Delivered")
+        FAILED = "failed", _("Failed")
+        SKIPPED = "skipped", _("Skipped")
+
+    notification = models.ForeignKey(
+        StudentNotification,
+        on_delete=models.CASCADE,
+        related_name="web_push_deliveries",
+    )
+    subscription = models.ForeignKey(
+        WebPushSubscription,
+        on_delete=models.CASCADE,
+        related_name="deliveries",
+    )
+    status = models.CharField(
+        max_length=16,
+        choices=Status.choices,
+        default=Status.QUEUED,
+    )
+    error_code = models.CharField(max_length=80, blank=True, default="")
+    error_message = models.CharField(max_length=500, blank=True, default="")
+    attempt_count = models.PositiveSmallIntegerField(default=0)
+    next_attempt_at = models.DateTimeField(default=timezone.now)
+    last_attempt_at = models.DateTimeField(null=True, blank=True)
+    delivered_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["notification", "subscription"],
+                name="web_push_delivery_notification_subscription_unique",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(attempt_count__gte=0) & models.Q(attempt_count__lte=3),
+                name="web_push_delivery_attempts_bounded",
+            ),
+        ]
+        indexes = [
+            models.Index(
+                fields=["status", "next_attempt_at"],
+                name="web_push_delivery_due_idx",
+            ),
+            models.Index(
+                fields=["notification", "status"],
+                name="web_push_delivery_notif_idx",
+            ),
+        ]
+
+    def __str__(self):
+        return f"Web push delivery {self.notification_id}/{self.subscription_id}"
+
+
+class WebAuthnCredential(models.Model):
+    """A browser WebAuthn public-key credential bound to one account."""
+
+    user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name="webauthn_credentials",
+    )
+    credential_id = models.CharField(max_length=1024, unique=True)
+    public_key = models.TextField()
+    sign_count = models.PositiveBigIntegerField(default=0)
+    transports = models.JSONField(default=list, blank=True)
+    label = models.CharField(max_length=80)
+    aaguid = models.CharField(max_length=36, blank=True, default="")
+    backup_eligible = models.BooleanField(default=False)
+    backup_state = models.BooleanField(default=False)
+    is_active = models.BooleanField(default=True)
+    last_used_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [
+            models.CheckConstraint(
+                condition=~models.Q(label=""),
+                name="webauthn_credential_label_not_empty",
+            ),
+        ]
+        indexes = [
+            models.Index(
+                fields=["user", "is_active"],
+                name="webauthn_user_active_idx",
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.user.username} passkey {self.label}"
 
 
 class TelegramConversation(models.Model):
@@ -3071,7 +3243,11 @@ class Question(models.Model):
             try:
                 answer = json.loads(answer)
             except (TypeError, json.JSONDecodeError):
-                return [segment.strip() for segment in answer.split("|") if segment.strip()]
+                return [
+                    segment.strip()
+                    for segment in re.split(r"[|\r\n]+", answer)
+                    if segment.strip()
+                ]
 
         if isinstance(answer, dict):
             answer = answer.get("order") or answer.get("items") or answer.get("answer") or []
@@ -3090,7 +3266,19 @@ class Question(models.Model):
             try:
                 answer = json.loads(answer)
             except (TypeError, json.JSONDecodeError):
-                return {}
+                parsed = {}
+                for line in answer.splitlines():
+                    if "=" in line:
+                        left, right = line.split("=", 1)
+                    elif ":" in line:
+                        left, right = line.split(":", 1)
+                    else:
+                        continue
+                    left = left.strip()
+                    right = right.strip()
+                    if left:
+                        parsed[left] = right
+                return parsed
 
         if isinstance(answer, dict):
             return {str(key).strip(): str(value).strip() for key, value in answer.items() if str(key).strip()}

@@ -1,10 +1,11 @@
 from django.contrib.auth import views as auth_views
-from django.urls import path
+from django.urls import include, path
 from management_system import password_reset as password_reset_views
 from management_system.views import *
 from management_system.admin_operation_views import admin_operation_download, admin_operation_status
 from management_system.job_monitor_views import background_jobs, background_job_detail, background_job_status_batch, notification_group_recipients, notification_redelivery
 from management_system.forms import UserLoginForm
+from management_system.pwa_views import PwaLoginView, PwaLogoutView
 from management_system.telegram_views import (
     telegram_account_unlink,
     telegram_accounts,
@@ -50,6 +51,7 @@ from management_system.student_experience_views import (
 )
 
 urlpatterns = [
+    path("", include("management_system.pwa_urls")),
     path('dashboard/background-jobs/', background_jobs, name='background-jobs'),
     path('dashboard/notification-history/', background_jobs, {"notifications_only": True}, name='notification-history'),
     path(
@@ -69,7 +71,7 @@ urlpatterns = [
     path("offerings/<int:offering_id>/quizzes/<int:quiz_id>/snapshot/", quiz_snapshot, name="quiz-snapshot"),
     path(
         'login/',
-        LoginView.as_view(
+        PwaLoginView.as_view(
             template_name="login.html",
             authentication_form=UserLoginForm
             ),
@@ -341,7 +343,7 @@ urlpatterns = [
     path('dashboard/content-qa/', content_qa_dashboard, name="content-qa"),
 
     # Logout
-    path('logout/', LogoutView.as_view(next_page='home'), name='logout'),
+    path('logout/', PwaLogoutView.as_view(next_page='home'), name='logout'),
 
     # P8-T04 - SEO
     path('robots.txt', robots_txt, name="robots-txt"),

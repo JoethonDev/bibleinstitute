@@ -1,0 +1,24 @@
+.pwa-save-button{
+  display:inline-flex;align-items:center;gap:7px;min-height:38px;margin:8px 0;
+  padding:7px 13px;border:1px solid #2f6b70;border-radius:999px;background:#fffdf8;
+  color:#1f4f56;font:700 .78rem/1.2 system-ui,-apple-system,"Segoe UI",sans-serif;
+  cursor:pointer;
+}
+.pwa-save-button:hover{background:#eef4f1}
+.pwa-save-button[disabled]{opacity:.55;cursor:wait}
+.pwa-save-button.is-saved{border-color:#2f7a52;color:#2f7a52}
+.pwa-install-card{max-width:760px;margin:18px auto;padding:22px;border:1px solid #e2d8c6;border-radius:16px;background:#fffdf8}
+.pwa-install-card h2{margin:0 0 6px;font-size:1.25rem}
+.pwa-install-card p{color:#5d6f73;line-height:1.7}
+.pwa-install-actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:12px}
+.pwa-install-button{display:inline-flex;align-items:center;justify-content:center;min-height:42px;min-width:150px;padding:9px 16px;border:0;border-radius:999px;background:#1f4f56;color:#fff;font-weight:800;cursor:pointer;text-decoration:none}
+.pwa-install-button[hidden]{display:none}
+.pwa-install-button:disabled{color:#fff;opacity:.65;cursor:not-allowed}
+.pwa-eyebrow{margin:0 0 6px;color:#b4863d;font-weight:800;letter-spacing:.12em;text-transform:uppercase;font-size:.68rem}
+.pwa-push-card{display:flex;flex-wrap:wrap;align-items:center;gap:12px;justify-content:space-between;border:1px solid #e2d8c6;border-radius:14px;background:#fffdf8;padding:14px 16px;margin:0 0 14px}
+.pwa-push-copy{display:grid;gap:3px;min-width:220px;flex:1}
+.pwa-push-copy strong{font-size:.9rem}
+.pwa-push-copy span{font-size:.78rem;color:#64777b;line-height:1.6}
+.pwa-push-actions{display:flex;gap:8px;flex-wrap:wrap}
+.pwa-push-card .pwa-install-note{flex-basis:100%;margin:0;font-size:.76rem;color:#64777b}
+.pwa-push-card .pwa-save-button{margin:0}

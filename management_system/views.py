@@ -93,6 +93,7 @@ from .student_experience.profile import (
 )
 from .student_experience.mode import resolve_student_mode
 from .student_experience.render import render_student_page, student_shell_context
+from .passkey_auth import has_fresh_auth
 from .calendar_grid import build_month_agenda as _build_month_agenda
 from .calendar_grid import build_month_grid as _build_month_grid
 from .models import StudentMode
@@ -628,6 +629,13 @@ class ProfileDetail(LoginProtection, DetailView):
                 form=kwargs.get("form"),
             )
             context.update(student_shell_context("profile"))
+            context["passkeys"] = list(
+                WebAuthnCredential.objects.filter(
+                    user=self.object,
+                    is_active=True,
+                ).order_by("created_at")[:10]
+            )
+            context["passkey_fresh"] = has_fresh_auth(self.request)
             return context
         context = super().get_context_data(**kwargs)
         user = self.object
@@ -640,6 +648,17 @@ class ProfileDetail(LoginProtection, DetailView):
         context["signup_details_form"] = signup_details_form
         context["form"] = signup_details_form
         context["profile_editable"] = profile_editable
+        context["passkeys"] = (
+            list(
+                WebAuthnCredential.objects.filter(
+                    user=user,
+                    is_active=True,
+                ).order_by("created_at")[:10]
+            )
+            if profile_editable
+            else []
+        )
+        context["passkey_fresh"] = has_fresh_auth(self.request)
         context["can_upload_missing_documents"] = user == self.request.user
         missing_documents_form = MissingApplicationDocumentsForm(instance=user)
         context["missing_documents_form"] = missing_documents_form
@@ -1044,7 +1063,7 @@ def take_exam(request, offering_id, quiz_id, *, allow_management=False):
         raise PermissionDenied(_("Quiz preview cannot be submitted."))
 
     try:
-        user = User.objects.get(pk=request.user.pk)
+        user = request.user
         if preview_requested and not can_manage_academic_setup(user):
             raise PermissionDenied
         offering = get_accessible_offering_or_403(
@@ -1059,11 +1078,29 @@ def take_exam(request, offering_id, quiz_id, *, allow_management=False):
             # visibility boundary as the course-detail list so a guessed
             # quiz URL cannot bypass Draft/Archived visibility.
             quiz_filters["status"] = PublicationStatus.PUBLISHED
-        quiz = get_object_or_404(Quiz, **quiz_filters)
+        quiz = get_object_or_404(
+            Quiz.objects.select_related(
+                "quiz_type",
+                "course_offering__academic_year_level__academic_year",
+                "course_offering__academic_year_level__level",
+            ).annotate(question_total=Count("questions")),
+            **quiz_filters,
+        )
 
         submission_datetime = now()
-        effective_opening_date, effective_closing_date = quiz_window(quiz, user)
-        quiz_mode, grade, snapshot = get_student_quiz_status(quiz, user, submission_datetime)
+        opening = QuizStudentOpening.objects.filter(
+            quiz=quiz,
+            student=user,
+        ).first()
+        effective_opening_date = opening.opening_date if opening else quiz.opening_date
+        effective_closing_date = opening.closing_date if opening else quiz.closing_date
+        quiz_mode, grade, snapshot = get_student_quiz_status(
+            quiz,
+            user,
+            submission_datetime,
+            opening=opening,
+            opening_loaded=True,
+        )
         if not preview_requested and not user_has_management_role(user) and grade is None:
             if snapshot is not None and snapshot.deadline_at <= submission_datetime:
                 reconcile_snapshots(quiz.pk, user_id=user.pk)

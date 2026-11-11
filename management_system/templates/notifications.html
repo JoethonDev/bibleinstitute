@@ -13,6 +13,7 @@
     </form>
     {% endif %}
   </div>
+  {% if web_push_enabled %}{% include "partials/web_push_toggle.html" %}{% endif %}
 
   {% if notification_items %}
   <div id="notification-history" class="ps-notif-history" data-next-url="{{ next_url }}">

@@ -38,6 +38,7 @@
                            href="{{ hls_url.download_url }}">
                             <i class="fas fa-download me-2"></i>{% translate "Download Audio" %}
                         </a>
+                        {% if pwa_enabled %}{% include "partials/pwa_save_button.html" with offering_id=offering_id lesson_id=lesson_id file_index=hls_url.file_index title=hls_url.name media_type="audio" %}{% endif %}
                     </div>
                 {% else %}
                    <div class="d-flex justify-content-center">
@@ -74,6 +75,9 @@
                                 <canvas class="pdf-canvas shadow-sm"></canvas>
                             </div>
                        </div>
+                   </div>
+                   <div class="mt-2">
+                       {% if pwa_enabled %}{% include "partials/pwa_save_button.html" with offering_id=offering_id lesson_id=lesson_id file_index=hls_url.file_index title=hls_url.name media_type="pdf" %}{% endif %}
                    </div>
                 {% endif %}
             </div>
