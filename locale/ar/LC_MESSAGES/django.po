@@ -16640,3 +16640,116 @@ msgstr "يستخدم كل طالب حاليا الواجهة المفروضة ا
 
 msgid "This is the default for students who inherit the global setting. Use the force action to apply it to every student and ignore per-account overrides."
 msgstr "هذه هي الواجهة الافتراضية للطلاب الذين يتبعون الإعداد العام. استخدم زر الفرض لتطبيقها على كل طالب وتجاهل التخصيصات الفردية."
+
+# In-app support chat (student experience)
+msgid "Support"
+msgstr "الدعم"
+
+msgid "Bible Institute team"
+msgstr "فريق المعهد"
+
+msgid "Your own conversation with the institute. Messages sent from Telegram appear here too."
+msgstr "محادثتك الخاصة مع المعهد. تظهر هنا أيضا الرسائل المرسلة من تيليجرام."
+
+msgid "Support conversation"
+msgstr "محادثة الدعم"
+
+msgid "Load earlier messages"
+msgstr "تحميل الرسائل الأقدم"
+
+msgid "Start the conversation"
+msgstr "ابدأ المحادثة"
+
+msgid "Write a message, attach an image, or record a voice note. The institute team replies here."
+msgstr "اكتب رسالة أو أرفق صورة أو سجل رسالة صوتية. يرد فريق المعهد هنا."
+
+msgid "Write a message to the institute team"
+msgstr "اكتب رسالة إلى فريق المعهد"
+
+msgid "Attach an image"
+msgstr "إرفاق صورة"
+
+msgid "Record an audio message"
+msgstr "تسجيل رسالة صوتية"
+
+msgid "Send"
+msgstr "إرسال"
+
+msgid "Text, one image, or an audio recording of up to one minute."
+msgstr "نص أو صورة واحدة أو تسجيل صوتي حتى دقيقة واحدة."
+
+msgid "Recording... tap to send"
+msgstr "جارٍ التسجيل... اضغط للإرسال"
+
+msgid "You"
+msgstr "أنت"
+
+msgid "Image message"
+msgstr "رسالة صورة"
+
+msgid "Sending..."
+msgstr "جارٍ الإرسال..."
+
+msgid "Attaching file..."
+msgstr "جارٍ إرفاق الملف..."
+
+msgid "This file is too large to send."
+msgstr "هذا الملف كبير جدا للإرسال."
+
+msgid "Messages must be %(count)s characters or fewer."
+msgstr "يجب ألا تتجاوز الرسالة %(count)s حرفا."
+
+msgid "Write a message or attach an image or audio file."
+msgstr "اكتب رسالة أو أرفق صورة أو ملفا صوتيا."
+
+msgid "Support attachments are unavailable right now."
+msgstr "مرفقات الدعم غير متاحة حاليا."
+
+msgid "The message could not be sent."
+msgstr "تعذر إرسال الرسالة."
+
+msgid "Only images and audio recordings can be sent in the chat."
+msgstr "يمكن إرسال الصور والتسجيلات الصوتية فقط في المحادثة."
+
+msgid "This message is no longer available."
+msgstr "هذه الرسالة لم تعد متاحة."
+
+msgid "This conversation is closed."
+msgstr "هذه المحادثة مغلقة."
+
+msgid "Audio messages must be %(limit)s or shorter."
+msgstr "يجب ألا تزيد الرسالة الصوتية على %(limit)s."
+
+msgid "%(count)s minute"
+msgid_plural "%(count)s minutes"
+msgstr[0] "دقيقة واحدة"
+msgstr[1] "دقيقة واحدة"
+msgstr[2] "دقيقتين"
+msgstr[3] "%(count)s دقائق"
+msgstr[4] "%(count)s دقيقة"
+msgstr[5] "%(count)s دقيقة"
+
+msgid "%(count)s second"
+msgid_plural "%(count)s seconds"
+msgstr[0] "ثانية واحدة"
+msgstr[1] "ثانية واحدة"
+msgstr[2] "ثانيتين"
+msgstr[3] "%(count)s ثوان"
+msgstr[4] "%(count)s ثانية"
+msgstr[5] "%(count)s ثانية"
+
+msgid "Support message"
+msgstr "رسالة دعم"
+
+msgid "Support chat"
+msgstr "محادثة الدعم"
+
+msgid "Microphone access was refused. Allow it in the browser settings, then try again."
+msgstr "تم رفض الوصول إلى الميكروفون. اسمح به من إعدادات المتصفح ثم أعد المحاولة."
+
+msgid "This browser cannot record audio."
+msgstr "هذا المتصفح لا يستطيع تسجيل الصوت."
+
+
+msgid "Invalid message cursor."
+msgstr "مرجع تحميل الرسائل غير صالح."

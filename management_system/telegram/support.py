@@ -4,11 +4,8 @@ from __future__ import annotations
 
 import hashlib
 import io
-import os
 import logging
 import mimetypes
-import subprocess
-import tempfile
 import uuid
 from dataclasses import dataclass
 from datetime import timedelta
@@ -30,12 +27,14 @@ from ..models import (
     TelegramMessage,
     User,
 )
+from ..student_notifications import create_support_reply_notification
 from ..utils.storage_operations import get_r2_client, upload_to_bucket
 from .attachments import (
     AUDIO_MAX_SECONDS,
     CAPTION_MAX_LENGTH,
+    AttachmentValidationError,
     SupportAttachmentSpec,
-    classify_attachment,
+    classify_uploaded_file,
     safe_filename,
 )
 from .deletion import delete_bot_message, is_missing_message_error
@@ -396,7 +395,12 @@ def _message_payload(message: dict) -> dict:
     }
 
 
-def _conversation_for_user(user: User) -> TelegramConversation:
+def conversation_for_user(user: User) -> TelegramConversation:
+    """Return or create the one support conversation for a user.
+
+    Shared by the Telegram webhook and the in-app chat so both channels write
+    the same durable conversation.
+    """
     active = TelegramConversation.objects.select_for_update().filter(
         user=user,
         status__in=(TelegramConversation.Status.OPEN, TelegramConversation.Status.CLAIMED),
@@ -437,7 +441,7 @@ def persist_inbound_message(*, user: User, update_id: int, message: dict) -> tup
     existing = TelegramMessage.objects.select_related("conversation").filter(telegram_update_id=update_id).first()
     if existing:
         return existing.conversation, existing, False
-    conversation = _conversation_for_user(user)
+    conversation = conversation_for_user(user)
     payload = _message_payload(message)
     try:
         stored = TelegramMessage.objects.create(
@@ -866,8 +870,13 @@ def _queue_reply(
     origin: str,
     content_type: str = TelegramMessage.ContentType.TEXT,
     target_message_id: int | None = None,
-) -> tuple[TelegramMessage, int, int | None]:
-    """Queue one reply under a short row lock, then release before API I/O."""
+) -> tuple[TelegramMessage, int | None, int | None]:
+    """Queue one reply under a short row lock, then release before API I/O.
+
+    A student without an active Telegram link still has a durable support
+    conversation, so the reply is created with no chat id and becomes an
+    in-app-only message instead of failing.
+    """
     _require_admin(admin)
     with transaction.atomic():
         try:
@@ -942,11 +951,16 @@ def _queue_reply(
             user_id=conversation.user_id,
             is_active=True,
         ).first()
-        if student_account is None:
-            raise SupportReplyError(_("The student's Telegram account is no longer available."))
+        student_chat_id = (
+            student_account.telegram_chat_id if student_account is not None else None
+        )
 
         telegram_reply_to = None
-        if reply_target and reply_target.content_type != TelegramMessage.ContentType.DIGEST:
+        if (
+            student_account is not None
+            and reply_target
+            and reply_target.content_type != TelegramMessage.ContentType.DIGEST
+        ):
             if reply_target.telegram_chat_id == student_account.telegram_chat_id:
                 telegram_reply_to = reply_to_telegram_message_id
 
@@ -969,7 +983,7 @@ def _queue_reply(
             conversation=conversation,
             direction=TelegramMessage.Direction.OUTBOUND,
             sender_user=admin,
-            telegram_chat_id=student_account.telegram_chat_id,
+            telegram_chat_id=student_chat_id,
             reply_to_telegram_message_id=telegram_reply_to,
             source_message=source_message,
             content_type=content_type,
@@ -979,7 +993,7 @@ def _queue_reply(
             covered_message_ids=covered_ids,
             bot_config=_active_bot_config(),
         )
-        return outbound, student_account.telegram_chat_id, telegram_reply_to
+        return outbound, student_chat_id, telegram_reply_to
 
 
 def _fail_reply(outbound: TelegramMessage, message: str) -> None:
@@ -998,10 +1012,12 @@ def _mark_reply_sending(outbound: TelegramMessage) -> None:
 
 
 def _finalize_delivered_reply(
-    bot: telebot.TeleBot,
+    bot: telebot.TeleBot | None,
     outbound: TelegramMessage,
     admin: User,
     result,
+    *,
+    web_only: bool = False,
 ) -> TelegramMessage:
     """Persist delivery and resolve only the exact latest student message."""
     sent_at = timezone.now()
@@ -1013,15 +1029,24 @@ def _finalize_delivered_reply(
         outbound = TelegramMessage.objects.select_for_update(
             of=("self",),
         ).select_related("sender_user").get(pk=outbound.pk)
-        outbound.telegram_message_id = message_id
-        outbound.delivery_status = TelegramMessage.DeliveryStatus.SENT
-        outbound.sent_at = sent_at
-        outbound.delivery_error = "" if message_id is not None else _(
-            "Telegram sent the reply without returning a message identifier."
-        )
-        outbound.save(update_fields=[
-            "telegram_message_id", "delivery_status", "sent_at", "delivery_error",
-        ])
+        if web_only:
+            outbound.telegram_message_id = None
+            outbound.delivery_status = TelegramMessage.DeliveryStatus.SENT
+            outbound.sent_at = sent_at
+            outbound.delivery_error = ""
+            outbound.save(update_fields=[
+                "telegram_message_id", "delivery_status", "sent_at", "delivery_error",
+            ])
+        else:
+            outbound.telegram_message_id = message_id
+            outbound.delivery_status = TelegramMessage.DeliveryStatus.SENT
+            outbound.sent_at = sent_at
+            outbound.delivery_error = "" if message_id is not None else _(
+                "Telegram sent the reply without returning a message identifier."
+            )
+            outbound.save(update_fields=[
+                "telegram_message_id", "delivery_status", "sent_at", "delivery_error",
+            ])
         covered_ids = [int(pk) for pk in (outbound.covered_message_ids or []) if pk]
         if covered_ids:
             TelegramMessage.objects.filter(
@@ -1079,21 +1104,23 @@ def _finalize_delivered_reply(
             "admin_read_at", "admin_read_by", "last_message_at", "version", "updated_at",
         ])
     try:
-        resolve_answered_announcements(
-            bot,
-            source_message_ids=covered_ids,
-            reply=outbound,
-        )
+        if bot is not None:
+            resolve_answered_announcements(
+                bot,
+                source_message_ids=covered_ids,
+                reply=outbound,
+            )
     except Exception:
         logger.exception(
             "telegram_support_resolution_error conversation=%s",
             outbound.conversation_id,
         )
+    create_support_reply_notification(outbound)
     return outbound
 
 
 def reply_to_conversation(
-    bot: telebot.TeleBot,
+    bot: telebot.TeleBot | None,
     *,
     admin: User,
     conversation_id: int,
@@ -1113,6 +1140,12 @@ def reply_to_conversation(
         origin=origin,
         target_message_id=target_message_id,
     )
+    if student_chat_id is None:
+        # The student has no active Telegram link: the reply lives only in the
+        # in-app chat, so no provider call and no bot is required.
+        return _finalize_delivered_reply(None, outbound, admin, None, web_only=True)
+    if bot is None:
+        raise SupportReplyError(_("Telegram bot is not active."))
     _mark_reply_sending(outbound)
     try:
         result = bot.send_message(
@@ -1136,65 +1169,19 @@ def _attachment_content_type(kind: str) -> str:
     }[kind]
 
 
-def _probe_audio_seconds(uploaded_file) -> float:
-    """Return the duration of a validated audio upload using ffprobe."""
-    temporary_path = None
+def _validated_upload(
+    uploaded_file,
+    *,
+    audio_max_seconds: int = AUDIO_MAX_SECONDS,
+) -> SupportAttachmentSpec:
+    """Convert one shared attachment rejection into a reply error."""
     try:
-        with tempfile.NamedTemporaryFile(suffix=".audio", delete=False) as handle:
-            temporary_path = handle.name
-            uploaded_file.seek(0)
-            for chunk in uploaded_file.chunks():
-                handle.write(chunk)
-        result = subprocess.run(
-            [
-                getattr(settings, "FFPROBE_BINARY", "ffprobe"),
-                "-v", "error", "-show_entries", "format=duration",
-                "-of", "default=nw=1:nk=1", temporary_path,
-            ],
-            capture_output=True,
-            text=True,
-            timeout=15,
-            check=False,
+        return classify_uploaded_file(
+            uploaded_file,
+            audio_max_seconds=audio_max_seconds,
         )
-        duration = float((result.stdout or "").strip())
-    except FileNotFoundError as exc:
-        raise SupportReplyError(_("Audio validation is unavailable on this server.")) from exc
-    except Exception as exc:
-        raise SupportReplyError(_("The audio file could not be inspected.")) from exc
-    finally:
-        uploaded_file.seek(0)
-        if temporary_path:
-            try:
-                os.unlink(temporary_path)
-            except OSError:
-                pass
-    if duration <= 0 or duration > AUDIO_MAX_SECONDS:
-        raise SupportReplyError(_("Audio messages must be 5 minutes or shorter."))
-    return duration
-
-
-def _classify_uploaded_file(uploaded_file) -> SupportAttachmentSpec:
-    try:
-        uploaded_file.seek(0)
-        head = uploaded_file.read(16)
-        uploaded_file.seek(0)
-        spec = classify_attachment(
-            filename=str(getattr(uploaded_file, "name", "") or ""),
-            size=int(getattr(uploaded_file, "size", 0) or 0),
-            head=head,
-        )
-        if spec.kind in {"voice", "audio"} or spec.mime_type == "audio/webm":
-            duration = _probe_audio_seconds(uploaded_file)
-            return SupportAttachmentSpec(
-                spec.kind, spec.mime_type, spec.filename, spec.size, duration,
-            )
-        return spec
-    except SupportReplyError:
-        raise
-    except ValueError as exc:
+    except AttachmentValidationError as exc:
         raise SupportReplyError(str(exc)) from exc
-    except Exception as exc:
-        raise SupportReplyError(_("The attachment could not be read.")) from exc
 
 
 def _store_outbound_attachment(
@@ -1266,7 +1253,7 @@ def _telegram_input_file(uploaded_file, filename: str) -> tuple[telebot.types.In
 
 
 def reply_with_attachment_to_conversation(
-    bot: telebot.TeleBot,
+    bot: telebot.TeleBot | None,
     *,
     admin: User,
     conversation_id: int,
@@ -1279,7 +1266,7 @@ def reply_with_attachment_to_conversation(
 ) -> TelegramMessage:
     """Queue and deliver one admin reply carrying a JPEG/PNG, MP4 or PDF file."""
     text = str(text or "").strip()
-    spec = _classify_uploaded_file(uploaded_file)
+    spec = _validated_upload(uploaded_file)
     if len(text) > CAPTION_MAX_LENGTH:
         raise SupportReplyError(_("Attachments support a message of 1,024 characters or fewer."))
     outbound, student_chat_id, telegram_reply_to = _queue_reply(
@@ -1297,6 +1284,10 @@ def reply_with_attachment_to_conversation(
     except SupportReplyError as exc:
         _fail_reply(outbound, str(exc))
         raise
+    if student_chat_id is None:
+        return _finalize_delivered_reply(None, outbound, admin, None, web_only=True)
+    if bot is None:
+        raise SupportReplyError(_("Telegram bot is not active."))
     try:
         input_file, cleanup_stream = _telegram_input_file(uploaded_file, spec.filename)
     except Exception as exc:
@@ -1369,6 +1360,9 @@ def reply_with_provider_media_to_conversation(
         content_type=_attachment_content_type(media_kind),
         target_message_id=target_message_id,
     )
+    if student_chat_id is None:
+        _fail_reply(outbound, _("The student's Telegram account is no longer available."))
+        raise SupportReplyError(_("The student's Telegram account is no longer available."))
     attachment = TelegramAttachment.objects.create(
         message=outbound,
         telegram_file_id=str(provider_file_id),

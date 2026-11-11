@@ -2,12 +2,11 @@
 {% comment %}
 Admin quiz-submission detail.
 
-Separate from the student exam template (display_quiz.html) on purpose: the
-student exam keeps its own markup and stylesheet, and this page renders the
-submitted answers with the admin grading form inside the workspace shell.
-The POST contract is unchanged: the form posts to the same URL and
-questions_rendering.html emits the same `questions[...]` field names that
-`unpack_quiz_form` parses.
+The answer review is the student's own graded view: this page includes the
+same canonical partial (partials/quiz_review_cards.html) the student quiz
+result page renders, so an administrator sees exactly what the student sees.
+The grading control lives inside that partial; the POST contract is unchanged
+and `unpack_quiz_form` parses the same `questions[...]` field names.
 {% endcomment %}
 <div id="content" class="aw-dashboard-page">
 
@@ -63,7 +62,9 @@ questions_rendering.html emits the same `questions[...]` field names that
             <div class="aw-card-body">
                 <form method="post" action="" id="quiz-form">
                     {% csrf_token %}
-                    {% include 'questions_rendering.html' %}
+                    <div class="sn-review-embed">
+                        {% include 'partials/quiz_review_cards.html' with review_can_grade=can_correct_grade %}
+                    </div>
                     {% if can_correct_grade %}
                     <div class="aw-form-actions">
                         <button type="submit" class="aw-btn aw-btn--primary">

@@ -4,8 +4,6 @@ from __future__ import annotations
 
 import json
 import logging
-import os
-import re
 import secrets
 from urllib.parse import urlencode
 
@@ -16,10 +14,9 @@ from django.contrib.auth.decorators import login_required
 from django.db import IntegrityError, transaction
 from django.db.models import Count, F, Max, OuterRef, Q, Subquery
 from django.core.paginator import Paginator
-from django.http import Http404, HttpResponse, JsonResponse, StreamingHttpResponse
+from django.http import Http404, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
-from django.utils.http import content_disposition_header
 from django.utils.translation import gettext as _
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_GET, require_POST
@@ -50,7 +47,6 @@ from .telegram.configuration import (
     webhook_secret,
 )
 from .utils.search import normalized_contains_q, normalize_search_text
-from .telegram.attachments import inline_attachment_mime_type
 from .telegram.linking import unlink_telegram_account
 from .telegram.support import (
     SupportReplyError,
@@ -89,8 +85,8 @@ from .telegram.broadcasts import (
     recipient_queryset,
 )
 from .telegram_forms import TelegramBotConfigForm, TelegramBroadcastForm, TelegramSupportReplyForm
+from .support_chat import stream_support_attachment
 from .utils.decorators import can_manage_academic_setup, capability_required
-from .utils.storage_operations import get_r2_client
 
 
 logger = logging.getLogger(__name__)
@@ -746,7 +742,11 @@ def telegram_conversation_reply(request, conversation_id):
         )
 
     config = TelegramBotConfig.objects.filter(is_active=True).first()
-    if not config:
+    student_linked = TelegramAccount.objects.filter(
+        user_id=conversation.user_id,
+        is_active=True,
+    ).exists()
+    if student_linked and not config:
         error_message = _("Telegram bot is not active.")
         form.add_error(None, error_message)
         if panel_request:
@@ -758,7 +758,13 @@ def telegram_conversation_reply(request, conversation_id):
         messages.error(request, error_message)
         return redirect("telegram-conversation-detail", conversation_id=conversation.pk)
     try:
-        bot = telebot.TeleBot(stored_token(config), parse_mode=None, threaded=False)
+        # A student without an active Telegram link is answered in the in-app
+        # chat only, so no bot is needed for that conversation.
+        bot = (
+            telebot.TeleBot(stored_token(config), parse_mode=None, threaded=False)
+            if config
+            else None
+        )
         attachment = form.cleaned_data.get("attachment")
         if attachment is not None:
             reply_with_attachment_to_conversation(
@@ -992,60 +998,13 @@ def telegram_admin_unlink(request, user_id):
     return redirect("user-profile", user_id=user.pk)
 
 
-def _attachment_chunks(body):
-    """Stream one R2 body in bounded chunks and always close it."""
-    try:
-        yield from body.iter_chunks(chunk_size=64 * 1024)
-    finally:
-        try:
-            body.close()
-        except Exception:
-            pass
-
-
 @capability_required(can_manage_academic_setup)
 def telegram_attachment(request, attachment_id):
     """Stream one support attachment with byte-range support for media playback."""
     attachment = get_object_or_404(TelegramAttachment, pk=attachment_id)
     if not attachment.is_available or not attachment.r2_key:
         raise Http404
-    bucket = getattr(settings, "TELEGRAM_R2_BUCKET_NAME", "")
-    if not bucket:
-        raise Http404
-    client = get_r2_client()
-    if client is None:
-        raise Http404
-    range_header = request.headers.get("Range", "").strip()
-    if range_header and not re.fullmatch(r"bytes=(?:\d+-\d*|-\d+)", range_header):
-        return HttpResponse(status=416)
-    params = {"Bucket": bucket, "Key": attachment.r2_key}
-    if range_header:
-        params["Range"] = range_header
-    try:
-        storage_response = client.get_object(**params)
-    except Exception as exc:
-        status = getattr(exc, "response", {}).get("ResponseMetadata", {}).get("HTTPStatusCode")
-        if status == 416:
-            return HttpResponse(status=416)
-        raise Http404 from exc
-
-    filename = os.path.basename(attachment.original_name or attachment.r2_key) or "attachment"
-    content_type = inline_attachment_mime_type(attachment.mime_type) or "application/octet-stream"
-    as_attachment = request.GET.get("download") == "1" or content_type == "application/octet-stream"
-    response = StreamingHttpResponse(
-        _attachment_chunks(storage_response["Body"]),
-        status=206 if storage_response.get("ContentRange") else 200,
-        content_type=content_type,
-    )
-    response["Accept-Ranges"] = "bytes"
-    response["X-Content-Type-Options"] = "nosniff"
-    response["Cache-Control"] = "private, no-store" if as_attachment else "private, max-age=300"
-    response["Content-Disposition"] = content_disposition_header(as_attachment, filename)
-    if storage_response.get("ContentLength") is not None:
-        response["Content-Length"] = str(storage_response["ContentLength"])
-    if storage_response.get("ContentRange"):
-        response["Content-Range"] = storage_response["ContentRange"]
-    return response
+    return stream_support_attachment(request, attachment)
 
 
 def _broadcast_year_context():

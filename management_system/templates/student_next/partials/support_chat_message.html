@@ -1,0 +1,34 @@
+{% load i18n %}
+{% translate "Image message" as image_alt %}
+<li class="sn-chat-msg{% if item.is_team %} is-team{% else %} is-mine{% endif %}" data-chat-message="{{ item.id }}">
+  <div class="sn-chat-bubble">
+    <span class="sn-chat-author">{% if item.is_team %}{% translate "Bible Institute team" %}{% else %}{% translate "You" %}{% endif %}</span>
+    {% if item.attachment %}
+      {% if item.attachment.is_image %}
+      <a class="sn-chat-media" href="{% url 'student-support-attachment' item.attachment.url %}" target="_blank" rel="noopener noreferrer">
+        <img src="{% url 'student-support-attachment' item.attachment.url %}" alt="{{ item.attachment.name|default:image_alt }}" loading="lazy" decoding="async">
+      </a>
+      {% elif item.attachment.is_audio %}
+      <audio class="sn-chat-audio" controls preload="none" src="{% url 'student-support-attachment' item.attachment.url %}"></audio>
+      {% else %}
+      <a class="sn-chat-file" href="{% url 'student-support-attachment' item.attachment.url %}?download=1">
+        <svg class="sn-ico" aria-hidden="true"><use href="#i-file"></use></svg>
+        <span dir="auto">{{ item.attachment.name }}</span>
+      </a>
+      {% endif %}
+    {% endif %}
+    {% if item.text %}<p class="sn-chat-text" dir="auto">{{ item.text|linebreaksbr }}</p>{% endif %}
+    <span class="sn-chat-meta">
+      <time datetime="{{ item.created_at|date:'c' }}">{{ item.created_at|date:"j M - H:i" }}</time>
+      {% if item.can_delete %}
+      <form class="sn-chat-delete" method="post" action="{% url 'student-support-message-delete' item.id %}" data-chat-delete>
+        {% csrf_token %}
+        <button type="submit" class="sn-chat-delete-btn">
+          <svg class="sn-ico" aria-hidden="true"><use href="#i-x"></use></svg>
+          <span>{% translate "Delete" %}</span>
+        </button>
+      </form>
+      {% endif %}
+    </span>
+  </div>
+</li>

@@ -762,10 +762,12 @@ class StudentNotification(models.Model):
         LESSON_PUBLISHED = "lesson_published", _("Lesson published")
         QUIZ_OPENING = "quiz_opening", _("Exam opening")
         ANNOUNCEMENT = "announcement", _("Announcement")
+        SUPPORT_MESSAGE = "support_message", _("Support message")
 
     class NavigationType(models.TextChoices):
         LESSON = "lesson", _("Lesson")
         QUIZ = "quiz", _("Exam")
+        SUPPORT = "support", _("Support chat")
         NONE = "none", _("None")
 
     student = models.ForeignKey(
@@ -866,6 +868,15 @@ class StudentNotification(models.Model):
                         effective_opening_at__isnull=True,
                         effective_closing_at__isnull=True,
                     )
+                    | models.Q(
+                        notification_type="support_message",
+                        lesson__isnull=True,
+                        quiz__isnull=True,
+                        announcement__isnull=True,
+                        navigation_type="support",
+                        effective_opening_at__isnull=True,
+                        effective_closing_at__isnull=True,
+                    )
                 ),
                 name="student_notification_source_type_match",
             ),
@@ -873,7 +884,7 @@ class StudentNotification(models.Model):
                 condition=(
                     models.Q(offering_id__gt=0, entity_id__gt=0)
                     | models.Q(
-                        notification_type="announcement",
+                        notification_type__in=("announcement", "support_message"),
                         offering_id=0,
                         entity_id=0,
                     )
@@ -1347,6 +1358,11 @@ class TelegramMessage(models.Model):
         related_name="deleted_telegram_support_messages",
     )
     telegram_deletion_error = models.CharField(max_length=500, blank=True, default="")
+    student_deleted_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="Set when the student removed this message from the in-app chat.",
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     sent_at = models.DateTimeField(null=True, blank=True)
 

@@ -8,6 +8,147 @@ Earlier detailed evidence is preserved in the
 and the [5 November archive](docs/archive/2026-11-05/history/IMPLEMENTATION_MEMORY.md).
 Historical open/done statements there are superseded by the current disposition.
 
+## Quiz edits only re-announce real scope changes (11 November 2026)
+
+Editing a published quiz used to bump `Quiz.publication_event_version` and
+re-schedule opening events whenever any copied fact changed (name, quiz type,
+total grade, opening date, closing date, duration), so fixing a typo pushed a
+new notification to every enrolled student.
+
+- `student_notifications.classify_quiz_announcement_change` is now the one
+  rule. It returns `reannounce` for a different course offering or a closing
+  date extended at minute precision, `withdraw` for a shortened or moved
+  window, and `refresh` for name/type/total-grade/duration edits. Minute
+  precision matters: the admin form submits `%Y-%m-%dT%H:%M`, so a stored
+  timestamp with seconds must not read as a shortened window.
+- `update_quiz` (`views.py`) bumps the publication version only on a publish
+  transition or `reannounce`; publishing still schedules, unpublishing still
+  cancels, `withdraw` cancels quietly, and `refresh` calls
+  `refresh_pending_quiz_event_snapshots`, which rewrites only the queued
+  `title_ar/body_ar/title_en/body_en` of future, uncancelled events in bounded
+  batches. No new `StudentNotification` row, no push, no key change.
+- The queued text keeps its own `effective_opening_at`/`effective_closing_at`
+  window, so a refresh never rewrites the window or the idempotency key.
+- The quiz create form already defaults the duration to `0`
+  (`create_quiz` context `duration_minutes: 0`, template
+  `default_if_none:0`, model `default=0`); verified in the browser and left
+  unchanged.
+- Verification (`tmp/quiz_notify/smoke_quiz_notifications.py`, disposable
+  PostgreSQL 18 on port 55449): 37 checks, all passing - rename and duration
+  edits create no rows and keep the three pending events with refreshed text;
+  extending the closing date, moving the offering and republishing each bump
+  the version and add one event per student; shortening withdraws the pending
+  events without adding rows; the create form renders `value="0"`. Browser
+  pass on the create and update pages (including structured questions):
+  duration `0` on create, no console errors.
+
+## Shared graded-answer review for students and management (11 November 2026)
+
+The management quiz-submission page used to render the legacy exam markup
+(`questions_rendering.html`) while a new-UI student saw the graded review
+cards, so an administrator reviewing a submission did not see what the
+student saw.
+
+- `management_system/templates/partials/quiz_review_cards.html` is now the one
+  review implementation. `student_next/partials/quiz_questions.html`
+  (`mode == "view"`) and `partials/submission_detail_content.html`
+  (`submission_user`) both include it, so per-question verdicts
+  (Correct / Partially correct / Incorrect / Under review), awarded/points,
+  given answer, correct answer and structured answer lists are identical on
+  both surfaces.
+- The partial takes one optional flag, `review_can_grade`. When set it also
+  emits the hidden `questions[n][id]` and the `questions[n][manual_grade]`
+  input, which is still the `unpack_quiz_form` / `submission_user` POST
+  contract. The student page passes nothing and renders no grading control.
+- Styles moved out of `static/css/student_next.css` into
+  `static/css/quiz_review.css`, loaded by `student_next/base.html` and by
+  `submission_detail.html` (`{% block style %}`). `.sn-review-embed` bridges
+  the `--sn-*` tokens to the `--aw-*` workspace palette, so one rule set
+  serves both shells; pills are re-styled only inside the embed.
+- Dead `.sn-review`, `.sn-review-row`, `.sn-review-num`, `.sn-review-points`,
+  `.sn-review-warn` and `.sn-review-explanation` rules (no template used them)
+  were deleted rather than moved.
+- Management can now correct an auto-graded question too, because every card
+  carries a grade input; the POST handler already validated `0..question.grade`
+  and recomputed `Grade.total_grade`.
+- Verification (`tmp/quiz_review/`): 23 checks against disposable PostgreSQL
+  18 on port 55445 - both pages render 6 identical review cards, the legacy
+  `sd-q-card` markup is gone, grading fields exist only on the management page,
+  and a correction moved the MCQ to 0, the written question to 4 and the quiz
+  total to 13. Browser pass on the same database: 6 cards each, computed styles
+  applied in both shells, no console errors; screenshots in
+  `tmp/quiz_review/shots/` at 1280 and 390 width. `manage.py check` clean,
+  `makemigrations --check --dry-run` no changes, `audit_text_encoding` passed.
+
+## In-app support chat for the new student UI (11 November 2026)
+
+The new student experience now has one support conversation (`/support/`)
+that replaces contacting support outside the LMS while staying unified with
+the existing Telegram support thread. Both surfaces write the same rows:
+`TelegramConversation` / `TelegramMessage` / `TelegramAttachment` remain the
+single source of truth, so a message sent from Telegram appears in the app and
+a message sent in the app appears in the admin chat workspace.
+
+- New domain module `management_system/support_chat.py` owns the whole rule:
+  `conversation_for_student`, `visible_messages` (excludes DIGEST rows and
+  student-deleted rows), `newest_messages`/`older_messages`/`messages_after`
+  (`(created_at, pk)` cursor, 20 per page, 30 per poll),
+  `message_presentation` (opaque "Bible Institute team" identity),
+  `send_student_message`, `delete_student_message`, `student_attachment`
+  and `stream_support_attachment`.
+- New views `management_system/support_chat_views.py` and routes
+  `student-support`, `student-support-send`,
+  `student-support-message-delete`, `student-support-attachment`. The page
+  requires student role and `StudentMode.NEW`; a legacy-mode student is
+  redirected to the notification inbox and any POST is refused with 403.
+- Student input is text (4000 chars), one JPEG/PNG image, or one audio
+  recording capped at 60 seconds. Attachment rules stay canonical in
+  `management_system/telegram/attachments.py`:
+  `classify_uploaded_file` and `probe_audio_seconds` were made public and now
+  accept the audio cap, so the chat passes `CHAT_AUDIO_MAX_SECONDS = 60` while
+  the Telegram reply keeps 300. Recorded WebM has no container duration, and a
+  video-only file yields no duration, so the probe falls back to the last audio
+  packet and a browser recording is only reclassified as voice once a duration
+  proves it holds audio.
+- Admin replies work without a Telegram account: `reply_to_conversation`,
+  `reply_with_attachment_to_conversation` accept `bot=None` and finalize
+  web-only as SENT with no `telegram_chat_id`; the admin workspace no longer
+  requires an active bot unless the student is Telegram-linked. Every reply
+  calls `student_notifications.create_support_reply_notification`, which stores
+  a `support_message` notification with a generic title/body and an
+  idempotency key per outbound message.
+- Web Push reuses the PWA worker: `StudentNotification.NavigationType.SUPPORT`
+  plus `SUPPORT_MESSAGE` type, and `notification_views._notification_target_url`
+  / `web_push._notification_url` resolve to the chat. The lock-screen payload
+  stays generic ("New message from the Bible Institute team") and never
+  contains conversation text. Notification inbox/panel now show a message icon
+  for this kind.
+- App-originated messages alert admins through
+  `telegram_tasks.send_web_support_digest`, which reuses `send_support_digest`
+  and skips silently when no bot is configured.
+- Front end: `templates/student_next/support.html` plus three partials,
+  `static/js/student_next/support_chat.js` (5s poll with backoff, older-page
+  load on scroll or button, fetch send, MediaRecorder with a 60s cap, delete)
+  and a `.sn-chat*` block in `static/css/student_next.css`. The chat owns the
+  mobile viewport above the fixed mobile nav so the composer never sits below
+  the fold. `static/pwa/file-inputs.js` now honours
+  `data-pwa-file-skip="1"` so an icon-sized picker is not replaced by the
+  full-width themed control.
+- Migration `0124_support_chat` adds `TelegramMessage.student_deleted_at`,
+  the `support_message`/`support` choices and their constraint branches.
+  Reversing it requires no `support_message` notifications to exist, because
+  the older route-ids constraint cannot represent them.
+- Verification on disposable PostgreSQL (`scc_smoke`, removed afterwards):
+  70 functional checks (`tmp/support_chat/smoke_support_chat.py`) covering
+  page/poll/older cursors, sends, MIME spoof rejection, real ffprobe duration
+  caps, soft delete, role/CSRF/mode authorization, notification and push
+  payloads, linked-Telegram replies and the admin thread, plus a 28-check
+  Playwright walk (`tmp/support_chat/browser_check.py`) for infinite scroll,
+  text/image/voice sending, delete, polling, inbox link, English/RTL and the
+  390x844 mobile layout. Chat page costs 9 queries. `manage.py check`,
+  `makemigrations --check`, migration forward/backward rehearsal and
+  `audit_text_encoding` pass; Arabic and English catalogs are compiled.
+
 ## PWA, offline library, Web Push and passkeys (11 November 2026)
 
 Implemented `docs/pending/PWA_OFFLINE_LIBRARY_PUSH_PASSKEY_SPEC.md`:
@@ -3668,6 +3809,13 @@ is addressed by plan revision 1.3 as documentation only; runtime implementation
 remains pending. Its prior findings are preserved as dated review evidence.
 
 ## Next safe step and limits
+
+The in-app support chat and migration 0124 are in the current working tree,
+applied only to a disposable PostgreSQL database and verified there; the
+worktree remains unstaged. The next safe step is an admin-side walk of a
+website-originated conversation on the real staging stack (real R2 bucket, real
+VAPID keys, live Telegram bot) to confirm storage, push delivery and
+cross-surface ordering with production-like configuration.
 
 The quiz/lesson/notification fixes and migration 0107 are in the current working
 tree, unapplied outside the disposable database; the worktree remains unstaged.

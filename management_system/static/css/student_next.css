@@ -101,9 +101,6 @@ html.sn-html[lang="ar"] .sn-notif-title b{ font-size: .9rem; }
 html.sn-html[lang="ar"] .sn-notif-meta time{ font-size: .74rem; }
 html.sn-html[lang="ar"] .sn-doc-row b{ font-size: .84rem; }
 html.sn-html[lang="ar"] .sn-doc-row > div span{ font-size: .74rem; }
-html.sn-html[lang="ar"] .sn-review-answer span{ font-size: .72rem; }
-html.sn-html[lang="ar"] .sn-review-answer b{ font-size: .88rem; }
-html.sn-html[lang="ar"] .sn-review-explanation{ font-size: .8rem; }
 html.sn-html[lang="ar"] .sn-field input, html.sn-html[lang="ar"] .sn-field select{ font-size: .9rem; }
 html.sn-html[lang="ar"] .sn-reading{ font-size: 1rem; line-height: 1.9; }
 html.sn-html[lang="ar"] .sn-course-desc{ font-size: .84rem; line-height: 1.65; }
@@ -889,17 +886,6 @@ body.sn-student .sn-stat small{ color: var(--sn-muted); font-size: .58rem; }
 body.sn-student .sn-stat--gold .sn-stat-icon{ background: var(--sn-gold-soft); color: var(--sn-gold-deep); }
 body.sn-student .sn-stat--teal .sn-stat-icon{ background: var(--sn-teal-soft); color: var(--sn-teal-deep); }
 body.sn-student .sn-result-actions{ display: flex; flex-direction: column; gap: 7px; flex: none; }
-body.sn-student .sn-review{ overflow: hidden; border: 1px solid var(--sn-line); border-radius: var(--sn-radius); background: var(--sn-paper); box-shadow: var(--sn-shadow); }
-body.sn-student .sn-review-row{ display: grid; grid-template-columns: 28px 1fr 1.2fr auto 18px; gap: 10px; align-items: center; padding: 12px 15px; border-bottom: 1px solid var(--sn-mist); }
-body.sn-student .sn-review-row:last-child{ border-bottom: 0; }
-body.sn-student .sn-review-num{ width: 25px; height: 25px; display: grid; place-items: center; border-radius: 50%; background: var(--sn-mist); color: var(--sn-muted); font-size: .62rem; font-weight: 800; }
-body.sn-student .sn-review-row > div{ display: flex; flex-direction: column; }
-body.sn-student .sn-review-row b{ font-size: .74rem; }
-body.sn-student .sn-review-row span{ color: var(--sn-muted); font-size: .65rem; }
-body.sn-student .sn-review-answer{ color: var(--sn-muted); font-size: .68rem; }
-body.sn-student .sn-review-points{ color: var(--sn-ink); font-size: .7rem; font-weight: 800; }
-body.sn-student .sn-review-row > .sn-ico{ width: 15px; height: 15px; color: var(--sn-success); }
-body.sn-student .sn-review-row > .sn-ico.sn-review-warn{ color: var(--sn-warning); }
 body.sn-student .sn-result-next{ display: flex; flex-direction: column; gap: 4px; }
 body.sn-student .sn-result-next b{ font-size: .8rem; }
 body.sn-student .sn-result-next span{ color: var(--sn-muted); font-size: .7rem; }
@@ -1055,6 +1041,7 @@ body.sn-student .sn-notif-icon--quiz{ background: var(--sn-gold-soft); color: va
 body.sn-student .sn-notif-icon--lesson{ background: var(--sn-teal-soft); color: var(--sn-teal-deep); }
 body.sn-student .sn-notif-icon--payment{ background: var(--sn-success-soft); color: var(--sn-success); }
 body.sn-student .sn-notif-icon--calendar{ background: #e9eef8; color: #4a5f8a; }
+body.sn-student .sn-notif-icon--support{ background: var(--sn-gold-soft); color: var(--sn-teal-deep); }
 body.sn-student .sn-notif-copy{ flex: 1; min-width: 0; }
 body.sn-student .sn-notif-title{ display: flex; align-items: center; gap: 7px; }
 body.sn-student .sn-notif-title b{ font-size: .82rem; }
@@ -1201,22 +1188,8 @@ body.sn-student .sn-pdf-footer .sn-inline-actions{ margin-inline-start: auto; }
    -------------------------------------------------------------------------- */
 body.sn-student .sn-question-warning{ display: flex; align-items: flex-start; gap: 8px; margin: 13px 0 0; padding: 10px 12px; border: 1px solid #e0b96b; border-radius: 9px; background: #fff5df; color: #744a0c; font-size: .76rem; }
 body.sn-student .sn-question-warning .sn-ico{ width: 15px; height: 15px; margin-top: 1px; flex: none; }
-body.sn-student .sn-review-cards{ display: flex; flex-direction: column; gap: 10px; }
-body.sn-student .sn-review-card{ padding: 15px 16px; border: 1px solid var(--sn-line); border-radius: 13px; background: var(--sn-paper); box-shadow: var(--sn-shadow); }
-body.sn-student .sn-review-card-head{ display: flex; align-items: center; gap: 8px; }
-body.sn-student .sn-review-card-head > span:first-child{ width: 26px; height: 26px; display: grid; place-items: center; border-radius: 50%; background: var(--sn-mist); color: var(--sn-muted); font-size: .64rem; font-weight: 800; }
-body.sn-student .sn-review-card-head > .sn-pill{ margin-inline-start: auto; }
-body.sn-student .sn-review-card h3{ margin: 9px 0 10px; font-family: var(--sn-display); font-size: 1.08rem; line-height: 1.35; }
-body.sn-student .sn-review-answer-grid{ display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-body.sn-student .sn-review-answer{ padding: 8px 10px; border-radius: 8px; background: var(--sn-cream); }
-body.sn-student .sn-review-answer span{ display: block; color: var(--sn-muted); font-size: .6rem; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; }
-body.sn-student .sn-review-answer b{ display: block; margin-top: 2px; font-size: .78rem; }
-body.sn-student .sn-review-card.is-wrong .sn-review-answer--correct{ background: #d7ebdf; }
-body.sn-student .sn-review-card.is-wrong .sn-review-answer--given{ background: #f6e4e4; }
-body.sn-student .sn-review-list{ display: grid; gap: 3px; margin: 4px 0 0; padding-inline-start: 18px; }
-body.sn-student .sn-review-list li{ color: var(--sn-ink); font-size: .78rem; line-height: 1.45; }
-html.sn-html[lang="ar"] .sn-review-list li{ font-size: .86rem; line-height: 1.6; }
-body.sn-student .sn-review-explanation{ margin: 9px 0 0; color: var(--sn-muted); font-size: .7rem; }
+/* Review cards live in css/quiz_review.css: the student result page and the
+   management submission detail share that one implementation. */
 
 /* --------------------------------------------------------------------------
    Graduates, gallery and app download
@@ -1605,3 +1578,124 @@ html.sn-html[lang="ar"] body.sn-student .sn-course-title a{ text-align:right; }
 html.sn-html[lang="ar"] body.sn-student .sn-notif-pop-copy b,
 html.sn-html[lang="ar"] body.sn-student .sn-notif-pop-copy small,
 html.sn-html[lang="ar"] body.sn-student .sn-notif-title b{ text-align:right; }
+
+/* In-app support chat (new student experience only). */
+body.sn-student .sn-support-page{ width: min(920px, calc(100% - 48px)); margin: 0 auto; padding: 32px 0 96px; }
+body.sn-student .sn-page-head--chat{ margin-bottom: 18px; }
+body.sn-student .sn-chat{
+    display: flex; flex-direction: column;
+    position: relative; overflow: hidden;
+    height: min(70dvh, 680px); min-height: 360px;
+    border: 1px solid var(--sn-line); border-radius: var(--sn-radius-lg);
+    background: var(--sn-paper); box-shadow: var(--sn-shadow);
+}
+body.sn-student .sn-chat-body{
+    position: relative; flex: 1 1 auto; min-height: 0;
+    display: flex; flex-direction: column;
+    overflow-y: auto; overscroll-behavior: contain;
+    padding: 18px 18px 8px;
+    scrollbar-width: thin; scrollbar-color: var(--sn-line) transparent;
+}
+body.sn-student .sn-chat-body::-webkit-scrollbar{ width: 8px; }
+body.sn-student .sn-chat-body::-webkit-scrollbar-thumb{ background: var(--sn-line); border-radius: 99px; }
+body.sn-student .sn-chat-older{
+    align-self: center; margin: 0 auto 12px; padding: 6px 14px;
+    border: 1px solid var(--sn-line); border-radius: 999px;
+    background: var(--sn-cream); color: var(--sn-muted);
+    font-size: .72rem; font-weight: 800; text-decoration: none; cursor: pointer;
+}
+body.sn-student .sn-chat-older:hover{ border-color: var(--sn-gold); color: var(--sn-gold-deep); }
+body.sn-student .sn-chat-older[hidden]{ display: none; }
+body.sn-student .sn-chat-list{ display: flex; flex-direction: column; gap: 10px; margin: 0; padding: 0; list-style: none; }
+body.sn-student .sn-chat-msg{ display: flex; flex-direction: column; align-items: flex-start; }
+body.sn-student .sn-chat-msg.is-mine{ align-items: flex-end; }
+body.sn-student .sn-chat-bubble{
+    max-width: min(80%, 560px);
+    display: flex; flex-direction: column; gap: 6px;
+    padding: 10px 14px; border-radius: 16px 16px 16px 6px;
+    background: var(--sn-mist); border: 1px solid var(--sn-line-cool);
+    color: var(--sn-ink);
+}
+body.sn-student .sn-chat-msg.is-mine .sn-chat-bubble{
+    border-radius: 16px 16px 6px 16px;
+    background: var(--sn-gold-soft); border-color: #e6d6b4;
+}
+body.sn-student .sn-chat-author{ font-size: .64rem; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--sn-muted); }
+body.sn-student .sn-chat-text{ margin: 0; font-size: .9rem; line-height: 1.55; white-space: pre-wrap; overflow-wrap: anywhere; }
+body.sn-student .sn-chat-text br + br{ display: none; }
+body.sn-student .sn-chat-media{ display: block; border-radius: 10px; overflow: hidden; line-height: 0; }
+body.sn-student .sn-chat-media img{ display: block; max-width: 260px; width: 100%; height: auto; border-radius: 10px; }
+body.sn-student .sn-chat-audio{ width: min(260px, 100%); height: 38px; }
+body.sn-student .sn-chat-file{ display: inline-flex; align-items: center; gap: 6px; font-size: .8rem; font-weight: 700; color: var(--sn-teal-deep); }
+body.sn-student .sn-chat-meta{
+    display: flex; align-items: center; gap: 10px;
+    color: var(--sn-muted); font-size: .66rem; font-variant-numeric: tabular-nums;
+}
+body.sn-student .sn-chat-delete{ margin: 0; }
+body.sn-student .sn-chat-delete-btn{
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 2px 6px; border: 0; border-radius: 999px;
+    background: transparent; color: var(--sn-muted);
+    font: inherit; font-size: .66rem; font-weight: 700; cursor: pointer;
+}
+body.sn-student .sn-chat-delete-btn:hover{ background: var(--sn-danger-soft); color: var(--sn-danger); }
+body.sn-student .sn-chat-delete-btn .sn-ico{ width: 12px; height: 12px; }
+body.sn-student .sn-chat-empty{ flex: 1 1 auto; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; padding: 32px 16px; text-align: center; color: var(--sn-muted); }
+body.sn-student .sn-chat-empty[hidden]{ display: none; }
+body.sn-student .sn-chat-empty-icon{ display: grid; place-items: center; width: 52px; height: 52px; border-radius: 999px; background: var(--sn-gold-soft); color: var(--sn-gold-deep); }
+body.sn-student .sn-chat-empty-icon .sn-ico{ width: 24px; height: 24px; }
+body.sn-student .sn-chat-empty h2{ margin: 6px 0 0; font-family: var(--sn-display); font-size: 1.1rem; color: var(--sn-ink); }
+body.sn-student .sn-chat-empty p{ margin: 0; max-width: 44ch; font-size: .82rem; }
+body.sn-student .sn-chat-composer{
+    flex: 0 0 auto; padding: 12px 14px 14px;
+    border-top: 1px solid var(--sn-line); background: var(--sn-cream);
+}
+body.sn-student .sn-chat-input{
+    width: 100%; min-height: 44px; max-height: 140px; resize: none;
+    padding: 10px 12px; border: 1px solid var(--sn-line); border-radius: 12px;
+    background: var(--sn-paper); color: var(--sn-ink);
+    font-family: var(--sn-sans); font-size: .9rem; line-height: 1.5;
+}
+body.sn-student .sn-chat-input:focus{ outline: 2px solid var(--sn-gold); outline-offset: 1px; border-color: var(--sn-gold); }
+body.sn-student .sn-chat-tools{ display: flex; align-items: center; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+body.sn-student .sn-chat-icon-btn{
+    display: inline-grid; place-items: center; width: 38px; height: 38px;
+    border: 1px solid var(--sn-line); border-radius: 999px;
+    background: var(--sn-paper); color: var(--sn-ink); cursor: pointer;
+    transition: background var(--sn-ease), border-color var(--sn-ease), color var(--sn-ease);
+}
+body.sn-student .sn-chat-icon-btn .sn-ico{ width: 17px; height: 17px; }
+body.sn-student .sn-chat-icon-btn:hover{ border-color: var(--sn-gold); color: var(--sn-gold-deep); }
+body.sn-student .sn-chat-icon-btn[disabled]{ opacity: .45; cursor: not-allowed; }
+body.sn-student .sn-chat-icon-btn.is-recording{ background: var(--sn-danger-soft); border-color: var(--sn-danger); color: var(--sn-danger); animation: sn-chat-pulse 1.2s infinite; }
+@keyframes sn-chat-pulse{ 0%, 100%{ box-shadow: 0 0 0 0 rgba(181, 71, 71, .28); } 50%{ box-shadow: 0 0 0 7px rgba(181, 71, 71, 0); } }
+body.sn-student .sn-chat-filename{ max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: .72rem; font-weight: 700; color: var(--sn-muted); }
+body.sn-student .sn-chat-spacer{ flex: 1 1 auto; }
+body.sn-student .sn-chat-send{ min-height: 38px; padding: 8px 18px; }
+body.sn-student .sn-chat-hint{ margin: 8px 0 0; font-size: .7rem; color: var(--sn-muted); }
+body.sn-student .sn-chat-error{ margin: 8px 0 0; font-size: .78rem; font-weight: 700; color: var(--sn-danger); }
+body.sn-student .sn-chat-error[hidden]{ display: none; }
+body.sn-student .sn-chat.is-busy .sn-chat-send{ opacity: .6; }
+
+@media (max-width: 680px){
+    body.sn-student .sn-page--support{ padding: 4px 0 0; }
+    /* The chat owns the visible area on phones: a fixed chat height plus the
+       page head pushes the composer below the fold. */
+    body.sn-student .sn-support-page{
+        width: 100%;
+        /* Topbar (64px) plus the fixed mobile nav (about 62px) own the rest of
+           the viewport, so the composer stays reachable without page scroll. */
+        height: calc(100dvh - 64px);
+        padding: 8px 12px calc(84px + env(safe-area-inset-bottom));
+        display: flex; flex-direction: column;
+    }
+    body.sn-student .sn-page-head--chat{ margin-bottom: 10px; }
+    body.sn-student .sn-page-head--chat .sn-page-desc{ display: none; }
+    body.sn-student .sn-page-head--chat .sn-page-title{ font-size: 1.25rem; }
+    body.sn-student .sn-chat{ flex: 1 1 auto; height: auto; min-height: 300px; border-radius: 18px; }
+    body.sn-student .sn-chat-body{ padding: 14px 12px 6px; }
+    body.sn-student .sn-chat-bubble{ max-width: 88%; }
+    body.sn-student .sn-chat-composer{ padding: 10px 10px 12px; }
+    body.sn-student .sn-chat-input{ font-size: 16px; }
+    body.sn-student .sn-chat-media img{ max-width: 210px; }
+}

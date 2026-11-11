@@ -39,6 +39,8 @@ def _retry_delay(attempt_count: int) -> int:
 def _notification_url(notification: StudentNotification, language: str) -> str:
     with translation.override(language):
         try:
+            if notification.navigation_type == StudentNotification.NavigationType.SUPPORT:
+                return reverse("student-support")
             if notification.navigation_type == StudentNotification.NavigationType.LESSON:
                 return reverse(
                     "lesson-details",
@@ -243,7 +245,7 @@ def _mark_retry(delivery: WebPushDelivery, code: str, message: str, now) -> None
 def _send_one(delivery: WebPushDelivery) -> bool:
     now = timezone.now()
     try:
-        response = webpush(
+        webpush(
             subscription_info=_subscription_info(delivery.subscription),
             data=_payload(delivery.notification, delivery.subscription.language),
             vapid_private_key=settings.WEB_PUSH_VAPID_PRIVATE_KEY,

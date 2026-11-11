@@ -49,6 +49,12 @@ from management_system.student_experience_views import (
     student_experience_override,
     student_experience_settings,
 )
+from management_system.support_chat_views import (
+    student_support_attachment,
+    student_support_chat,
+    student_support_message_delete,
+    student_support_send,
+)
 
 urlpatterns = [
     path("", include("management_system.pwa_urls")),
@@ -126,6 +132,20 @@ urlpatterns = [
     path('notifications/read-all/', student_notification_read_all, name="student-notification-read-all"),
     path('notifications/<int:notification_id>/open/', student_notification_open, name="student-notification-open"),
     path('notifications/<int:notification_id>/read/', student_notification_read, name="student-notification-read"),
+
+    # In-app support chat (new student experience only)
+    path('support/', student_support_chat, name="student-support"),
+    path('support/send/', student_support_send, name="student-support-send"),
+    path(
+        'support/messages/<int:message_id>/delete/',
+        student_support_message_delete,
+        name="student-support-message-delete",
+    ),
+    path(
+        'support/attachments/<int:attachment_id>/',
+        student_support_attachment,
+        name="student-support-attachment",
+    ),
     
     # Admin Routes
     path('dashboard/', admin_panel, name="admin-panel"),

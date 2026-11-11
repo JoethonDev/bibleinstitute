@@ -14,11 +14,15 @@ Bot API limits implemented here:
 
 from __future__ import annotations
 
+import os
 import posixpath
 import re
+import subprocess
+import tempfile
 from dataclasses import dataclass
 
-from django.utils.translation import gettext as _
+from django.conf import settings
+from django.utils.translation import gettext as _, ngettext
 
 PHOTO_MAX_BYTES = 10 * 1024 * 1024
 FILE_MAX_BYTES = 50 * 1024 * 1024
@@ -66,6 +70,10 @@ class SupportAttachmentSpec:
     filename: str
     size: int
     duration_seconds: float | None = None
+
+
+class AttachmentValidationError(ValueError):
+    """A localized, user-facing attachment rejection."""
 
 
 def safe_filename(name: str, fallback: str) -> str:
@@ -201,3 +209,160 @@ def _is_m4a(head: bytes) -> bool:
 
 def _is_webm(head: bytes) -> bool:
     return bytes(head[:4]) == b"\x1aE\xdf\xa3"
+
+
+def _ffprobe_duration_seconds(path: str) -> float:
+    """Return one media file's duration in seconds, even without a header.
+
+    Browser voice recordings are streamed WebM/Opus files that carry no
+    container duration, so an empty header falls back to the end of the last
+    audio packet instead of rejecting a valid recording.
+    """
+    binary = getattr(settings, "FFPROBE_BINARY", "ffprobe")
+    result = subprocess.run(
+        [
+            binary,
+            "-v", "error", "-show_entries", "format=duration",
+            "-of", "default=nw=1:nk=1", path,
+        ],
+        capture_output=True,
+        text=True,
+        timeout=15,
+        check=False,
+    )
+    header_value = (result.stdout or "").strip()
+    if header_value and header_value != "N/A":
+        try:
+            header_seconds = float(header_value)
+        except ValueError:
+            header_seconds = 0.0
+        if header_seconds > 0:
+            return header_seconds
+
+    packets = subprocess.run(
+        [
+            binary,
+            "-v", "error", "-select_streams", "a:0",
+            "-show_entries", "packet=pts_time,duration_time",
+            "-of", "csv=p=0", path,
+        ],
+        capture_output=True,
+        text=True,
+        timeout=15,
+        check=False,
+    )
+    end_seconds = 0.0
+    for line in (packets.stdout or "").splitlines():
+        parts = line.strip().split(",")
+        if not parts or not parts[0]:
+            continue
+        try:
+            packet_start = float(parts[0])
+        except ValueError:
+            continue
+        packet_length = 0.0
+        if len(parts) > 1 and parts[1]:
+            try:
+                packet_length = float(parts[1])
+            except ValueError:
+                packet_length = 0.0
+        end_seconds = max(end_seconds, packet_start + packet_length)
+    return end_seconds
+
+
+def probe_audio_seconds(
+    uploaded_file,
+    *,
+    max_seconds: int = AUDIO_MAX_SECONDS,
+) -> float:
+    """Return the duration of one audio upload using ffprobe.
+
+    The server never trusts a browser-supplied duration, and the cap is a
+    parameter so one canonical implementation serves the Telegram support
+    reply (5 minutes) and the shorter in-app chat recording limit.
+    """
+    temporary_path = None
+    try:
+        with tempfile.NamedTemporaryFile(suffix=".audio", delete=False) as handle:
+            temporary_path = handle.name
+            uploaded_file.seek(0)
+            for chunk in uploaded_file.chunks():
+                handle.write(chunk)
+        duration = _ffprobe_duration_seconds(temporary_path)
+    except FileNotFoundError as exc:
+        raise AttachmentValidationError(
+            _("Audio validation is unavailable on this server.")
+        ) from exc
+    except Exception as exc:
+        raise AttachmentValidationError(
+            _("The audio file could not be inspected.")
+        ) from exc
+    finally:
+        uploaded_file.seek(0)
+        if temporary_path:
+            try:
+                os.unlink(temporary_path)
+            except OSError:
+                pass
+    if duration <= 0 or duration > max_seconds:
+        if max_seconds >= 60 and max_seconds % 60 == 0:
+            minutes = max_seconds // 60
+            raise AttachmentValidationError(
+                _("Audio messages must be %(limit)s or shorter.")
+                % {
+                    "limit": ngettext(
+                        "%(count)s minute",
+                        "%(count)s minutes",
+                        minutes,
+                    ) % {"count": minutes}
+                }
+            )
+        raise AttachmentValidationError(
+            _("Audio messages must be %(limit)s or shorter.")
+            % {
+                "limit": ngettext(
+                    "%(count)s second",
+                    "%(count)s seconds",
+                    max_seconds,
+                ) % {"count": max_seconds}
+            }
+        )
+    return duration
+
+
+def classify_uploaded_file(
+    uploaded_file,
+    *,
+    audio_max_seconds: int = AUDIO_MAX_SECONDS,
+) -> SupportAttachmentSpec:
+    """Validate one browser upload through the canonical attachment rules."""
+    try:
+        uploaded_file.seek(0)
+        head = uploaded_file.read(16)
+        uploaded_file.seek(0)
+        spec = classify_attachment(
+            filename=str(getattr(uploaded_file, "name", "") or ""),
+            size=int(getattr(uploaded_file, "size", 0) or 0),
+            head=head,
+        )
+        if spec.kind in {"voice", "audio"} or spec.mime_type == "audio/webm":
+            duration = probe_audio_seconds(
+                uploaded_file,
+                max_seconds=audio_max_seconds,
+            )
+            # A browser recording arrives as WebM and the container cannot say
+            # whether it holds audio or video; a probed duration proves audio,
+            # and a video-only file yields no duration and is rejected above.
+            kind = spec.kind if spec.kind in {"voice", "audio"} else "voice"
+            return SupportAttachmentSpec(
+                kind, spec.mime_type, spec.filename, spec.size, duration,
+            )
+        return spec
+    except AttachmentValidationError:
+        raise
+    except ValueError as exc:
+        raise AttachmentValidationError(str(exc)) from exc
+    except Exception as exc:
+        raise AttachmentValidationError(
+            _("The attachment could not be read.")
+        ) from exc

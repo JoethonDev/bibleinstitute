@@ -67,6 +67,8 @@ def _notification_target_url(notification: StudentNotification) -> str | None:
     """Return the student route a notification points at, when still valid."""
     if notification.action_url:
         return notification.action_url
+    if notification.navigation_type == StudentNotification.NavigationType.SUPPORT:
+        return reverse("student-support")
     if (
         notification.navigation_type == StudentNotification.NavigationType.LESSON
         and notification.lesson_id

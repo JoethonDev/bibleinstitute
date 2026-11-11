@@ -1,0 +1,9 @@
+{% load i18n %}
+<div
+  data-chat-page
+  data-append-only="{{ chat_append_only|yesno:'1,0' }}"
+  data-has-older="{{ chat_has_older|yesno:'1,0' }}"
+  data-oldest-at="{% if chat_oldest %}{{ chat_oldest.created_at|date:'c' }}{% endif %}"
+  data-oldest-id="{{ chat_oldest.pk|default:0 }}"
+  data-last-id="{{ chat_last_id|default:0 }}"
+>{% include "student_next/partials/support_chat_message_list.html" %}</div>

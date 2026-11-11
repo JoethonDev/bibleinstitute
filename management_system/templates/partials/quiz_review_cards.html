@@ -1,0 +1,53 @@
+{% load i18n %}
+{% comment %}
+Canonical graded-answer review.
+
+One implementation for the student quiz result page and the management
+submission detail, so an administrator reviews a submission exactly as the
+student sees it. `review_can_grade` adds the per-question manual grade
+control; its field names are the ones `unpack_quiz_form` parses.
+{% endcomment %}
+<div class="sn-review-cards">
+  {% for question in questions %}
+    {% with counter=forloop.counter0 %}
+      <article class="sn-review-card{% if question.is_graded and question.current_grade < question.grade %} is-wrong{% endif %}">
+        {% if review_can_grade %}<input type="hidden" name="questions[{{ counter }}][id]" value="{{ question.id }}">{% endif %}
+        <div class="sn-review-card-head">
+          <span>{{ forloop.counter }}</span>
+          {% if question.is_graded %}
+            {% if question.current_grade == question.grade %}<span class="sn-pill sn-pill--success">{% translate "Correct" %}</span>
+            {% elif question.current_grade %}<span class="sn-pill sn-pill--warning">{% translate "Partially correct" %}</span>
+            {% else %}<span class="sn-pill sn-pill--danger">{% translate "Incorrect" %}</span>{% endif %}
+          {% else %}<span class="sn-pill sn-pill--gold">{% translate "Under review" %}</span>{% endif %}
+          <span class="sn-pill sn-pill--gold"><bdi dir="ltr">{{ question.current_grade }} / {{ question.grade }}</bdi></span>
+        </div>
+        <h3 dir="auto">{{ question.name }}</h3>
+        <div class="sn-review-answer-grid">
+          <div class="sn-review-answer sn-review-answer--given"><span>{% translate "Your answer" %}</span>
+            {% if question.type == "order_events" and question.submitted_answer_payload %}
+              <ol class="sn-review-list" dir="auto">{% for item in question.submitted_answer_payload %}<li>{{ item }}</li>{% endfor %}</ol>
+            {% elif question.type == "match_related" and question.submitted_answer_payload.items %}
+              <ul class="sn-review-list" dir="auto">{% for left, right in question.submitted_answer_payload.items %}<li>{{ left }} - {{ right }}</li>{% endfor %}</ul>
+            {% elif question.submitted_answer %}<b dir="auto">{{ question.submitted_answer }}</b>{% else %}{% translate "No answer submitted" %}{% endif %}
+          </div>
+          {% if question.answer_payload or question.correct_answer %}
+            <div class="sn-review-answer sn-review-answer--correct"><span>{% translate "Correct answer" %}</span>
+              {% if question.type == "order_events" %}<ol class="sn-review-list" dir="auto">{% for item in question.answer_payload %}<li>{{ item }}</li>{% endfor %}</ol>
+              {% elif question.type == "match_related" %}<ul class="sn-review-list" dir="auto">{% for left, right in question.answer_payload.items %}<li>{{ left }} - {{ right }}</li>{% endfor %}</ul>
+              {% else %}<b dir="auto">{{ question.correct_answer|default:question.answer_payload }}</b>{% endif %}
+            </div>
+          {% endif %}
+        </div>
+        {% if review_can_grade %}
+          <div class="sn-review-grade">
+            <label for="manual_grade_{{ counter }}">{% translate "Give Question Grade" %}</label>
+            <input type="number" id="manual_grade_{{ counter }}" name="questions[{{ counter }}][manual_grade]"
+                   min="0" max="{{ question.grade }}" step="1" value="{{ question.current_grade }}"
+                   inputmode="numeric" aria-describedby="manual_grade_hint_{{ counter }}">
+            <span id="manual_grade_hint_{{ counter }}">/ {{ question.grade }}</span>
+          </div>
+        {% endif %}
+      </article>
+    {% endwith %}
+  {% endfor %}
+</div>

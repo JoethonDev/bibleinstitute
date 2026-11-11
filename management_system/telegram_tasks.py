@@ -18,7 +18,15 @@ from django.utils.translation import gettext as _
 import telebot
 
 from .academic_access import active_year_published_offerings_for_user
-from .models import Lesson, PublicationStatus, Quiz, TelegramAccount, TelegramBotConfig, TelegramWebhookUpdate
+from .models import (
+    Lesson,
+    PublicationStatus,
+    Quiz,
+    TelegramAccount,
+    TelegramBotConfig,
+    TelegramMessage,
+    TelegramWebhookUpdate,
+)
 from .telegram.configuration import stored_token
 from .telegram.linking import TelegramLinkError, is_eligible_user, link_with_phone, link_with_token
 from .telegram.media import audio_links, download_audio_asset
@@ -45,6 +53,7 @@ from .telegram.support import (
     handle_admin_message,
     handle_student_message,
     recover_stale_support_replies as recover_support_replies,
+    send_support_digest,
 )
 from .utils.quiz_access import quiz_window
 from .utils.lesson_access import lesson_available_filter
@@ -595,3 +604,32 @@ def recover_stale_telegram_support_replies(limit: int = 100) -> None:
     """Reopen claims blocked by interrupted Telegram support sends."""
     with translation.override("ar"):
         recover_support_replies(limit=limit)
+
+
+@shared_task(
+    autoretry_for=(Exception,),
+    retry_backoff=True,
+    retry_backoff_max=900,
+    retry_jitter=True,
+    retry_kwargs={"max_retries": 3},
+    ignore_result=True,
+)
+def send_web_support_digest(message_id: int) -> None:
+    """Alert Telegram-linked admins about one in-app chat message.
+
+    The message is already durable, so this is advisory: no bot configuration
+    or provider failure can undo or block the student's message.
+    """
+    message = (
+        TelegramMessage.objects.select_related("conversation")
+        .filter(pk=message_id, origin=TelegramMessage.Origin.WEB)
+        .first()
+    )
+    if message is None or message.student_deleted_at is not None:
+        return
+    config = TelegramBotConfig.objects.filter(is_active=True).first()
+    if config is None:
+        return
+    bot = telebot.TeleBot(stored_token(config), parse_mode=None, threaded=False)
+    with translation.override("ar"):
+        send_support_digest(bot, message.conversation_id, message_id=message.pk)

@@ -8,7 +8,7 @@ from datetime import datetime, timedelta
 
 from celery import current_app
 from django.conf import settings
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from django.db.models import Exists, OuterRef, Q, QuerySet, Subquery
 from django.utils import timezone, translation
 from django.utils.translation import gettext as _
@@ -473,6 +473,107 @@ def cancel_future_quiz_opening_events(quiz: Quiz) -> int:
     return cancelled
 
 
+def _minute_key(value: datetime) -> datetime:
+    """Compare announced windows at the minute precision the form submits."""
+    return ensure_aware(value).replace(second=0, microsecond=0)
+
+
+def classify_quiz_announcement_change(
+    *,
+    previous_offering_id: int,
+    previous_opening: datetime,
+    previous_closing: datetime,
+    offering_id: int,
+    opening: datetime,
+    closing: datetime,
+) -> str:
+    """Classify one quiz edit for the students' opening announcements.
+
+    Only a different offering or an extended closing date is worth announcing
+    again; a shorter or moved window is withdrawn quietly, and any other edit
+    (name, type, total grade, duration) only refreshes the queued text.
+    Publication status transitions are handled by the caller.
+    """
+    if previous_offering_id != offering_id:
+        return "reannounce"
+    previous_open = _minute_key(previous_opening)
+    previous_close = _minute_key(previous_closing)
+    if _minute_key(closing) > previous_close:
+        return "reannounce"
+    if _minute_key(opening) != previous_open or _minute_key(closing) < previous_close:
+        return "withdraw"
+    return "refresh"
+
+
+def refresh_pending_quiz_event_snapshots(quiz: Quiz) -> int:
+    """Refresh queued opening-event text without announcing the exam again.
+
+    An edit that only changes display facts (name, type, total grade, duration)
+    must not create a new notification or push. The queued rows keep their
+    window, idempotency key and delivery state; only the copied text is
+    rewritten so the later delivery stays accurate.
+    """
+    quiz = Quiz.objects.select_related(
+        "course_offering__course",
+        "quiz_type",
+    ).get(pk=quiz.pk)
+    pending = (
+        StudentNotification.objects.filter(
+            quiz_id=quiz.pk,
+            notification_type=StudentNotification.NotificationType.QUIZ_OPENING,
+            scheduled_for__gt=timezone.now(),
+            cancelled_at__isnull=True,
+        )
+        .select_related("student")
+        .only(
+            "pk",
+            "student_id",
+            "effective_opening_at",
+            "effective_closing_at",
+            "title_ar",
+            "body_ar",
+            "title_en",
+            "body_en",
+            "student__id",
+            "student__time_zone",
+        )
+    )
+    refreshed = []
+    for notification in pending.iterator(chunk_size=NOTIFICATION_BATCH_SIZE):
+        opening = notification.effective_opening_at or quiz.opening_date
+        closing = notification.effective_closing_at or quiz.closing_date
+        title_ar, body_ar, title_en, body_en = _snapshot(
+            StudentNotification.NotificationType.QUIZ_OPENING,
+            quiz,
+            notification.student,
+            opening,
+            closing,
+        )
+        if (
+            notification.title_ar == title_ar
+            and notification.body_ar == body_ar
+            and notification.title_en == title_en
+            and notification.body_en == body_en
+        ):
+            continue
+        notification.title_ar = title_ar
+        notification.body_ar = body_ar
+        notification.title_en = title_en
+        notification.body_en = body_en
+        refreshed.append(notification)
+    if refreshed:
+        StudentNotification.objects.bulk_update(
+            refreshed,
+            ["title_ar", "body_ar", "title_en", "body_en"],
+            batch_size=NOTIFICATION_BATCH_SIZE,
+        )
+        logger.info(
+            "quiz event text refreshed",
+            extra={"event": "quiz_events_refreshed", "quiz_id": quiz.pk, "count": len(refreshed)},
+        )
+    return len(refreshed)
+
+
 def schedule_quiz_opening_events(quiz: Quiz, *, locked: bool = False) -> int:
     """Create one idempotent opening event per student/window."""
     if not locked:
@@ -586,3 +687,66 @@ def schedule_quiz_opening_events(quiz: Quiz, *, locked: bool = False) -> int:
             extra={"event": "quiz_opening_events_scheduled", "quiz_id": quiz.pk, "student_count": created},
         )
     return created
+
+
+SUPPORT_REPLY_PUSH_TTL = timedelta(hours=24)
+SUPPORT_REPLY_TITLES = {
+    "ar": "رسالة جديدة من فريق المعهد",
+    "en": "New message from the Bible Institute team",
+}
+SUPPORT_REPLY_BODIES = {
+    "ar": "افتح محادثة الدعم لقراءة الرد.",
+    "en": "Open the support chat to read the reply.",
+}
+
+
+def create_support_reply_notification(outbound) -> bool:
+    """Publish one inbox and push notification for a delivered support reply.
+
+    The push payload stays generic on purpose: a lock screen must not show the
+    support conversation itself. Web Push and mobile push both materialize from
+    this one row, so no second delivery path is introduced.
+    """
+    from .models import TelegramMessage
+
+    if not isinstance(outbound, TelegramMessage):
+        return False
+    if (
+        outbound.direction != TelegramMessage.Direction.OUTBOUND
+        or outbound.content_type == TelegramMessage.ContentType.DIGEST
+        or outbound.delivery_status != TelegramMessage.DeliveryStatus.SENT
+    ):
+        return False
+    student = outbound.conversation.user
+    if (
+        not student.is_active
+        or getattr(getattr(student, "role", None), "role", None) != "student"
+    ):
+        return False
+    now = timezone.now()
+    try:
+        with transaction.atomic():
+            StudentNotification.objects.create(
+                student=student,
+                notification_type=StudentNotification.NotificationType.SUPPORT_MESSAGE,
+                navigation_type=StudentNotification.NavigationType.SUPPORT,
+                offering_id=0,
+                entity_id=0,
+                title_ar=SUPPORT_REPLY_TITLES["ar"],
+                title_en=SUPPORT_REPLY_TITLES["en"],
+                body_ar=SUPPORT_REPLY_BODIES["ar"],
+                body_en=SUPPORT_REPLY_BODIES["en"],
+                idempotency_key=f"support_chat:{outbound.pk}",
+                scheduled_for=now,
+                push_expires_at=now + SUPPORT_REPLY_PUSH_TTL,
+            )
+    except IntegrityError:
+        # The same reply was already announced (retry or duplicate finalize).
+        return False
+    except Exception:
+        logger.exception(
+            "support reply notification failed",
+            extra={"event": "support_reply_notification_failed", "message_id": outbound.pk},
+        )
+        return False
+    return True

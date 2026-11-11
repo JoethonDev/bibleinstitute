@@ -1,0 +1,117 @@
+{% extends "student_next/base.html" %}
+{% load static i18n %}
+{% block title %}{% translate "Support" %} - {% translate "Bible Institute" %}{% endblock %}
+{% block page_class %} sn-page--support{% endblock %}
+{% block body %}
+<div class="sn-support-page">
+  <header class="sn-page-head sn-page-head--chat">
+    <div class="sn-page-head-main">
+      <div class="sn-eyebrow">{% translate "Support" %}</div>
+      <h1 class="sn-page-title">{% translate "Bible Institute team" %}</h1>
+      <p class="sn-page-desc">{% translate "Your own conversation with the institute. Messages sent from Telegram appear here too." %}</p>
+    </div>
+  </header>
+
+  <section
+    id="sn-chat"
+    class="sn-chat"
+    data-chat-root
+    data-page-url="{% url 'student-support' %}"
+    data-poll-url="{% url 'student-support' %}?fragment=poll"
+    data-older-url="{% url 'student-support' %}?fragment=older"
+    data-send-url="{% url 'student-support-send' %}"
+    data-delete-url="{% url 'student-support-message-delete' 0 %}"
+    data-last-id="{{ chat_last_id }}"
+    data-oldest-at="{% if chat_oldest %}{{ chat_oldest.created_at|date:'c' }}{% endif %}"
+    data-oldest-id="{{ chat_oldest.pk|default:0 }}"
+    data-has-older="{{ chat_has_older|yesno:'1,0' }}"
+    data-attachments="{{ chat_attachment_enabled|yesno:'1,0' }}"
+    data-max-seconds="{{ chat_audio_max_seconds }}"
+    data-max-chars="{{ chat_text_max_length }}"
+    data-text-recording="{% translate 'Recording... tap to send' %}"
+    data-text-record="{% translate 'Record an audio message' %}"
+    data-text-sending="{% translate 'Sending...' %}"
+    data-text-mic-blocked="{% translate 'Microphone access was refused. Allow it in the browser settings, then try again.' %}"
+    data-text-mic-missing="{% translate 'This browser cannot record audio.' %}"
+    data-text-failed="{% translate 'The message could not be sent.' %}"
+    data-text-upload="{% translate 'Attaching file...' %}"
+    aria-label="{% translate 'Support conversation' %}"
+  >
+    <div class="sn-chat-body">
+      <a
+        class="sn-chat-older"
+        id="sn-chat-older"
+        data-chat-older
+        href="{{ request.path }}"
+        {% if not chat_has_older %}hidden{% endif %}
+      >{% translate "Load earlier messages" %}</a>
+      <ol class="sn-chat-list" id="sn-chat-list" role="log" aria-live="polite" aria-relevant="additions">
+        {% include "student_next/partials/support_chat_message_list.html" %}
+      </ol>
+      <div class="sn-chat-empty" id="sn-chat-empty"{% if chat_messages %} hidden{% endif %}>
+        <span class="sn-chat-empty-icon" aria-hidden="true"><svg class="sn-ico"><use href="#i-message"></use></svg></span>
+        <h2>{% translate "Start the conversation" %}</h2>
+        <p>{% translate "Write a message, attach an image, or record a voice note. The institute team replies here." %}</p>
+      </div>
+    </div>
+
+    <form
+      class="sn-chat-composer"
+      id="sn-chat-form"
+      method="post"
+      action="{% url 'student-support-send' %}"
+      enctype="multipart/form-data"
+      data-chat-form
+      novalidate
+    >
+      {% csrf_token %}
+      <label class="sn-sr-only" for="sn-chat-input">{% translate "Message" %}</label>
+      <textarea
+        class="sn-chat-input"
+        id="sn-chat-input"
+        name="message"
+        rows="2"
+        maxlength="{{ chat_text_max_length }}"
+        placeholder="{% translate 'Write a message to the institute team' %}"
+        dir="auto"
+      ></textarea>
+      <div class="sn-chat-tools">
+        <label class="sn-chat-icon-btn" for="sn-chat-file" title="{% translate 'Attach an image' %}">
+          <svg class="sn-ico" aria-hidden="true"><use href="#i-camera"></use></svg>
+          <span class="sn-sr-only">{% translate "Attach an image" %}</span>
+          <input
+            class="sn-sr-only"
+            id="sn-chat-file"
+            type="file"
+            name="attachment"
+            accept="image/jpeg,image/png"
+            data-pwa-file-skip="1"
+            {% if not chat_attachment_enabled %}disabled{% endif %}
+          >
+        </label>
+        <button
+          class="sn-chat-icon-btn"
+          id="sn-chat-record"
+          type="button"
+          title="{% translate 'Record an audio message' %}"
+          {% if not chat_attachment_enabled %}disabled{% endif %}
+        >
+          <svg class="sn-ico" aria-hidden="true"><use href="#i-audio"></use></svg>
+          <span class="sn-sr-only">{% translate "Record an audio message" %}</span>
+        </button>
+        <span class="sn-chat-filename" id="sn-chat-filename" hidden></span>
+        <span class="sn-chat-spacer" aria-hidden="true"></span>
+        <button class="sn-btn sn-btn--gold sn-chat-send" id="sn-chat-send" type="submit">
+          <svg class="sn-ico" aria-hidden="true"><use href="#i-send"></use></svg>
+          <span>{% translate "Send" %}</span>
+        </button>
+      </div>
+      <p class="sn-chat-hint">{% translate "Text, one image, or an audio recording of up to one minute." %}</p>
+      <p class="sn-chat-error" id="sn-chat-error" role="alert" hidden></p>
+    </form>
+  </section>
+</div>
+{% endblock %}
+{% block extra_scripts %}
+<script defer src="{% static 'js/student_next/support_chat.js' %}?v={{ static_asset_version }}"></script>
+{% endblock %}

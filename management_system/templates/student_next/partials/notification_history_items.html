@@ -1,8 +1,8 @@
 {% load i18n %}
 {% for item in notification_items %}
 <article class="sn-notif-card{% if not item.is_read %} is-unread{% endif %}" data-notification-id="{{ item.id }}">
-  <span class="sn-notif-icon{% if item.kind == 'quiz_opening' %} sn-notif-icon--quiz{% elif item.kind == 'lesson_published' %} sn-notif-icon--lesson{% else %} sn-notif-icon--calendar{% endif %}" aria-hidden="true">
-    <svg class="sn-ico"><use href="#i-{% if item.kind == 'quiz_opening' %}check-circle{% elif item.kind == 'lesson_published' %}play{% else %}bell{% endif %}"></use></svg>
+  <span class="sn-notif-icon{% if item.kind == 'quiz_opening' %} sn-notif-icon--quiz{% elif item.kind == 'lesson_published' %} sn-notif-icon--lesson{% elif item.kind == 'support_message' %} sn-notif-icon--support{% else %} sn-notif-icon--calendar{% endif %}" aria-hidden="true">
+    <svg class="sn-ico"><use href="#i-{% if item.kind == 'quiz_opening' %}check-circle{% elif item.kind == 'lesson_published' %}play{% elif item.kind == 'support_message' %}message{% else %}bell{% endif %}"></use></svg>
   </span>
   <div class="sn-notif-copy">
     <div class="sn-notif-title"><b dir="auto">{{ item.title }}</b>{% if not item.is_read %}<i class="sn-unread-dot" aria-label="{% translate 'Unread' %}"></i>{% endif %}</div>

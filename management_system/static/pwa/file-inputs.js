@@ -17,6 +17,9 @@
 
   document.querySelectorAll('input[type="file"]').forEach((input) => {
     if (input.dataset.pwaFileEnhanced === "1") return;
+    // Icon-sized pickers (for example the support chat attach button) own their
+    // own styling; the full-width themed control would cover their neighbours.
+    if (input.dataset.pwaFileSkip === "1") return;
     if (!input.closest(".sd-page") && !document.body.classList.contains("sn-student")) return;
     input.dataset.pwaFileEnhanced = "1";
 

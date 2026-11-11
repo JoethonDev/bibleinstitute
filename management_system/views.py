@@ -289,7 +289,9 @@ from .telegram.linking import TelegramLinkError, current_telegram_link
 from .student_notifications import (
     cancel_future_quiz_opening_events,
     cancel_future_lesson_publication_events,
+    classify_quiz_announcement_change,
     create_lesson_publication_event,
+    refresh_pending_quiz_event_snapshots,
     schedule_quiz_opening_events,
 )
 from .payment_matrix import PAYMENT_MATRIX_PAGE_SIZE, PAYMENT_STATUS_VALUES, payment_matrix_page, payment_matrix_student_queryset
@@ -4467,15 +4469,9 @@ def update_quiz(request, quiz_id):
 
                 removed_ids = set(current_questions) - set(questions_id)
                 previous_status = quiz.status
-                previous_notification_facts = (
-                    quiz.name,
-                    quiz.course_offering_id,
-                    quiz.quiz_type_id,
-                    quiz.total_grade,
-                    quiz.opening_date,
-                    quiz.closing_date,
-                    quiz.duration_minutes,
-                )
+                previous_offering_id = quiz.course_offering_id
+                previous_opening_date = quiz.opening_date
+                previous_closing_date = quiz.closing_date
                 quiz.name = requested_name
                 quiz.opening_date = requested_opening_date
                 quiz.closing_date = requested_closing_date
@@ -4484,18 +4480,22 @@ def update_quiz(request, quiz_id):
                 quiz.status = publication_status
                 quiz.quiz_type = requested_quiz_type
                 quiz.course_offering = requested_offering
-                current_notification_facts = (
-                    quiz.name,
-                    quiz.course_offering_id,
-                    quiz.quiz_type_id,
-                    quiz.total_grade,
-                    quiz.opening_date,
-                    quiz.closing_date,
-                    quiz.duration_minutes,
+                # Only a different offering, an extended closing date or a
+                # status change may announce the exam again. Renaming, retyping,
+                # re-grading or changing the duration refreshes the queued text
+                # in place instead of pushing another notification.
+                announcement_change = classify_quiz_announcement_change(
+                    previous_offering_id=previous_offering_id,
+                    previous_opening=previous_opening_date,
+                    previous_closing=previous_closing_date,
+                    offering_id=quiz.course_offering_id,
+                    opening=quiz.opening_date,
+                    closing=quiz.closing_date,
                 )
-                notification_facts_changed = previous_notification_facts != current_notification_facts
+                announcement_scope_changed = announcement_change == "reannounce"
+                window_withdrawn = announcement_change == "withdraw"
                 if publication_status == PublicationStatus.PUBLISHED and (
-                    previous_status != PublicationStatus.PUBLISHED or notification_facts_changed
+                    previous_status != PublicationStatus.PUBLISHED or announcement_scope_changed
                 ):
                     quiz.publication_event_version += 1
                 # Delete Removed Questions
@@ -4520,9 +4520,15 @@ def update_quiz(request, quiz_id):
                     schedule_quiz_opening_events(quiz, locked=True)
                 elif previous_status == PublicationStatus.PUBLISHED and publication_status != PublicationStatus.PUBLISHED:
                     cancel_future_quiz_opening_events(quiz)
-                elif previous_status == PublicationStatus.PUBLISHED and notification_facts_changed:
+                elif previous_status == PublicationStatus.PUBLISHED and announcement_scope_changed:
                     cancel_future_quiz_opening_events(quiz)
                     schedule_quiz_opening_events(quiz, locked=True)
+                elif previous_status == PublicationStatus.PUBLISHED and window_withdrawn:
+                    # A shortened or moved window cannot be announced again, so
+                    # the queued reminder is withdrawn quietly.
+                    cancel_future_quiz_opening_events(quiz)
+                elif previous_status == PublicationStatus.PUBLISHED:
+                    refresh_pending_quiz_event_snapshots(quiz)
 
             logger.info(
                 "Quiz %s is updated successfully in offering %s with %s new and %s existing questions",

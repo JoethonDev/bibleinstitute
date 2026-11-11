@@ -10,7 +10,7 @@
     {% csrf_token %}
     <input type="hidden" name="target_url" value="{{ item.target_url }}">
     <button type="submit" class="sn-notif-pop-item">
-      <span class="sn-notif-pop-icon" aria-hidden="true"><svg class="sn-ico"><use href="#i-{% if item.kind == 'quiz_opening' %}check-circle{% elif item.kind == 'lesson_published' %}play{% else %}bell{% endif %}"></use></svg></span>
+      <span class="sn-notif-pop-icon" aria-hidden="true"><svg class="sn-ico"><use href="#i-{% if item.kind == 'quiz_opening' %}check-circle{% elif item.kind == 'lesson_published' %}play{% elif item.kind == 'support_message' %}message{% else %}bell{% endif %}"></use></svg></span>
       <span class="sn-notif-pop-copy"><b dir="auto">{{ item.title }}</b><small dir="auto">{{ item.body|truncatechars:90 }}</small></span>
       <time>{{ item.created_at|date:"D, j M" }}</time>
     </button>

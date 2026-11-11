@@ -1,0 +1,56 @@
+/* ==========================================================================
+   Bible Institute - graded answer review
+   One stylesheet for the student quiz result page (student_next shell) and
+   the management submission detail (.sn-review-embed inside the workspace
+   shell), so both render the same review cards.
+   ========================================================================== */
+
+/* Token bridge: the workspace shell defines --aw-*, the student shell
+   defines --sn-*. Inside the embed the sn tokens fall back to the workspace
+   palette, so the same rules serve both shells. */
+.sn-review-embed{
+    --sn-ink: var(--aw-ink, #142c34);
+    --sn-paper: var(--aw-paper, #fffdf9);
+    --sn-cream: var(--aw-paper-3, #f7f2e8);
+    --sn-mist: var(--aw-cream-2, #efe8da);
+    --sn-line: var(--aw-line, #e4dac6);
+    --sn-muted: var(--aw-muted, #6e7c82);
+    --sn-shadow: var(--aw-shadow-sm, 0 1px 2px rgba(20, 44, 52, .05));
+    --sn-display: inherit;
+}
+
+.sn-review-cards{ display: flex; flex-direction: column; gap: 10px; }
+.sn-review-card{ padding: 15px 16px; border: 1px solid var(--sn-line); border-radius: 13px; background: var(--sn-paper); box-shadow: var(--sn-shadow); }
+.sn-review-card-head{ display: flex; align-items: center; gap: 8px; }
+.sn-review-card-head > span:first-child{ width: 26px; height: 26px; display: grid; place-items: center; border-radius: 50%; background: var(--sn-mist); color: var(--sn-muted); font-size: .64rem; font-weight: 800; }
+.sn-review-card-head > .sn-pill{ margin-inline-start: auto; }
+.sn-review-card h3{ margin: 9px 0 10px; font-family: var(--sn-display); font-size: 1.08rem; line-height: 1.35; }
+.sn-review-answer-grid{ display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.sn-review-answer{ padding: 8px 10px; border-radius: 8px; background: var(--sn-cream); color: var(--sn-muted); font-size: .68rem; }
+.sn-review-answer span{ display: block; color: var(--sn-muted); font-size: .6rem; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; }
+.sn-review-answer b{ display: block; margin-top: 2px; font-size: .78rem; }
+.sn-review-card.is-wrong .sn-review-answer--correct{ background: #d7ebdf; }
+.sn-review-card.is-wrong .sn-review-answer--given{ background: #f6e4e4; }
+.sn-review-list{ display: grid; gap: 3px; margin: 4px 0 0; padding-inline-start: 18px; }
+.sn-review-list li{ color: var(--sn-ink); font-size: .78rem; line-height: 1.45; }
+[dir="rtl"] .sn-review-answer span{ font-size: .72rem; }
+[dir="rtl"] .sn-review-answer b{ font-size: .88rem; }
+[dir="rtl"] .sn-review-list li{ font-size: .86rem; line-height: 1.6; }
+
+/* Grading control, management only. */
+.sn-review-grade{ display: flex; align-items: center; gap: 8px; margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--sn-line); }
+.sn-review-grade label{ color: var(--sn-muted); font-size: .68rem; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }
+.sn-review-grade input{ width: 84px; padding: 6px 8px; border: 1px solid var(--sn-line); border-radius: 8px; background: #fff; color: var(--sn-ink); font: inherit; font-size: .8rem; font-weight: 700; }
+.sn-review-grade input:focus-visible{ outline: 2px solid var(--sn-ink); outline-offset: 1px; }
+.sn-review-grade span{ color: var(--sn-muted); font-size: .74rem; font-weight: 700; }
+
+/* Pills inside the workspace shell; the student shell already styles .sn-pill. */
+.sn-review-embed .sn-pill{ display: inline-flex; align-items: center; gap: 5px; padding: 0 9px; min-height: 23px; border-radius: 999px; font-size: .62rem; font-weight: 800; letter-spacing: .02em; }
+.sn-review-embed .sn-pill--success{ background: #d7ebdf; color: #1e5b40; }
+.sn-review-embed .sn-pill--gold{ background: #f1dfbe; color: #6d4a10; }
+.sn-review-embed .sn-pill--warning{ background: #f2dfb8; color: #744a0c; }
+.sn-review-embed .sn-pill--danger{ background: #f3dada; color: #8c2f2f; }
+
+@media (max-width: 640px){
+    .sn-review-answer-grid{ grid-template-columns: 1fr; }
+}

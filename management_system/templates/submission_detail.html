@@ -1,7 +1,11 @@
 {% extends 'admin_panel.html' %}
-{% load i18n %}
+{% load i18n static %}
 
 {% block breadcrumbs %}{% endblock %}
+
+{% block style %}
+<link rel="stylesheet" href="{% static 'css/quiz_review.css' %}?v={{ static_asset_version }}">
+{% endblock %}
 
 {% block body %}
 {% include 'partials/submission_detail_content.html' %}
