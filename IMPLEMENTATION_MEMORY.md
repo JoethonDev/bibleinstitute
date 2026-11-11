@@ -67,7 +67,11 @@ Implemented `docs/pending/PWA_OFFLINE_LIBRARY_PUSH_PASSKEY_SPEC.md`:
   public VAPID key into `.compose.env`; the private VAPID key remains only in
   `.env`. `compose.application.yml` no longer overrides the private key from
   Compose interpolation, so it reaches the app through the `.env` service
-  env_file and is not blanked when `.compose.env` is used.
+  env_file and is not blanked when `.compose.env` is used. The setup script
+  also prompts for the RP/origin/display/contact values and enables both
+  features by default; it generates a VAPID key pair with OpenSSL and a small
+  stdlib Python encoder when either half is missing, without printing the
+  private key.
 
 Query-budget evidence (disposable PostgreSQL 16, 100,002 users, 120,003
 notifications for one student):

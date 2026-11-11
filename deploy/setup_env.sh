@@ -135,6 +135,69 @@ gen_secret() {
     fi
 }
 
+normalize_bool() {
+    case "${1,,}" in
+        true|1|yes|on) printf 'true' ;;
+        false|0|no|off) printf 'false' ;;
+        *) die "Expected true or false, got: $1" ;;
+    esac
+}
+
+normalize_positive_int() {
+    [[ "$1" =~ ^[1-9][0-9]*$ ]] || die "Expected a positive integer, got: $1"
+    printf '%s' "$1"
+}
+
+normalize_nonnegative_int() {
+    [[ "$1" =~ ^[0-9]+$ ]] || die "Expected a non-negative integer, got: $1"
+    printf '%s' "$1"
+}
+
+generate_vapid_pair() {
+    # Print PUBLIC=base64url and PRIVATE=base64url without logging the private
+    # value. OpenSSL generates the EC key; the small stdlib parser only encodes
+    # the P-256 scalar and uncompressed public point as VAPID expects.
+    local key_file python_bin
+    command -v openssl >/dev/null 2>&1 || die "openssl is required to generate VAPID keys"
+    if command -v python3 >/dev/null 2>&1; then
+        python_bin=python3
+    elif command -v python >/dev/null 2>&1; then
+        python_bin=python
+    else
+        die "python3 is required to encode generated VAPID keys"
+    fi
+    key_file="$(mktemp "${TMPDIR:-/tmp}/vapid.XXXXXX")"
+    openssl ecparam -name prime256v1 -genkey -noout -out "$key_file" 2>/dev/null
+    "$python_bin" - "$key_file" <<'PY'
+import base64
+import re
+import subprocess
+import sys
+
+key_file = sys.argv[1]
+text = subprocess.check_output(
+    ["openssl", "ec", "-in", key_file, "-text", "-noout"],
+    text=True,
+    stderr=subprocess.DEVNULL,
+)
+private_part = text.split("priv:", 1)[1].split("pub:", 1)[0]
+public_part = text.split("pub:", 1)[1]
+if "ASN1 OID:" in public_part:
+    public_part = public_part.split("ASN1 OID:", 1)[0]
+private_hex = "".join(re.findall(r"[0-9a-fA-F]{2}", private_part)).lower().rjust(64, "0")
+public_hex = "".join(re.findall(r"[0-9a-fA-F]{2}", public_part)).lower()
+if len(private_hex) != 64 or len(public_hex) != 130 or not public_hex.startswith("04"):
+    raise SystemExit("Could not parse generated VAPID key")
+encode = lambda value: base64.urlsafe_b64encode(
+    bytes.fromhex(value)
+).rstrip(b"=").decode()
+print("PUBLIC=" + encode(public_hex))
+print("PRIVATE=" + encode(private_hex))
+PY
+    rm -f "$key_file"
+}
+
+
 # -- Preflight ----------------------------------------------------------
 [[ $# -eq 0 ]] || { case "$1" in -h|--help) usage ;; *) die "Unknown: $1" ;; esac; }
 [[ -f compose.infrastructure.yml ]] || die "Run from repo root"
@@ -166,20 +229,73 @@ write_value DJANGO_TRUSTED_PROXY_IPS "${LMS_NETWORK_SUBNET:-172.31.240.0/24}"
 write_value DJANGO_SITE_DOMAIN "https://$domain"
 write_value MONITORING_DOMAIN "monitor.$domain"
 write_value DEPLOY_HEALTHCHECK_URL "https://${domain}/"
-# PWA defaults are derived from the primary domain unless the operator has
-# already supplied an explicit value in .env. Push/passkey secrets stay in .env;
-# .compose.env receives only domain facts and the public VAPID key.
-write_value WEBAUTHN_RP_ID "$(value_from_tmp WEBAUTHN_RP_ID "$domain")"
-write_value WEBAUTHN_EXPECTED_ORIGIN "$(value_from_tmp WEBAUTHN_EXPECTED_ORIGIN "https://$domain")"
-write_value WEB_PUSH_VAPID_SUBJECT "$(value_from_tmp WEB_PUSH_VAPID_SUBJECT "https://$domain")"
-write_value WEBAUTHN_RP_NAME "$(value_from_tmp WEBAUTHN_RP_NAME "Bible Institute Coptic")"
-write_value WEBAUTHN_ENABLED "$(value_from_tmp WEBAUTHN_ENABLED "false")"
-write_value WEB_PUSH_ENABLED "$(value_from_tmp WEB_PUSH_ENABLED "false")"
-write_value WEB_PUSH_TIMEOUT_SECONDS "$(value_from_tmp WEB_PUSH_TIMEOUT_SECONDS "15")"
-write_value WEB_PUSH_BATCH_SIZE "$(value_from_tmp WEB_PUSH_BATCH_SIZE "100")"
-write_value WEBAUTHN_CHALLENGE_TTL_SECONDS "$(value_from_tmp WEBAUTHN_CHALLENGE_TTL_SECONDS "300")"
-write_value PWA_MEDIA_MAX_BYTES "$(value_from_tmp PWA_MEDIA_MAX_BYTES "0")"
 echo ""
+
+# -- 1b. PWA, Web Push and WebAuthn ------------------------------------
+# These values are written to .env. Non-secret values and the public VAPID key
+# are also copied to .compose.env by write_compose_env below. The VAPID private
+# key remains only in .env and is never printed.
+echo "PWA / Web Push / WebAuthn"
+echo ""
+
+rp_id="$(read_value WEBAUTHN_RP_ID \
+    "WebAuthn RP ID (hostname only; normally the exact site hostname)" \
+    "$domain")"
+[[ "$rp_id" =~ ^[A-Za-z0-9]([A-Za-z0-9.-]{0,251}[A-Za-z0-9])?$ ]] \
+    || die "WEBAUTHN_RP_ID must be a hostname without scheme, path or port"
+write_value WEBAUTHN_RP_ID "$rp_id"
+
+expected_origin="$(read_value WEBAUTHN_EXPECTED_ORIGIN \
+    "Exact HTTPS origin (no trailing slash)" \
+    "https://$domain")"
+[[ "$expected_origin" == https://* ]] || die "WEBAUTHN_EXPECTED_ORIGIN must start with https://"
+[[ "$expected_origin" != */ ]] || die "WEBAUTHN_EXPECTED_ORIGIN must not end with /"
+origin_host="${expected_origin#https://}"
+origin_host="${origin_host%%/*}"
+origin_host="${origin_host%%:*}"
+[[ "$origin_host" == "$rp_id" || "$origin_host" == *."$rp_id" ]] \
+    || die "WEBAUTHN_RP_ID must equal or be a parent of the expected origin host"
+write_value WEBAUTHN_EXPECTED_ORIGIN "$expected_origin"
+
+write_value WEBAUTHN_RP_NAME "$(read_value WEBAUTHN_RP_NAME \
+    "Passkey display name" "Bible Institute Coptic")"
+
+vapid_subject="$(read_value WEB_PUSH_VAPID_SUBJECT \
+    "VAPID contact (mailto: or https:)" "https://$domain")"
+[[ "$vapid_subject" == mailto:* || "$vapid_subject" == https://* ]] \
+    || die "WEB_PUSH_VAPID_SUBJECT must start with mailto: or https://"
+write_value WEB_PUSH_VAPID_SUBJECT "$vapid_subject"
+
+write_value WEB_PUSH_ENABLED "$(normalize_bool "$(read_value WEB_PUSH_ENABLED \
+    "Enable Web Push? (true/false)" "true")")"
+write_value WEBAUTHN_ENABLED "$(normalize_bool "$(read_value WEBAUTHN_ENABLED \
+    "Enable passkeys/WebAuthn? (true/false)" "true")")"
+write_value WEB_PUSH_TIMEOUT_SECONDS "$(normalize_positive_int "$(read_value WEB_PUSH_TIMEOUT_SECONDS \
+    "Web Push timeout in seconds" "15")")"
+write_value WEB_PUSH_BATCH_SIZE "$(normalize_positive_int "$(read_value WEB_PUSH_BATCH_SIZE \
+    "Web Push batch size" "100")")"
+write_value WEBAUTHN_CHALLENGE_TTL_SECONDS "$(normalize_positive_int "$(read_value WEBAUTHN_CHALLENGE_TTL_SECONDS \
+    "WebAuthn challenge lifetime in seconds" "300")")"
+write_value PWA_MEDIA_MAX_BYTES "$(normalize_nonnegative_int "$(read_value PWA_MEDIA_MAX_BYTES \
+    "Offline media max bytes (0 = no app cap)" "0")")"
+
+# Preserve an existing pair. If either half is missing, generate a fresh pair;
+# existing browser subscriptions then need to be re-enabled.
+vapid_public="$(value_from_tmp WEB_PUSH_VAPID_PUBLIC_KEY "")"
+vapid_private="$(value_from_tmp WEB_PUSH_VAPID_PRIVATE_KEY "")"
+if [[ -z "$vapid_public" || -z "$vapid_private" ]]; then
+    info "Generating a new VAPID key pair (private key is not displayed)"
+    vapid_output="$(generate_vapid_pair)" || die "VAPID key generation failed"
+    vapid_public="$(printf '%s\n' "$vapid_output" | sed -n 's/^PUBLIC=//p')"
+    vapid_private="$(printf '%s\n' "$vapid_output" | sed -n 's/^PRIVATE=//p')"
+    [[ -n "$vapid_public" && -n "$vapid_private" ]] || die "VAPID key generation returned empty keys"
+    write_value WEB_PUSH_VAPID_PUBLIC_KEY "$vapid_public"
+    write_value WEB_PUSH_VAPID_PRIVATE_KEY "$vapid_private"
+else
+    info "Keeping existing VAPID key pair; delete both key lines to rotate"
+fi
+echo ""
+
 
 # -- 2. PostgreSQL ------------------------------------------------------
 write_value POSTGRES_DB "$(read_value POSTGRES_DB "Database name" lms_database)"
