@@ -19,6 +19,7 @@ from ..academic_access import (
 )
 from ..models import (
     AcademicHoliday,
+    AcademicYearLevel,
     AcademicYearLevelMeeting,
     AttendanceRecord,
     CourseOffering,
@@ -449,17 +450,34 @@ def _student_course_quiz_rows(
     offering_id: int,
     *,
     limit: int | None = None,
+    include_drafts: bool = False,
 ) -> list[dict]:
-    quiz_queryset = Quiz.objects.filter(
-        course_offering_id=offering_id,
-        status=PublicationStatus.PUBLISHED,
-    ).select_related(
+    quiz_queryset = Quiz.objects.filter(course_offering_id=offering_id)
+    if not include_drafts:
+        quiz_queryset = quiz_queryset.filter(status=PublicationStatus.PUBLISHED)
+    quiz_queryset = quiz_queryset.select_related(
         "course_offering__academic_year_level__academic_year",
         "course_offering__academic_year_level__level",
     ).order_by("opening_date", "pk")
     if limit is not None:
         quiz_queryset = quiz_queryset[:max(0, limit)]
     quizzes = list(quiz_queryset)
+    is_management = include_drafts or bool(
+        user.is_authenticated and getattr(getattr(user, "role", None), "role", None) in {"admin", "staff"}
+    )
+    if is_management:
+        return [
+            {
+                "quiz": quiz,
+                "id": quiz.pk,
+                "status": "draft" if quiz.status != PublicationStatus.PUBLISHED else (
+                    "upcoming" if quiz.opening_date and quiz.opening_date > now()
+                    else ("closed_unsolved" if quiz.closing_date and quiz.closing_date <= now() else "ready")
+                ),
+                "grade": None,
+            }
+            for quiz in quizzes
+        ]
     grades = {
         row.quiz_id: row
         for row in Grade.objects.filter(user=user, quiz_id__in=[quiz.pk for quiz in quizzes])
@@ -504,9 +522,15 @@ def student_course_quiz_data(
     offering: CourseOffering,
     *,
     limit: int | None = None,
+    include_drafts: bool = False,
 ) -> list[dict]:
     """Return quiz state for a course offering authorized by the caller."""
-    return _student_course_quiz_rows(user, offering.pk, limit=limit)
+    return _student_course_quiz_rows(
+        user,
+        offering.pk,
+        limit=limit,
+        include_drafts=include_drafts,
+    )
 
 
 def student_quiz_statuses(user: User, offering_id: int) -> list[dict] | None:
@@ -568,43 +592,58 @@ def student_calendar_data(
     language: str = "en",
     scope_id: int | None = None,
     month: str | None = None,
+    *,
+    include_management: bool = False,
 ) -> dict | None:
     """Return one authorized academic scope and one bounded calendar month.
 
-    Scope choices come only from this account's normal enrollments. The default
-    remains the active academic year, falling back to its latest normal scope.
-    ``None`` means a requested scope is not owned by this account; an invalid
-    month raises ``ValueError`` for the API boundary to map to 400.
+    Scope choices come from this account's normal enrollments, or from all
+    academic year-level scopes when ``include_management`` is enabled for an
+    authenticated admin/staff reader.
     """
-    enrollments = list(
-        Enrollment.objects.filter(
-            student=user,
-            status__in=(Enrollment.Status.ACTIVE, Enrollment.Status.COMPLETED),
-            enrollment_type=Enrollment.Type.NORMAL,
-        ).select_related(
-            "academic_year_level__academic_year",
-            "academic_year_level__level",
-        ).order_by(
-            "-academic_year_level__academic_year__is_active",
-            "-academic_year_level__academic_year__ordering",
-            "-enrolled_at",
-            "-pk",
-        )
+    is_management = include_management and bool(
+        user.is_authenticated and getattr(getattr(user, "role", None), "role", None) in {"admin", "staff"}
     )
+    if is_management:
+        scopes = list(
+            AcademicYearLevel.objects.select_related(
+                "academic_year",
+                "level",
+            ).order_by(
+                "-academic_year__is_active",
+                "-academic_year__ordering",
+                "level__ordering",
+                "pk",
+            )
+        )
+    else:
+        enrollments = list(
+            Enrollment.objects.filter(
+                student=user,
+                status__in=(Enrollment.Status.ACTIVE, Enrollment.Status.COMPLETED),
+                enrollment_type=Enrollment.Type.NORMAL,
+            ).select_related(
+                "academic_year_level__academic_year",
+                "academic_year_level__level",
+            ).order_by(
+                "-academic_year_level__academic_year__is_active",
+                "-academic_year_level__academic_year__ordering",
+                "-enrolled_at",
+                "-pk",
+            )
+        )
+        scopes = [enrollment.academic_year_level for enrollment in enrollments]
+
     scope_options = [
         {
-            "id": enrollment.academic_year_level_id,
-            "academic_year": enrollment.academic_year_level.academic_year.name,
-            "level": (
-                enrollment.academic_year_level.level.name_ar
-                if language == "ar"
-                else enrollment.academic_year_level.level.name_en
-            ),
-            "is_active": enrollment.academic_year_level.academic_year.is_active,
+            "id": item.pk,
+            "academic_year": item.academic_year.name,
+            "level": item.level.name_ar if language == "ar" else item.level.name_en,
+            "is_active": item.academic_year.is_active,
         }
-        for enrollment in enrollments
+        for item in scopes
     ]
-    if not enrollments:
+    if not scopes:
         return {
             "scope": None,
             "scope_options": [],
@@ -617,27 +656,15 @@ def student_calendar_data(
         }
 
     if scope_id is None:
-        selected = next(
-            (
-                enrollment
-                for enrollment in enrollments
-                if enrollment.academic_year_level.academic_year.is_active
-            ),
-            enrollments[0],
+        scope = next(
+            (item for item in scopes if item.academic_year.is_active),
+            scopes[0],
         )
     else:
-        selected = next(
-            (
-                enrollment
-                for enrollment in enrollments
-                if enrollment.academic_year_level_id == scope_id
-            ),
-            None,
-        )
-        if selected is None:
+        scope = next((item for item in scopes if item.pk == scope_id), None)
+        if scope is None:
             return None
 
-    scope = selected.academic_year_level
     year = scope.academic_year
     months = _calendar_month_keys(year.starts_on, year.ends_on)
     today_month = localdate().strftime("%Y-%m")

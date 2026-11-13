@@ -13,7 +13,12 @@ _NAV_ITEMS = (
 )
 
 
-def student_navigation(active_page: str) -> list[dict[str, object]]:
+def student_navigation(
+    active_page: str,
+    *,
+    include_support: bool = True,
+    include_offline: bool = True,
+) -> list[dict[str, object]]:
     active_key = "learn" if active_page in {
         "courses", "course", "lesson", "quiz", "graduates", "download",
     } else active_page
@@ -26,4 +31,5 @@ def student_navigation(active_page: str) -> list[dict[str, object]]:
             "active": key == active_key,
         }
         for key, label, url_name, icon in _NAV_ITEMS
+        if (include_support or key != "support") and (include_offline or key != "offline")
     ]

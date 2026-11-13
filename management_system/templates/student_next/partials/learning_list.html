@@ -8,6 +8,25 @@
       </a>
       {% endfor %}
     </nav>
+    {% if is_management_view and year_options %}
+    <form method="get" action="{% url 'courses' %}" class="sn-filter-selects" hx-get="{% url 'courses' %}" hx-target="#student-learning-list" hx-select="#student-learning-list" hx-swap="outerHTML" hx-push-url="true" hx-trigger="change">
+      <input type="hidden" name="filter" value="{{ selected_filter }}">
+      <label class="sn-sr-only" for="sn-filter-year">{% translate "Academic year" %}</label>
+      <select id="sn-filter-year" name="year" class="sn-scope-select" aria-label="{% translate 'Academic year' %}" onchange="if (!window.htmx) { this.form.submit(); }">
+        {% for opt in year_options %}
+        <option value="{{ opt.value }}"{% if opt.selected %} selected{% endif %}>{{ opt.label }}</option>
+        {% endfor %}
+      </select>
+      {% if level_options %}
+      <label class="sn-sr-only" for="sn-filter-level">{% translate "Level" %}</label>
+      <select id="sn-filter-level" name="level" class="sn-scope-select" aria-label="{% translate 'Level' %}" onchange="if (!window.htmx) { this.form.submit(); }">
+        {% for opt in level_options %}
+        <option value="{{ opt.value }}"{% if opt.selected %} selected{% endif %}>{{ opt.label }}</option>
+        {% endfor %}
+      </select>
+      {% endif %}
+    </form>
+    {% endif %}
     <span class="sn-filter-note">
       {% blocktrans count count=total_count %}Showing {{ count }} course{% plural %}Showing {{ count }} courses{% endblocktrans %}
     </span>
@@ -53,7 +72,12 @@
                     {% endif %}
                   </a>
                   <div class="sn-course-body">
-                    <div class="sn-course-kicker">{{ section.level_name }} - {{ section.academic_year.name }}</div>
+                    <div class="sn-course-kicker-row">
+                      <div class="sn-course-kicker">{{ section.level_name }} - {{ section.academic_year.name }}</div>
+                      {% if is_management_view and offering.status != "published" %}
+                      <span class="sn-pill sn-pill--warning">{{ offering.get_status_display }}</span>
+                      {% endif %}
+                    </div>
                     <h3 class="sn-course-title"><a href="{% url 'course-details' offering.pk %}" dir="auto">{{ offering.course.name }}</a></h3>
                     {% if offering.course.description %}<p class="sn-course-desc" dir="auto">{{ offering.course.description|truncatechars:145 }}</p>{% endif %}
                     <div class="sn-course-meta">
@@ -68,7 +92,7 @@
                     </div>
                     {% endif %}
                     <div class="sn-course-foot">
-                      <span class="sn-course-next">{% if offering.student_progress.completion_percent == 100 %}{% translate "Review" %}{% else %}{% translate "Next" %}: {% translate "Continue" %}{% endif %}</span>
+                      <span class="sn-course-next">{% if is_management_view %}{% translate "Preview" %}{% elif offering.student_progress.completion_percent == 100 %}{% translate "Review" %}{% else %}{% translate "Next" %}: {% translate "Continue" %}{% endif %}</span>
                       <a class="sn-text-link" href="{% url 'course-details' offering.pk %}">{% translate "Open course workspace" %}<svg class="sn-ico" aria-hidden="true"><use href="#i-arrow-right"></use></svg></a>
                     </div>
                   </div>
@@ -105,17 +129,18 @@
       {% if page_obj.paginator.num_pages > 1 %}
       <nav class="sn-pager" aria-label="{% translate 'Course pages' %}">
         {% if page_obj.has_previous %}
-        <a class="sn-btn sn-btn--ghost sn-btn--sm" href="?filter={{ selected_filter }}&page={{ page_obj.previous_page_number }}">{% translate "Previous" %}</a>
+        <a class="sn-btn sn-btn--ghost sn-btn--sm" href="?{% if pagination_query %}{{ pagination_query }}&amp;{% else %}filter={{ selected_filter }}&amp;{% endif %}page={{ page_obj.previous_page_number }}" hx-get="?{% if pagination_query %}{{ pagination_query }}&amp;{% else %}filter={{ selected_filter }}&amp;{% endif %}page={{ page_obj.previous_page_number }}" hx-target="#student-learning-list" hx-select="#student-learning-list" hx-swap="outerHTML" hx-push-url="true">{% translate "Previous" %}</a>
         {% endif %}
         <span>{% blocktrans with page=page_obj.number total=page_obj.paginator.num_pages %}Page {{ page }} of {{ total }}{% endblocktrans %}</span>
         {% if page_obj.has_next %}
-        <a class="sn-btn sn-btn--ghost sn-btn--sm" href="?filter={{ selected_filter }}&page={{ page_obj.next_page_number }}">{% translate "Next" %}</a>
+        <a class="sn-btn sn-btn--ghost sn-btn--sm" href="?{% if pagination_query %}{{ pagination_query }}&amp;{% else %}filter={{ selected_filter }}&amp;{% endif %}page={{ page_obj.next_page_number }}" hx-get="?{% if pagination_query %}{{ pagination_query }}&amp;{% else %}filter={{ selected_filter }}&amp;{% endif %}page={{ page_obj.next_page_number }}" hx-target="#student-learning-list" hx-select="#student-learning-list" hx-swap="outerHTML" hx-push-url="true">{% translate "Next" %}</a>
         {% endif %}
       </nav>
       {% endif %}
     </div>
 
     <aside class="sn-aside">
+      {% if not is_management_view %}
       <section class="sn-card sn-aside-card">
         <div class="sn-section-head">
           <div class="sn-section-head-main"><h2><svg class="sn-ico" aria-hidden="true"><use href="#i-clock"></use></svg>{% translate "Due soon" %}</h2><p>{% translate "Quizzes still open for your account." %}</p></div>
@@ -135,6 +160,7 @@
           <div class="sn-card-actions"><a class="sn-btn sn-btn--ghost sn-btn--sm" href="{% url 'student-notifications' %}">{% translate "View notifications" %}</a></div>
         </div>
       </section>
+      {% endif %}
 
       <section class="sn-card sn-aside-card">
         <div class="sn-section-head"><div class="sn-section-head-main"><h2><svg class="sn-ico" aria-hidden="true"><use href="#i-calendar"></use></svg>{% translate "This week" %}</h2><p>{% translate "Your next meetings." %}</p></div></div>
@@ -150,6 +176,7 @@
         </div>
       </section>
 
+      {% if not is_management_view %}
       <section class="sn-card sn-aside-card">
         <div class="sn-section-head"><div class="sn-section-head-main"><h2><svg class="sn-ico" aria-hidden="true"><use href="#i-chart"></use></svg>{% translate "Your progress" %}</h2><p>{% translate "A quick view of your studies." %}</p></div></div>
         <div class="sn-card-body">
@@ -164,13 +191,16 @@
           <div class="sn-card-actions"><a class="sn-btn sn-btn--ghost sn-btn--sm" href="{% url 'view-profile' %}">{% translate "Open student record" %}</a></div>
         </div>
       </section>
+      {% endif %}
 
       <section class="sn-card sn-aside-card">
         <div class="sn-section-head"><div class="sn-section-head-main"><h2>{% translate "More from the institute" %}</h2></div></div>
         <div class="sn-card-body">
           <div class="sn-more-list">
             <a class="sn-more-item" href="{% url 'graduates' %}"><span><svg class="sn-ico" aria-hidden="true"><use href="#i-graduation"></use></svg></span><div><b>{% translate "Graduates" %}</b><small>{% translate "Your graduation albums" %}</small></div><svg class="sn-ico" aria-hidden="true"><use href="#i-chevron-right"></use></svg></a>
+            {% if not is_management_student_view %}
             <a class="sn-more-item" href="{% url 'offline-library' %}"><span><svg class="sn-ico" aria-hidden="true"><use href="#i-download"></use></svg></span><div><b>{% translate "Downloaded media" %}</b><small>{% translate "Saved audio and PDF" %}</small></div><svg class="sn-ico" aria-hidden="true"><use href="#i-chevron-right"></use></svg></a>
+            {% endif %}
       <a class="sn-more-item" href="{% url 'download-app' %}"><span><svg class="sn-ico" aria-hidden="true"><use href="#i-android"></use></svg></span><div><b>{% translate "Install the app" %}</b><small>{% translate "Add to your home screen" %}</small></div><svg class="sn-ico" aria-hidden="true"><use href="#i-chevron-right"></use></svg></a>
           </div>
         </div>

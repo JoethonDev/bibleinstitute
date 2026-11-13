@@ -12,7 +12,17 @@
     </div>
     {% if calendar %}
     <div class="sn-page-actions">
-      <a class="sn-btn sn-btn--ghost" href="?month={{ calendar.today_month }}"><svg class="sn-ico" aria-hidden="true"><use href="#i-calendar"></use></svg>{% translate "Today" %}</a>
+      {% if calendar.scope_options|length > 1 %}
+      <form method="get" class="sn-inline-filter-form">
+        <label class="sn-sr-only" for="sn-calendar-scope">{% translate "Academic scope" %}</label>
+        <select id="sn-calendar-scope" name="scope" class="sn-scope-select" onchange="this.form.submit()">
+          {% for opt in calendar.scope_options %}
+          <option value="{{ opt.id }}"{% if opt.id == calendar.scope.id %} selected{% endif %}>{{ opt.academic_year }} - {{ opt.level }}</option>
+          {% endfor %}
+        </select>
+      </form>
+      {% endif %}
+      <a class="sn-btn sn-btn--ghost" href="?{% if calendar.scope %}scope={{ calendar.scope.id }}&amp;{% endif %}month={{ calendar.today_month }}"><svg class="sn-ico" aria-hidden="true"><use href="#i-calendar"></use></svg>{% translate "Today" %}</a>
     </div>
     {% endif %}
   </header>
@@ -34,8 +44,8 @@
             <div><b>{{ calendar.title }}</b><span>{{ calendar.scope.level }} - {{ calendar.scope.academic_year }}</span></div>
           </div>
           <div class="sn-calendar-controls">
-            {% if calendar.previous_month %}<a class="sn-icon-btn" href="?month={{ calendar.previous_month }}" aria-label="{% translate 'Previous month' %}"><svg class="sn-ico" aria-hidden="true"><use href="{% if request.LANGUAGE_CODE == 'ar' %}#i-chevron-right{% else %}#i-chevron-left{% endif %}"></use></svg></a>{% else %}<span class="sn-icon-btn is-disabled" aria-hidden="true"><svg class="sn-ico"><use href="#i-chevron-left"></use></svg></span>{% endif %}
-            {% if calendar.next_month %}<a class="sn-icon-btn" href="?month={{ calendar.next_month }}" aria-label="{% translate 'Next month' %}"><svg class="sn-ico" aria-hidden="true"><use href="{% if request.LANGUAGE_CODE == 'ar' %}#i-chevron-left{% else %}#i-chevron-right{% endif %}"></use></svg></a>{% else %}<span class="sn-icon-btn is-disabled" aria-hidden="true"><svg class="sn-ico"><use href="#i-chevron-right"></use></svg></span>{% endif %}
+            {% if calendar.previous_month %}<a class="sn-icon-btn" href="?{% if calendar.scope %}scope={{ calendar.scope.id }}&amp;{% endif %}month={{ calendar.previous_month }}" aria-label="{% translate 'Previous month' %}"><svg class="sn-ico" aria-hidden="true"><use href="{% if request.LANGUAGE_CODE == 'ar' %}#i-chevron-right{% else %}#i-chevron-left{% endif %}"></use></svg></a>{% else %}<span class="sn-icon-btn is-disabled" aria-hidden="true"><svg class="sn-ico"><use href="#i-chevron-left"></use></svg></span>{% endif %}
+            {% if calendar.next_month %}<a class="sn-icon-btn" href="?{% if calendar.scope %}scope={{ calendar.scope.id }}&amp;{% endif %}month={{ calendar.next_month }}" aria-label="{% translate 'Next month' %}"><svg class="sn-ico" aria-hidden="true"><use href="{% if request.LANGUAGE_CODE == 'ar' %}#i-chevron-left{% else %}#i-chevron-right{% endif %}"></use></svg></a>{% else %}<span class="sn-icon-btn is-disabled" aria-hidden="true"><svg class="sn-ico"><use href="#i-chevron-right"></use></svg></span>{% endif %}
           </div>
         </div>
         <div class="sn-cal-grid" role="grid" aria-label="{{ calendar.title }}">

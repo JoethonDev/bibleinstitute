@@ -16428,6 +16428,9 @@ msgstr "تُعرض المحاضرات كلها مباشرة، وتُفصل ال�
 msgid "Lectures"
 msgstr "المحاضرات"
 
+msgid "Lectures and lessons"
+msgstr "المحاضرات والدروس"
+
 #: .\management_system\templates\student_next\partials\course_workspace.html:67
 #, python-format
 msgid "%(count)s direct lecture"
@@ -17339,6 +17342,18 @@ msgstr "مجدول"
 
 msgid "Cancel this scheduled or queued notification?"
 msgstr "هل تريد إلغاء هذا الإشعار المجدول أو المنتظر؟"
+
+msgid "Drafts"
+msgstr "المسودات"
+
+msgid "Student View"
+msgstr "عرض الطالب"
+
+msgid "All academic years"
+msgstr "كل السنوات الدراسية"
+
+msgid "Total grade"
+msgstr "الدرجة الكلية"
 
 #~ msgid "Cannot accept a %(status)s application."
 #~ msgstr "لا يمكن قبول طلب حالته %(status)s."

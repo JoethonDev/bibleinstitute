@@ -3,6 +3,7 @@
 from django.utils import formats, timezone
 
 from ..utils.timezones import ensure_aware, user_timezone
+from .mode import is_management_student_view
 
 
 def _datetime_label(value, user) -> str:
@@ -30,6 +31,9 @@ def build_quiz_presentation_context(quiz_context: dict, *, user=None) -> dict:
     )
     context["score_percent"] = score_percent
     context["score_ring_offset"] = round(320.44 * (1 - score_percent / 100), 2)
+    context["is_management_preview"] = (
+        is_management_student_view(user) if user is not None else False
+    )
     if user is not None:
         context["quiz_opening_label"] = _datetime_label(
             context.get("effective_opening_date"), user

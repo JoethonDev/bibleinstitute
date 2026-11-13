@@ -39,6 +39,7 @@ def build_student_profile_context(
 ) -> dict:
     """Build the bounded profile data consumed by the new student template."""
     profile_editable = user == request.user
+    is_student_account = getattr(getattr(user, "role", None), "role", None) == "student"
     signup_details_form = form or StudentSignupDetailsForm(
         instance=user,
         auto_id="profile_%s",
@@ -53,11 +54,13 @@ def build_student_profile_context(
         auto_id="document_%s",
     )
     payment_scopes = (
-        list(academic_payment_scopes_for_student(user)) if profile_editable else []
+        list(academic_payment_scopes_for_student(user))
+        if profile_editable and is_student_account
+        else []
     )
     missing_profile_items = []
     profile_required_total = 0
-    if profile_editable:
+    if profile_editable and is_student_account:
         for field_name in sorted(SignupDetailsForm.SIGNUP_REQUIRED_FIELDS | {"full_name"}):
             field = signup_details_form.fields.get(field_name)
             if field is None:
@@ -73,26 +76,31 @@ def build_student_profile_context(
             for scope in payment_scopes
         )
 
-    academic_payments = list(
-        AcademicPayment.objects.filter(student=user)
-        .select_related("academic_year_level__academic_year", "academic_year_level__level")
-        .order_by("-uploaded_at", "-pk")[:20]
+    academic_payments = (
+        list(
+            AcademicPayment.objects.filter(student=user)
+            .select_related("academic_year_level__academic_year", "academic_year_level__level")
+            .order_by("-uploaded_at", "-pk")[:20]
+        )
+        if is_student_account
+        else []
     )
     application_documents = []
-    for document_type, model_field in APPLICATION_DOCUMENT_FIELDS.items():
-        key = getattr(user, model_field, None)
-        if not key:
-            continue
-        application_documents.append({
-            "type": document_type,
-            "label": APPLICATION_DOCUMENT_LABELS[document_type],
-            "url": reverse("application-document", args=[user.pk, document_type]),
-            "download_url": (
-                reverse("application-document", args=[user.pk, document_type])
-                + "?download=1"
-            ),
-            "is_image": (mimetypes.guess_type(key)[0] or "").startswith("image/"),
-        })
+    if is_student_account:
+        for document_type, model_field in APPLICATION_DOCUMENT_FIELDS.items():
+            key = getattr(user, model_field, None)
+            if not key:
+                continue
+            application_documents.append({
+                "type": document_type,
+                "label": APPLICATION_DOCUMENT_LABELS[document_type],
+                "url": reverse("application-document", args=[user.pk, document_type]),
+                "download_url": (
+                    reverse("application-document", args=[user.pk, document_type])
+                    + "?download=1"
+                ),
+                "is_image": (mimetypes.guess_type(key)[0] or "").startswith("image/"),
+            })
 
     telegram_account = None
     telegram_link_url = None
@@ -109,7 +117,7 @@ def build_student_profile_context(
         )
 
     next_actions = {"resume": None, "next_quizzes": [], "gaps": []}
-    if profile_editable:
+    if profile_editable and is_student_account:
         next_actions = student_next_actions(user)
 
     initials = ""
@@ -140,14 +148,15 @@ def build_student_profile_context(
         "object": user,
         "signup_details_form": signup_details_form,
         "form": signup_details_form,
+        "show_student_records": is_student_account,
         "profile_editable": profile_editable,
-        "can_upload_missing_documents": profile_editable,
+        "can_upload_missing_documents": profile_editable and is_student_account,
         "missing_documents_form": missing_documents_form,
         "academic_payment_scopes": payment_scopes,
         "academic_payment_form": (
             academic_payment_form
             or StudentAcademicPaymentForm(student=user, auto_id="academic_payment_%s")
-            if profile_editable else None
+            if profile_editable and is_student_account else None
         ),
         "missing_profile_items": missing_profile_items,
         "has_profile_gaps": bool(missing_profile_items),

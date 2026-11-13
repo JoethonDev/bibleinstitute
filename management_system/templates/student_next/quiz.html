@@ -138,7 +138,29 @@
     </aside>
   </div>
   {% endif %}
-{% elif mode == "view" %}
+{% elif mode == "view" or mode == "preview" %}
+  {% if is_management_preview or mode == "preview" %}
+  <section class="sn-result-hero">
+    <div class="sn-result-copy">
+      <span class="sn-eyebrow">{% translate "Read-only preview" %}</span>
+      <h1 dir="auto">{{ quiz.name }}</h1>
+      <p>{{ offering.course.name }}</p>
+      <div class="sn-result-stats">
+        <div class="sn-stat sn-stat--gold"><span class="sn-stat-icon"><svg class="sn-ico" aria-hidden="true"><use href="#i-award"></use></svg></span><div><b><bdi dir="ltr">{{ quiz.total_grade }}</bdi></b><span>{% translate "Total grade" %}</span></div></div>
+        <div class="sn-stat sn-stat--teal"><span class="sn-stat-icon"><svg class="sn-ico" aria-hidden="true"><use href="#i-check-circle"></use></svg></span><div><b>{{ questions|length }}</b><span>{% translate "Questions" %}</span></div></div>
+      </div>
+    </div>
+    <div class="sn-result-actions"><a class="sn-btn sn-btn--primary" href="{{ back_url }}"><svg class="sn-ico" aria-hidden="true"><use href="#i-arrow-left"></use></svg><span>{% translate "Back to course" %}</span></a><a class="sn-btn sn-btn--ghost" href="{% url 'courses' %}"><svg class="sn-ico" aria-hidden="true"><use href="#i-book-open"></use></svg><span>{% translate "My learning" %}</span></a></div>
+  </section>
+  <div class="sn-layout-main-aside">
+    <div class="sn-stack">
+      <section class="sn-section"><div class="sn-section-head"><div class="sn-section-head-main"><h2><svg class="sn-ico" aria-hidden="true"><use href="#i-list"></use></svg>{% translate "Questions" %}</h2><p>{% translate "Read-only preview" %}</p></div></div>{% include "student_next/partials/quiz_questions.html" with mode=mode questions=questions %}</section>
+    </div>
+    <aside class="sn-aside">
+      <section class="sn-card sn-aside-card"><div class="sn-section-head"><div class="sn-section-head-main"><h2>{% translate "Preview" %}</h2></div></div><div class="sn-card-body"><div class="sn-card-actions"><a class="sn-btn sn-btn--ghost sn-btn--sm" href="{{ back_url }}">{% translate "Back to course" %}</a></div></div></section>
+    </aside>
+  </div>
+  {% else %}
   <section class="sn-result-hero">
     <div class="sn-result-ring"><span class="sn-ring" style="--sn-ring-size:120px;--sn-ring-stroke:9px" role="img" aria-label="{% blocktrans with score=score_percent %}{{ score }} percent{% endblocktrans %}">
       <svg viewBox="0 0 120 120" aria-hidden="true"><circle class="sn-ring-track" cx="60" cy="60" r="51" stroke-width="9"></circle><circle class="sn-ring-value" cx="60" cy="60" r="51" stroke-width="9" stroke-dasharray="320.44" stroke-dashoffset="{{ score_ring_offset }}"></circle></svg><b>{{ score_percent }}%</b>
@@ -160,6 +182,7 @@
       <section class="sn-card sn-aside-card"><div class="sn-section-head"><div class="sn-section-head-main"><h2>{% translate "What happens next" %}</h2></div></div><div class="sn-card-body"><p class="sn-small-copy">{% translate "Your result is saved to your student record and appears in your course progress." %}</p></div></section>
     </aside>
   </div>
+  {% endif %}
 {% else %}
   <div class="sn-alert sn-alert--warning" role="status"><span class="sn-alert-icon"><svg class="sn-ico" aria-hidden="true"><use href="#i-lock"></use></svg></span><div class="sn-alert-copy"><b>{% translate "Quiz closed" %}</b><p>{% blocktrans with date=quiz_closing_label %}This quiz closed on {{ date }}. Answers are not available for quizzes you did not submit.{% endblocktrans %}</p></div></div>
   <section class="sn-section"><div class="sn-section-head"><div class="sn-section-head-main"><h1 dir="auto">{{ quiz.name }}</h1><p>{{ offering.course.name }} - {{ quiz_closing_label }}</p></div><a class="sn-btn sn-btn--ghost" href="{{ back_url }}"><svg class="sn-ico" aria-hidden="true"><use href="#i-arrow-left"></use></svg>{% translate "Back to course" %}</a></div></section>

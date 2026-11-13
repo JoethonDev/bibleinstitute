@@ -558,7 +558,10 @@ class LoginView(views.LoginView):
 
     def get(self, request, *args, **kwargs):
         if request.user.is_authenticated:
-            if resolve_student_mode(request) == StudentMode.NEW:
+            if (
+                not user_has_management_role(request.user)
+                and resolve_student_mode(request) == StudentMode.NEW
+            ):
                 redirect_url = self.get_redirect_url()
                 if redirect_url:
                     return redirect(redirect_url)
@@ -582,7 +585,10 @@ class LoginView(views.LoginView):
                 "web login succeeded",
                 extra={"event": "login_succeeded", "username": username or ""},
             )
-            if resolve_student_mode(request) == StudentMode.NEW:
+            if (
+                not user_has_management_role(request.user)
+                and resolve_student_mode(request) == StudentMode.NEW
+            ):
                 response = redirect(self.get_redirect_url() or reverse("courses"))
 
         return response
@@ -602,7 +608,10 @@ def index(request):
 
 @login_required(login_url=LOGIN_URL)
 def portal(request):
-    if resolve_student_mode(request) == StudentMode.NEW:
+    if (
+        not user_has_management_role(request.user)
+        and resolve_student_mode(request) == StudentMode.NEW
+    ):
         return redirect("courses")
     return redirect("home")
 
@@ -618,19 +627,25 @@ class ProfileDetail(LoginProtection, DetailView):
     pk_url_kwarg = "user_id"
     template_name = "profile.html"
 
+    def _use_student_next_profile(self) -> bool:
+        return bool(
+            not self.kwargs.get(self.pk_url_kwarg)
+            and resolve_student_mode(self.request) == StudentMode.NEW
+        )
+
     def get_template_names(self):
-        if resolve_student_mode(self.request) == StudentMode.NEW:
+        if self._use_student_next_profile():
             return ["student_next/profile.html"]
         return [self.template_name]
 
     def get_context_data(self, **kwargs):
-        if resolve_student_mode(self.request) == StudentMode.NEW:
+        if self._use_student_next_profile():
             context = build_student_profile_context(
                 self.request,
                 self.object,
                 form=kwargs.get("form"),
             )
-            context.update(student_shell_context("profile"))
+            context.update(student_shell_context("profile", user=self.request.user))
             context["passkeys"] = list(
                 WebAuthnCredential.objects.filter(
                     user=self.object,
@@ -891,13 +906,11 @@ def view_courses(request, course_id=None):
 def view_course_details(request, offering_id):
     user = request.user
     management_preview = user_has_management_role(user)
-    student_next = (
-        resolve_student_mode(request) == StudentMode.NEW and not management_preview
-    )
+    student_next = resolve_student_mode(request) == StudentMode.NEW
     offering_queryset = (
         with_offering_content_counts(
             CourseOffering.objects.all(),
-            include_drafts=False,
+            include_drafts=management_preview,
         )
         if student_next else None
     )
@@ -914,7 +927,7 @@ def view_course_details(request, offering_id):
             context=build_course_context(
                 user,
                 offering,
-                management_preview=False,
+                management_preview=management_preview,
             ),
         )
     return render(request, "course_detail.html", {
@@ -929,13 +942,11 @@ def view_course_details(request, offering_id):
 def view_lesson_details(request, offering_id, lesson_id):
     user = request.user
     management_preview = user_has_management_role(user)
-    student_next = (
-        resolve_student_mode(request) == StudentMode.NEW and not management_preview
-    )
+    student_next = resolve_student_mode(request) == StudentMode.NEW
     offering_queryset = (
         with_offering_content_counts(
             CourseOffering.objects.all(),
-            include_drafts=False,
+            include_drafts=management_preview,
         )
         if student_next else None
     )
@@ -978,22 +989,8 @@ def view_lesson_details(request, offering_id, lesson_id):
             offering,
             lesson,
             context["links"],
-            management_preview=False,
+            management_preview=management_preview,
         )
-        target = (request.headers.get("HX-Target") or "").strip()
-        target_id = target.rsplit("#", 1)[-1].strip() if "#" in target else target
-        history_restore = (
-            request.headers.get("HX-History-Restore-Request") or ""
-        ).strip().lower() == "true"
-        if history_restore or (
-            request.headers.get("HX-Request") == "true"
-            and target_id == "display-page"
-        ):
-            return render(
-                request,
-                "student_next/partials/lesson_content.html",
-                next_context,
-            )
         return render_student_page(
             request,
             page="lesson",
@@ -1228,7 +1225,7 @@ def take_exam(request, offering_id, quiz_id, *, allow_management=False):
                 "offering": offering,
                 "quiz": quiz,
             }
-            if resolve_student_mode(request) == StudentMode.NEW and not user_has_management_role(user):
+            if resolve_student_mode(request) == StudentMode.NEW:
                 return render_student_page(
                     request,
                     page="quiz",
@@ -6641,7 +6638,7 @@ def profile_missing_documents(request):
             return render(
                 request,
                 "student_next/profile.html",
-                {**context, **student_shell_context("profile")},
+                {**context, **student_shell_context("profile", user=request.user)},
             )
         messages.error(request, str(exc))
         return redirect("view-profile")
@@ -6704,7 +6701,7 @@ def profile_academic_payment(request):
             return render(
                 request,
                 "student_next/profile.html",
-                {**context, **student_shell_context("profile")},
+                {**context, **student_shell_context("profile", user=request.user)},
             )
         messages.error(request, str(exc))
         return redirect("view-profile")

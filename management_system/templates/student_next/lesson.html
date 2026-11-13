@@ -16,7 +16,7 @@
     <h1 dir="auto">{{ lesson.name }}</h1>
     <div class="sn-inline-meta">
       <span><svg class="sn-ico" aria-hidden="true"><use href="#i-list"></use></svg>{% blocktrans count count=lesson_parts_count %}{{ count }} part{% plural %}{{ count }} parts{% endblocktrans %}</span>
-      <span><svg class="sn-ico" aria-hidden="true"><use href="#i-check-circle"></use></svg>{% translate "Published" %}</span>
+      <span><svg class="sn-ico" aria-hidden="true"><use href="#i-check-circle"></use></svg>{% if management_preview %}{{ lesson.get_status_display }}{% else %}{% translate "Published" %}{% endif %}</span>
       {% if next_meeting %}<span><svg class="sn-ico" aria-hidden="true"><use href="#i-calendar"></use></svg>{% translate "Next meeting" %}: {{ next_meeting.date|date:"D, j M" }}</span>{% endif %}
     </div>
   </div>
@@ -26,7 +26,7 @@
   </div>
 </header>
 
-{% if lesson_progress.watchable_parts %}
+{% if not management_preview and lesson_progress.watchable_parts %}
 <div class="sn-lesson-progress">
   <div class="sn-lesson-progress-copy"><b>{{ lesson_progress.watch_percent }}% {% translate "watched" %}</b><span>{% blocktrans with watched=lesson_progress.watched_parts total=lesson_progress.watchable_parts %}{{ watched }} of {{ total }} parts completed{% endblocktrans %}</span></div>
   <span class="sn-meter-wrap"><span class="sn-meter sn-meter--gold" role="progressbar" aria-label="{% translate 'Lesson progress' %}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ lesson_progress.watch_percent }}"><span style="width:{{ lesson_progress.watch_percent }}%"></span></span></span>
@@ -42,15 +42,15 @@
         </div>
       </div>
       <p class="sn-lesson-part-note"><svg class="sn-ico" aria-hidden="true"><use href="#i-info"></use></svg>{% translate "All parts are visible on this page. There are no tabs and no hidden part." %}</p>
-      <div id="display-page" class="sn-card sn-card-body sn-content-panel">
-        <div id="content-loaded">
-          {% include "student_next/partials/lesson_body.html" with show_nav=False %}
-        </div>
+      <div class="sn-card sn-card-body sn-content-panel">
+        {% if lesson.description %}<p class="sn-reading" dir="auto">{{ lesson.description|linebreaksbr }}</p>{% endif %}
+        {% include "student_next/partials/lesson_body.html" %}
       </div>
     </section>
   </div>
 
   <aside class="sn-aside">
+    {% if not management_preview %}
     <section class="sn-card sn-aside-card">
       <div class="sn-section-head"><div class="sn-section-head-main"><h2>{% translate "Your progress" %}</h2><p>{% translate "This lesson." %}</p></div></div>
       <div class="sn-card-body">
@@ -64,6 +64,7 @@
         </div>
       </div>
     </section>
+    {% endif %}
 
     <section class="sn-card sn-aside-card">
       <div class="sn-section-head"><div class="sn-section-head-main"><h2>{% translate "Next up" %}</h2><p>{% translate "Check your understanding." %}</p></div></div>

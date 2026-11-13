@@ -77,6 +77,6 @@
 {% endfor %}
 {% endif %}
 
-{% if mode == "view" %}
+{% if mode == "view" or mode == "preview" %}
   {% include "partials/quiz_review_cards.html" %}
 {% endif %}

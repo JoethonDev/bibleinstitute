@@ -73,6 +73,10 @@ authorized admin queues, language switch and account menu.
                 <svg class="aw-ico aw-ico--sm" aria-hidden="true"><use href="#i-chevron-down"></use></svg>
             </button>
             <div class="aw-menu" hidden>
+                <a class="aw-menu-item" href="{% url 'courses' %}">
+                    <svg class="aw-ico" aria-hidden="true"><use href="#i-book"></use></svg>
+                    <span>{% translate "Student View" %}</span>
+                </a>
                 <a class="aw-menu-item" href="{% url 'view-profile' %}">
                     <svg class="aw-ico" aria-hidden="true"><use href="#i-user"></use></svg>
                     <span>{% translate "Profile" %}</span>

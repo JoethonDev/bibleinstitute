@@ -15,7 +15,7 @@
     <p>{% translate "Install this website for a full-screen app, saved audio and PDFs, and browser notifications. It uses the same student account and stays up to date automatically." %}</p>
     <div class="sn-app-actions">
       <button type="button" class="sn-btn sn-btn--gold" data-pwa-install><svg class="sn-ico" aria-hidden="true"><use href="#i-download"></use></svg>{% translate "Install app" %}</button>
-      <a class="sn-btn sn-btn--ghost" href="{% url 'offline-library' %}"><svg class="sn-ico" aria-hidden="true"><use href="#i-book-open"></use></svg>{% translate "Downloaded media" %}</a>
+      {% if not is_management_student_view %}<a class="sn-btn sn-btn--ghost" href="{% url 'offline-library' %}"><svg class="sn-ico" aria-hidden="true"><use href="#i-book-open"></use></svg>{% translate "Downloaded media" %}</a>{% endif %}
     </div>
     <p class="pwa-installed-status" data-pwa-installed hidden><svg class="sn-ico" aria-hidden="true"><use href="#i-check-circle"></use></svg>{% translate "Installed on this device" %}</p>
     <small>{% translate "If the install button does not appear, use your browser menu and choose Install app or Add to Home Screen." %}</small>
@@ -45,7 +45,7 @@
   </div>
   <aside class="sn-aside">
     <section class="sn-card sn-aside-card"><div class="sn-section-head"><div class="sn-section-head-main"><h2><svg class="sn-ico" aria-hidden="true"><use href="#i-bell"></use></svg>{% translate "Notifications" %}</h2><p>{% translate "Optional browser alerts." %}</p></div></div><div class="sn-card-body"><p class="sn-small-copy">{% translate "Turn on lesson, quiz and announcement alerts from the notifications page. iPhone and iPad require iOS or iPadOS 16.4 or later after adding the app to the Home Screen." %}</p><div class="sn-card-actions"><a class="sn-btn sn-btn--ghost sn-btn--sm" href="{% url 'student-notifications' %}">{% translate "Notification settings" %}</a></div></div></section>
-    <section class="sn-card sn-aside-card"><div class="sn-section-head"><div class="sn-section-head-main"><h2><svg class="sn-ico" aria-hidden="true"><use href="#i-book-open"></use></svg>{% translate "Downloaded media" %}</h2></div></div><div class="sn-card-body"><p class="sn-small-copy">{% translate "Your saved audio and PDFs are available on this device even without internet." %}</p><div class="sn-card-actions"><a class="sn-btn sn-btn--ghost sn-btn--sm" href="{% url 'offline-library' %}">{% translate "Open Downloaded media" %}</a></div></div></section>
+    {% if not is_management_student_view %}<section class="sn-card sn-aside-card"><div class="sn-section-head"><div class="sn-section-head-main"><h2><svg class="sn-ico" aria-hidden="true"><use href="#i-book-open"></use></svg>{% translate "Downloaded media" %}</h2></div></div><div class="sn-card-body"><p class="sn-small-copy">{% translate "Your saved audio and PDFs are available on this device even without internet." %}</p><div class="sn-card-actions"><a class="sn-btn sn-btn--ghost sn-btn--sm" href="{% url 'offline-library' %}">{% translate "Open Downloaded media" %}</a></div></div></section>{% endif %}
   </aside>
 </div>
 {% endblock %}

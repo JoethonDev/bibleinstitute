@@ -17,6 +17,18 @@ from .constants import (
 
 logger = logging.getLogger(__name__)
 _VALID_MODES = {StudentMode.LEGACY, StudentMode.NEW}
+_NEW_MODE_ROLES = {"student", "admin", "staff"}
+
+
+def is_management_student_view(user) -> bool:
+    """Return True when an authenticated admin/staff user browses student views."""
+    if not getattr(user, "is_authenticated", False):
+        return False
+    try:
+        role = getattr(getattr(user, "role", None), "role", None)
+    except DatabaseError:
+        role = None
+    return role in {"admin", "staff"}
 
 
 def invalidate_student_experience_mode_cache() -> None:
@@ -53,7 +65,7 @@ def _global_settings() -> tuple[str, bool]:
 
 
 def resolve_student_mode(request_or_user) -> str:
-    """Return a request-cached mode; only student accounts can use new mode."""
+    """Return a request-cached mode for student and admin/staff accounts."""
     request = request_or_user if hasattr(request_or_user, "user") else None
     if request is not None and hasattr(request, "_student_experience_mode"):
         return request._student_experience_mode
@@ -65,7 +77,7 @@ def resolve_student_mode(request_or_user) -> str:
             role = getattr(getattr(user, "role", None), "role", None)
         except DatabaseError:
             role = None
-        if role == "student":
+        if role in _NEW_MODE_ROLES:
             global_mode, force_all = _global_settings()
             if force_all:
                 mode = global_mode

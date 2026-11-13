@@ -70,6 +70,12 @@
           <div id="notification-panel" class="sn-notif-pop" hidden role="dialog" aria-label="{% translate 'Notifications' %}" hx-get="{% url 'student-notification-panel' %}" hx-trigger="click from:#notification-bell-button" hx-target="this" hx-swap="innerHTML"></div>
           <div id="notification-popups" class="sn-notification-popups" aria-live="polite"></div>
         </div>
+        {% if is_management_student_view %}
+        <a class="sn-btn sn-btn--ghost sn-btn--sm" href="{% url 'admin-panel' %}">
+          <svg class="sn-ico" aria-hidden="true"><use href="#i-grid"></use></svg>
+          <span>{% translate "Admin" %}</span>
+        </a>
+        {% endif %}
         <a class="sn-account" href="{% url 'view-profile' %}" aria-label="{% translate 'Open profile' %}">
           <span class="sn-avatar sn-avatar--sm sn-avatar--gold">
             {% if request.user.first_name or request.user.last_name %}{{ request.user.first_name|slice:":1"|upper }}{{ request.user.last_name|slice:":1"|upper }}{% else %}{{ request.user.username|slice:":1"|upper }}{% endif %}

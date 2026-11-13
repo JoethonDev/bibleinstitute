@@ -10,7 +10,15 @@ from django.utils.translation import gettext_lazy as _
 
 from ..academic_access import accessible_offerings
 from ..course_content import with_offering_content_counts
-from ..models import AcademicYearLevelMeeting, Enrollment, StudentNotification
+from ..models import (
+    AcademicYear,
+    AcademicYearLevel,
+    AcademicYearLevelMeeting,
+    Enrollment,
+    Level,
+    PublicationStatus,
+    StudentNotification,
+)
 from ..utils.student_data import (
     localized_notification_text,
     student_course_progress_data,
@@ -19,13 +27,191 @@ from ..utils.student_data import (
 )
 from ..utils.helpers import pagination_query_string
 from .calendar import next_student_meeting
+from .mode import is_management_student_view
 
 STUDENT_OFFERING_PAGE_SIZE = 20
 _LEARNING_FILTERS = {"all", "current", "completed"}
+_MANAGEMENT_FILTERS = {"all", "published", "unpublished"}
+
+
+def _time_greeting() -> str:
+    hour = timezone.localtime().hour
+    if 5 <= hour < 12:
+        return _("Good morning")
+    if 12 <= hour < 17:
+        return _("Good afternoon")
+    return _("Good evening")
+
+
+def _management_learning_context(request) -> dict:
+    user = request.user
+    years = list(AcademicYear.objects.order_by("-is_active", "-ordering", "-pk")[:25])
+    levels = list(Level.objects.order_by("ordering", "pk")[:25])
+    year_ids = {str(year.pk) for year in years}
+    level_ids = {str(level.pk) for level in levels}
+
+    raw_year = (request.GET.get("year") or "").strip()
+    if raw_year == "all" or raw_year in year_ids:
+        selected_year = raw_year
+    else:
+        active_year = next((year for year in years if year.is_active), None)
+        selected_year = str(active_year.pk) if active_year else "all"
+
+    raw_level = (request.GET.get("level") or "").strip()
+    selected_level = raw_level if raw_level in level_ids else "all"
+
+    selected_filter = request.GET.get("filter", "all")
+    if selected_filter not in _MANAGEMENT_FILTERS:
+        selected_filter = "all"
+
+    scoped_offerings = with_offering_content_counts(
+        accessible_offerings(user, include_management=True),
+        include_drafts=True,
+    ).select_related(
+        "course",
+        "academic_year_level__academic_year",
+        "academic_year_level__level",
+    )
+    if selected_year != "all":
+        scoped_offerings = scoped_offerings.filter(
+            academic_year_level__academic_year_id=int(selected_year)
+        )
+    if selected_level != "all":
+        scoped_offerings = scoped_offerings.filter(
+            academic_year_level__level_id=int(selected_level)
+        )
+    scoped_offerings = scoped_offerings.order_by(
+        "-academic_year_level__academic_year__ordering",
+        "academic_year_level__level__ordering",
+        "course__name",
+    )
+
+    counts = scoped_offerings.aggregate(
+        all=Count("pk"),
+        published=Count("pk", filter=Q(status=PublicationStatus.PUBLISHED)),
+        unpublished=Count("pk", filter=~Q(status=PublicationStatus.PUBLISHED)),
+    )
+    filtered = scoped_offerings
+    if selected_filter == "published":
+        filtered = filtered.filter(status=PublicationStatus.PUBLISHED)
+    elif selected_filter == "unpublished":
+        filtered = filtered.exclude(status=PublicationStatus.PUBLISHED)
+
+    paginator = Paginator(filtered, STUDENT_OFFERING_PAGE_SIZE)
+    paginator.count = counts[selected_filter] or 0
+    page_obj = paginator.get_page(request.GET.get("page", 1))
+    page_offerings = list(page_obj.object_list)
+
+    grouped = defaultdict(list)
+    for offering in page_offerings:
+        offering.student_progress = None
+        scope = offering.academic_year_level
+        grouped[(scope.academic_year_id, scope.level_id)].append(offering)
+
+    sections = []
+    for _key, rows in grouped.items():
+        scope = rows[0].academic_year_level
+        sections.append({
+            "academic_year": scope.academic_year,
+            "level": scope.level,
+            "level_name": scope.level.display_name,
+            "access_kind": "current" if scope.academic_year.is_active else "historical",
+            "is_completed": False,
+            "offerings": rows,
+        })
+
+    active_scope = (
+        AcademicYearLevel.objects.filter(academic_year_id=int(selected_year))
+        .select_related("academic_year", "level")
+        .order_by("level__ordering", "pk")
+        .first()
+        if selected_year != "all" else None
+    )
+    if active_scope is None and sections:
+        first_offering = sections[0]["offerings"][0]
+        active_scope = first_offering.academic_year_level
+
+    today = timezone.localdate()
+    week_meetings = []
+    if active_scope is not None:
+        week_filters = {
+            "meeting_date__gte": today,
+            "meeting_date__lt": today + timedelta(days=7),
+            "academic_year_level__academic_year_id": active_scope.academic_year_id,
+        }
+        if selected_level != "all":
+            week_filters["academic_year_level__level_id"] = int(selected_level)
+        week_meetings = list(
+            AcademicYearLevelMeeting.objects.filter(**week_filters)
+            .select_related("course_offering__course")
+            .order_by("meeting_date", "pk")[:7]
+        )
+
+    base_query = f"year={selected_year}&level={selected_level}"
+    return {
+        "sections": sections,
+        "active_scope": active_scope,
+        "next_meeting": None,
+        "resume": None,
+        "due_soon": [],
+        "announcements": [],
+        "week_meetings": week_meetings,
+        "greeting": _time_greeting(),
+        "overall_percent": None,
+        "overall_ring_offset": 100,
+        "selected_filter": selected_filter,
+        "selected_year": selected_year,
+        "selected_level": selected_level,
+        "year_options": [
+            {"value": "all", "label": _("All academic years"), "selected": selected_year == "all"},
+            *[
+                {
+                    "value": str(year.pk),
+                    "label": year.name,
+                    "selected": selected_year == str(year.pk),
+                }
+                for year in years
+            ],
+        ],
+        "level_options": [
+            {"value": "all", "label": _("All levels"), "selected": selected_level == "all"},
+            *[
+                {
+                    "value": str(level.pk),
+                    "label": level.display_name,
+                    "selected": selected_level == str(level.pk),
+                }
+                for level in levels
+            ],
+        ],
+        "filter_counts": counts,
+        "filter_tabs": [
+            {
+                "key": key,
+                "label": label,
+                "count": counts[key] or 0,
+                "url": f"{reverse('courses')}?{base_query}&filter={key}",
+                "active": key == selected_filter,
+            }
+            for key, label in (
+                ("all", _("All")),
+                ("published", _("Published")),
+                ("unpublished", _("Drafts")),
+            )
+        ],
+        "visible_count": len(page_offerings),
+        "total_count": counts[selected_filter] or 0,
+        "page_obj": page_obj,
+        "pagination_query": pagination_query_string(request),
+        "is_empty": counts[selected_filter] == 0,
+        "is_management_view": True,
+    }
 
 
 def build_learning_context(request) -> dict:
     user = request.user
+    if is_management_student_view(user):
+        return _management_learning_context(request)
     normal_active = Enrollment.objects.filter(
         student=user,
         status=Enrollment.Status.ACTIVE,

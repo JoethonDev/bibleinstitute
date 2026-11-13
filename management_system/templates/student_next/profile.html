@@ -38,8 +38,10 @@
       <section class="sn-card sn-profile-card">
         <div class="sn-tabs" role="tablist" aria-label="{% translate 'Student record sections' %}" data-profile-tabs>
           <button type="button" role="tab" id="profile-tab-personal" tabindex="0" class="is-active" aria-selected="true" aria-controls="profile-personal" data-profile-tab="personal"><svg class="sn-ico" aria-hidden="true"><use href="#i-user"></use></svg>{% translate "Personal" %}</button>
+          {% if show_student_records %}
           <button type="button" role="tab" id="profile-tab-documents" tabindex="-1" aria-selected="false" aria-controls="profile-documents" data-profile-tab="documents"><svg class="sn-ico" aria-hidden="true"><use href="#i-file"></use></svg>{% translate "Documents" %}</button>
           <button type="button" role="tab" id="profile-tab-payments" tabindex="-1" aria-selected="false" aria-controls="profile-payments" data-profile-tab="payments"><svg class="sn-ico" aria-hidden="true"><use href="#i-receipt"></use></svg>{% translate "Payments" %}</button>
+          {% endif %}
         </div>
 
         <div id="profile-personal" role="tabpanel" aria-labelledby="profile-tab-personal" data-profile-panel="personal" data-tab-panel="personal">
@@ -62,6 +64,7 @@
           {% endif %}
         </div>
 
+        {% if show_student_records %}
         <div id="profile-documents" role="tabpanel" aria-labelledby="profile-tab-documents" data-profile-panel="documents" data-tab-panel="documents" hidden>
           <div class="sn-section-head"><div class="sn-section-head-main"><h2>{% translate "Documents" %}</h2><p>{% translate "View your submitted application documents." %}</p></div></div>
           {% if application_documents %}
@@ -122,10 +125,12 @@
           </div>
           {% endif %}
         </div>
+        {% endif %}
       </section>
     </div>
 
     <aside class="sn-aside">
+      {% if show_student_records %}
       <section class="sn-card sn-aside-card">
         <div class="sn-section-head"><div class="sn-section-head-main"><h2>{% translate "Profile health" %}</h2><p>{% translate "The details your record still needs." %}</p></div></div>
         <div class="sn-card-body">
@@ -140,6 +145,7 @@
           {% endif %}
         </div>
       </section>
+      {% endif %}
 
       {% if next_actions.resume or next_actions.next_quizzes %}
       <section class="sn-card sn-aside-card">

@@ -9,6 +9,7 @@ from django.utils import formats, timezone
 from ..calendar_grid import build_month_agenda, build_month_grid
 from ..models import AcademicYearLevelMeeting, Enrollment
 from ..utils.student_data import student_calendar_data
+from .mode import is_management_student_view
 
 
 def next_student_meeting(user) -> dict | None:
@@ -53,18 +54,35 @@ def build_calendar_context(request) -> dict:
         if 1 <= month_number <= 12:
             requested_month = f"{int(year_text):04d}-{month_number:02d}"
 
+    raw_scope = (request.GET.get("scope") or "").strip()
+    scope_id = int(raw_scope) if raw_scope.isdigit() else None
+    is_management = is_management_student_view(request.user)
+
     language = (request.LANGUAGE_CODE or "ar").split("-")[0]
     try:
         data = student_calendar_data(
             request.user,
             language=language,
-            scope_id=None,
+            scope_id=scope_id,
             month=requested_month,
+            include_management=is_management,
         )
     except ValueError:
-        data = student_calendar_data(request.user, language=language, scope_id=None)
+        data = student_calendar_data(
+            request.user,
+            language=language,
+            scope_id=scope_id,
+            include_management=is_management,
+        )
+    if data is None and scope_id is not None:
+        data = student_calendar_data(
+            request.user,
+            language=language,
+            scope_id=None,
+            include_management=is_management,
+        )
 
-    next_meeting = next_student_meeting(request.user)
+    next_meeting = None if is_management else next_student_meeting(request.user)
     if not data or not data["scope"]:
         return {
             "calendar": None,

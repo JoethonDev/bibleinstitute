@@ -76,9 +76,3 @@
   </div>
   {% endfor %}
 </div>
-{% if show_nav %}
-<nav class="sn-lesson-navigation" aria-label="{% translate 'Lesson navigation' %}">
-  {% if previous_url %}<a class="sn-btn sn-btn--ghost" href="{{ previous_url }}" hx-get="{{ previous_url }}" hx-target="#display-page" hx-select="#content-loaded" hx-swap="innerHTML" hx-push-url="true"><svg class="sn-ico" aria-hidden="true"><use href="#i-arrow-left"></use></svg>{% translate "Previous lesson" %}</a>{% endif %}
-  {% if next_url %}<a class="sn-btn sn-btn--primary" href="{{ next_url }}" hx-get="{{ next_url }}" hx-target="#display-page" hx-select="#content-loaded" hx-swap="innerHTML" hx-push-url="true">{% translate "Next lesson" %}<svg class="sn-ico" aria-hidden="true"><use href="#i-arrow-right"></use></svg></a>{% endif %}
-</nav>
-{% endif %}

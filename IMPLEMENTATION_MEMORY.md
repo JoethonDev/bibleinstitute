@@ -8,6 +8,22 @@ Earlier detailed evidence is preserved in the
 and the [5 November archive](docs/archive/2026-11-05/history/IMPLEMENTATION_MEMORY.md).
 Historical open/done statements there are superseded by the current disposition.
 
+## Student UI course content cards and full-page lesson navigation
+
+Reported:
+- The new student UI (`student_next`) needed separate card containers for lectures/lessons and quizzes (matching the rounded inner row cards and pill badges in the prototype screenshot).
+- Pressing a lesson on the course page had to open a dedicated full page (`student_next/lesson.html`) instead of swapping inline into `#display-page`.
+
+Changes and decisions:
+- `management_system/student_experience/course.py`: added `_lesson_media_summary()` (loaded `links` via `.only(..., "links")` with zero extra queries) and one bounded `Question` count query (`question_count`) for the visible `<= 20` quizzes.
+- `management_system/templates/student_next/partials/course_workspace.html`, `partials/ring.html`: split the single course-content section into two `<section class="sn-card sn-content-card">` containers (Lectures & lessons, Quizzes) with `.sn-section-head` and `.sn-card-body > .sn-content-list`, replaced `.sn-content-label` + `.sn-content-go` with `.sn-pill` status badges, added media summary / question counts, removed inline `#display-page`, changed lesson links to standard full-page `<a href="...">` navigation without `hx-get`/`hx-target="#display-page"`, hid `.sn-course-hero-progress` under `management_preview`, and handled `value=None` in `ring.html` without rendering a bare `%`.
+- `management_system/templates/student_next/course.html`, `lesson.html`, `partials/lesson_body.html`, `views.py`: removed `lesson_runtime.html` from `course.html`, rendered `lesson.description` in `lesson.html`, removed the unused `show_nav` / `HX-Target == "display-page"` -> `lesson_content.html` branch in `views.py::view_lesson_details`, and deleted obsolete `student_next/partials/lesson_content.html`. Legacy `course_detail.html` and `lesson_stream.html` remain untouched.
+- `management_system/static/css/student_next.css`: styled `.sn-content-card`, `.sn-content-row` rounded cards, `.sn-content-state` icon boxes, mobile pill layout, and `.sn-reading + .sn-lesson-parts` spacing; removed obsolete `.sn-content-group*`, `.sn-content-label`, `.sn-content-go`, `.sn-content-empty-hint`, `.sn-lesson-content`, `.sn-lesson-navigation`, and `.sn-course-page .sn-content-panel` rules.
+- `locale/ar/LC_MESSAGES/django.po`, `django.mo`: added `"Lectures and lessons"` -> `"المحاضرات والدروس"` and compiled with `compilemessages -l ar`.
+- Verification (PostgreSQL unavailable on `localhost:5432`, so ORM execution against live PostgreSQL was not run):
+  - `python manage.py compilemessages -l ar`, `python manage.py audit_text_encoding` (843 text files), `python manage.py check` (0 issues), `python manage.py makemigrations --check --dry-run` (No changes detected), and `python -m compileall management_system/student_experience management_system/views.py` all passed.
+  - Focused verification script (`_lesson_media_summary`, EN/AR template rendering of `student_next/course.html` and `student_next/lesson.html`, `TemplateDoesNotExist` check on `lesson_content.html`, legacy template loading, and mocked `view_lesson_details` dispatch under `HX-Target=body#display-page`) exited 0 (`VERIFICATION_ALL_PASSED`).
+
 ## Self-hosted Bootstrap and Font Awesome vendor assets
 
 Reported:

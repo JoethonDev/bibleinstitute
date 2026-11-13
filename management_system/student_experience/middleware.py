@@ -57,6 +57,8 @@ class StudentExperienceMiddleware:
         user = getattr(request, "user", None)
         if user is None or not getattr(user, "is_authenticated", False):
             return False
+        if getattr(getattr(user, "role", None), "role", None) != "student":
+            return False
         if resolve_student_mode(request) != StudentMode.NEW:
             return False
         try:

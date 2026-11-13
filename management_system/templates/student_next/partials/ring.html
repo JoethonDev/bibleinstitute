@@ -1,8 +1,8 @@
 {% load i18n %}
-<span class="sn-ring" style="--sn-ring-size:{{ size|default:52 }}px;--sn-ring-stroke:{{ stroke|default:5 }}px" role="img" aria-label="{% if label %}{{ label }} {% endif %}{{ value|floatformat:'0' }}%">
+<span class="sn-ring" style="--sn-ring-size:{{ size|default:52 }}px;--sn-ring-stroke:{{ stroke|default:5 }}px" role="img" aria-label="{% if label %}{{ label }} {% endif %}{% if value is not None %}{{ value|floatformat:'0' }}%{% else %}--{% endif %}">
   <svg viewBox="0 0 120 120" aria-hidden="true">
     <circle class="sn-ring-track" cx="60" cy="60" r="51" stroke-width="{{ stroke|default:5 }}"></circle>
     <circle class="sn-ring-value" cx="60" cy="60" r="51" stroke-width="{{ stroke|default:5 }}" pathLength="100" stroke-dasharray="100" stroke-dashoffset="{{ offset|default:0 }}"></circle>
   </svg>
-  <b aria-hidden="true">{{ value|floatformat:"0" }}%</b>
+  <b aria-hidden="true">{% if value is not None %}{{ value|floatformat:"0" }}%{% else %}--{% endif %}</b>
 </span>

@@ -86,7 +86,7 @@ def student_banners(request):
         if user is None or not getattr(user, "is_authenticated", False):
             return []
         try:
-            if getattr(getattr(user, "role", None), "role", None) != "student":
+            if getattr(getattr(user, "role", None), "role", None) not in {"student", "admin", "staff"}:
                 return []
             if resolve_student_mode(request) != StudentMode.NEW:
                 return list(
