@@ -87,8 +87,6 @@ html.sn-html[lang="ar"] .sn-year-copy small{ font-size: .8rem; }
 html.sn-html[lang="ar"] .sn-year-count{ font-size: .74rem; }
 html.sn-html[lang="ar"] .sn-content-copy small{ font-size: .8rem; }
 html.sn-html[lang="ar"] .sn-lesson-part-head p{ font-size: .78rem; }
-html.sn-html[lang="ar"] .sn-lesson-part-note{ font-size: .82rem; }
-html.sn-html[lang="ar"] .sn-media-caption{ font-size: .8rem; }
 html.sn-html[lang="ar"] .sn-pdf-sheet > span{ font-size: .65rem; }
 html.sn-html[lang="ar"] .sn-pdf-sheet p{ font-size: .85rem; }
 html.sn-html[lang="ar"] .sn-pdf-sheet small{ font-size: .7rem; }
@@ -720,8 +718,6 @@ body.sn-student .sn-player-track .sn-meter{ height: 4px; background: rgba(255, 2
 body.sn-student .sn-player-track .sn-meter > span{ background: #d8b471; }
 body.sn-student .sn-player-control{ width: 23px; height: 23px; display: grid; place-items: center; border-radius: 5px; background: rgba(255, 255, 255, .1); }
 body.sn-student .sn-player-control .sn-ico{ width: 12px; height: 12px; }
-body.sn-student .sn-media-caption{ display: flex; align-items: flex-start; gap: 6px; margin: 12px 2px 0; color: var(--sn-muted); font-size: .72rem; }
-body.sn-student .sn-media-caption .sn-ico{ width: 14px; height: 14px; margin-top: 1px; color: var(--sn-gold-deep); flex: none; }
 body.sn-student .sn-audio{ display: flex; align-items: center; gap: 16px; min-height: 220px; padding: 28px; border-radius: 14px; background: linear-gradient(135deg, #eef3f4, #fffdf8); }
 body.sn-student .sn-audio-play{ width: 56px; height: 56px; display: grid; place-items: center; border: 1px solid var(--sn-teal); border-radius: 50%; background: var(--sn-teal); color: #fff; flex: none; cursor: pointer; }
 body.sn-student .sn-audio-play .sn-ico{ width: 21px; height: 21px; margin-inline-start: 2px; }
@@ -1100,8 +1096,6 @@ html.sn-html[lang="ar"] .sn-content-copy small{ font-size: .85rem; }
 /* --------------------------------------------------------------------------
    Lesson - visible parts and PDF viewer
    -------------------------------------------------------------------------- */
-body.sn-student .sn-lesson-part-note{ display: flex; align-items: flex-start; gap: 7px; margin: 0 0 12px; padding: 9px 11px; border-radius: 9px; background: var(--sn-teal-soft); color: var(--sn-teal-deep); font-size: .74rem; }
-body.sn-student .sn-lesson-part-note .sn-ico{ width: 14px; height: 14px; margin-top: 1px; flex: none; }
 body.sn-student .sn-lesson-part{ overflow: hidden; border: 1px solid var(--sn-line); border-radius: var(--sn-radius); background: var(--sn-paper); box-shadow: var(--sn-shadow); }
 body.sn-student .sn-lesson-part + .sn-lesson-part{ margin-top: 14px; }
 body.sn-student .sn-lesson-part-head{ display: flex; align-items: center; gap: 11px; padding: 13px 15px; border-bottom: 1px solid var(--sn-mist); background: rgba(238, 243, 244, .48); }
@@ -1159,7 +1153,6 @@ body.sn-student .sn-pdf-control{ display: inline-flex; align-items: center; just
 body.sn-student .sn-content-panel{ min-width: 0; }
 body.sn-student .sn-lesson-part > .sn-player{ margin: 13px; }
 body.sn-student .sn-lesson-part > .sn-audio{ margin: 13px; }
-body.sn-student .sn-lesson-part > .sn-media-caption{ margin: 0 13px 13px; }
 body.sn-student .sn-pdf-viewer{ margin: 13px; overflow: hidden; border: 1px solid var(--sn-line); border-radius: 12px; background: #ded8cc; }
 body.sn-student .sn-pdf-toolbar{ display: flex; align-items: center; gap: 9px; flex-wrap: wrap; padding: 7px 9px; border-bottom: 1px solid var(--sn-line); background: var(--sn-paper); }
 body.sn-student .sn-pdf-controls{ display: flex; align-items: center; gap: 2px; }

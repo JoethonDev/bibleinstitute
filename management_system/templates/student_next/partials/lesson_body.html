@@ -29,7 +29,6 @@
         {% endif %}
       </div>
     </div>
-    {% if not management_preview %}<p class="sn-media-caption"><svg class="sn-ico" aria-hidden="true"><use href="#i-info"></use></svg>{% translate "Your progress is saved as you watch or listen." %}</p>{% endif %}
     {% elif part.type == "audio" %}
     <div class="sn-audio sd-live-player" x-data="progressTracker()" data-offering-id="{{ offering_id }}" data-lesson-id="{{ lesson_id }}" data-part-id="{{ part.part_id }}" data-file-index="{{ part.file_index }}" data-start-session-url="{% url 'start-viewing-session' offering_id lesson_id part.file_index %}" data-heartbeat-url="{% url 'progress-heartbeat' %}">
       <div class="sn-audio-copy">
@@ -49,7 +48,6 @@
       {% if part.download_url %}<a class="sn-btn sn-btn--ghost sn-btn--sm" href="{{ part.download_url }}"><svg class="sn-ico" aria-hidden="true"><use href="#i-download"></use></svg>{% translate "Download audio" %}</a>{% endif %}
       {% if not management_preview %}{% include "partials/pwa_save_button.html" with offering_id=offering_id lesson_id=lesson_id file_index=part.file_index title=part.name media_type="audio" %}{% endif %}
     </div>
-    {% if not management_preview %}<p class="sn-media-caption"><svg class="sn-ico" aria-hidden="true"><use href="#i-info"></use></svg>{% translate "Listen on the go. The download is available for offline study." %}</p>{% endif %}
     {% else %}
     <div class="pdf-viewer sn-pdf-viewer" data-url="{{ part.url }}">
       <div class="pdf-controls sn-pdf-toolbar sn-pdf-controls" role="toolbar" aria-label="{% translate 'PDF reading controls' %}">
@@ -69,7 +67,6 @@
       <div class="pdf-stage sn-pdf-stage" tabindex="0" aria-label="{% translate 'PDF page' %}"><canvas class="pdf-canvas"></canvas></div>
     </div>
     {% if not management_preview %}{% include "partials/pwa_save_button.html" with offering_id=offering_id lesson_id=lesson_id file_index=part.file_index title=part.name media_type="pdf" %}{% endif %}
-    <p class="sn-media-caption"><svg class="sn-ico" aria-hidden="true"><use href="#i-info"></use></svg>{% translate "The handout uses the same viewer controls as the rest of your lessons." %}</p>
     {% endif %}
   </article>
   {% empty %}

@@ -41,7 +41,6 @@
           <h2><svg class="sn-ico" aria-hidden="true"><use href="#i-list"></use></svg>{% translate "Lesson parts" %}</h2>
         </div>
       </div>
-      <p class="sn-lesson-part-note"><svg class="sn-ico" aria-hidden="true"><use href="#i-info"></use></svg>{% translate "All parts are visible on this page. There are no tabs and no hidden part." %}</p>
       <div class="sn-card sn-card-body sn-content-panel">
         {% if lesson.description %}<p class="sn-reading" dir="auto">{{ lesson.description|linebreaksbr }}</p>{% endif %}
         {% include "student_next/partials/lesson_body.html" %}
