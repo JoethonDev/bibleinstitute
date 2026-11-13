@@ -81,6 +81,7 @@
       </div>
     </section>
 
+    {% if not management_preview %}
     <section class="sn-card sn-aside-card">
       <div class="sn-section-head"><div class="sn-section-head-main"><h2>{% translate "Need help?" %}</h2></div></div>
       <div class="sn-card-body">
@@ -88,6 +89,7 @@
         <div class="sn-card-actions"><a class="sn-btn sn-btn--ghost sn-btn--sm" href="{% url 'courses' %}">{% translate "Back to My learning" %}</a></div>
       </div>
     </section>
+    {% endif %}
   </aside>
 </div>
 {% endblock %}

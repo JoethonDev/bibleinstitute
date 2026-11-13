@@ -8,6 +8,26 @@ Earlier detailed evidence is preserved in the
 and the [5 November archive](docs/archive/2026-11-05/history/IMPLEMENTATION_MEMORY.md).
 Historical open/done statements there are superseded by the current disposition.
 
+## Admin and staff access to student_next views
+
+Requested / approved scope:
+- Enable `student_next` automatically on student routes for `admin` and `staff` accounts (`role in {"admin", "staff"}`; `moderator` remains excluded) whenever `StudentExperienceSettings` resolves `StudentMode.NEW`, while keeping `/login/`, `/portal/`, `/dashboard/`, and `/profile/<user_id>/` management workflows untouched.
+- Grant management read-only access across all Academic Years and Levels, reuse existing `student_next/*` templates, keep filters page-local (`courses` and `my-calendar` only), and omit Support chat and student-only Offline Library.
+
+Changes and decisions:
+- `management_system/student_experience/mode.py`, `middleware.py`, `navigation.py`, `render.py`, `context_processors.py`:
+  - Included `"admin"` and `"staff"` in `_NEW_MODE_ROLES`, added `is_management_student_view(user)`, kept `StudentExperienceMiddleware._should_redirect` strictly scoped to `role == "student"`, omitted `support` and `offline` from `student_navigation()` for management users, exposed `is_management_student_view` via `student_shell_context()`, and allowed `student_banners` for `student`, `admin`, and `staff`.
+- `management_system/utils/student_data.py`, `management_system/student_experience/{learning.py,course.py,quiz.py,calendar.py,profile.py}`, `management_system/views.py`:
+  - `build_learning_context()` dispatches `admin`/`staff` to `_management_learning_context(request)` across all years/levels with page-local `year` (defaults to active year), `level`, and `filter` (`all`, `published`, `unpublished`), preserving filters in `pagination_query` and skipping student progress/next-actions/due-soon queries.
+  - `student_course_quiz_data(..., include_drafts=...)`, `build_course_workspace_context()`, and `build_quiz_presentation_context()` support `management_preview` / `include_drafts=True` while `take_exam` POST remains forbidden (`403`) for non-students.
+  - `student_calendar_data(..., include_management=False)` + `build_calendar_context()` let management switch `?scope=<id>` across up to 50 `AcademicYearLevel` rows without changing the `False` default used by mobile API callers.
+  - `ProfileDetail` routes own `/profile/` to `student_next/profile.html` (`show_student_records=False`, hiding student Documents, Payments, and Profile health gaps) while `/profile/<user_id>/` continues rendering management `profile.html`.
+- `management_system/templates/student_next/{base.html,courses.html,calendar.html,lesson.html,quiz.html,profile.html,download_app.html}`, `student_next/partials/{learning_list.html,course_workspace.html,lesson_body.html,quiz_questions.html}`, `partials/quiz_review_cards.html`, `partials/components/admin_topbar.html`, `static/css/student_next.css`, `locale/ar/LC_MESSAGES/django.{po,mo}`:
+  - Added header `"Admin"` switch in `student_next/base.html` and `"Student View"` item in `admin_topbar.html`; omitted the student `sn-context-strip` on `courses.html` when `is_management_view`; added page-local Year/Level `<select>` filters inside `learning_list.html` and Scope `<select>` in `calendar.html` (preserving query args across pagination and month navigation); hid student-only progress/due-soon/need-help/offline-library/save-offline/documents/payments UI and score rings in `management_preview` / `mode == "preview"`; rendered clean grade pills without `"Under review"` / `"Your answer: No answer submitted"` in `quiz_review_cards.html`; compiled 4 new Arabic translations (`Drafts`, `Student View`, `All academic years`, `Total grade`).
+- Verification (disposable SQLite via `tmp/admin_student_view/smoke.py`; PostgreSQL/Docker not available locally):
+  - `tmp/admin_student_view/smoke.py`: passed (`ALL_CHECKS_PASSED`, `admin_courses_queries=11` under `DEBUG=True`), verifying `admin` and `staff` login redirect preservation, `/dashboard/` -> `/courses/` link, `/courses/` without student `sn-context-strip`, page-local Year/Level/Drafts filters, HTMX partial updates, published/draft course & lesson previews without progress/save-offline/need-help controls, read-only quiz preview across `open`/`upcoming`/`closed`/`draft` states (`GET` 200 without score ring or student-submission noise, `POST` 403), `/my-calendar/?scope=` preservation, own `/profile/` vs `/profile/<student_id>/`, `403` on `/support/` and `/offline-library/`, `moderator` exclusion, Arabic RTL rendering, legacy mode fallback, and student regression checks.
+  - Note: PostgreSQL/Docker was not run in this environment; verify against PostgreSQL in Docker before release.
+
 ## Student UI course content cards and full-page lesson navigation
 
 Reported:

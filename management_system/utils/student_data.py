@@ -614,7 +614,7 @@ def student_calendar_data(
                 "-academic_year__ordering",
                 "level__ordering",
                 "pk",
-            )
+            )[:50]
         )
     else:
         enrollments = list(

@@ -15,7 +15,7 @@
     </div>
   </header>
 
-  {% if active_scope %}
+  {% if active_scope and not is_management_view %}
   <div class="sn-context-strip">
     <span class="sn-ctx-item"><svg class="sn-ico" aria-hidden="true"><use href="#i-calendar"></use></svg><span><b>{{ active_scope.academic_year.name }}</b> {% translate "active year" %}</span></span>
     <span class="sn-ctx-item"><svg class="sn-ico" aria-hidden="true"><use href="#i-layers"></use></svg><span>{{ active_scope.level.display_name }}</span></span>

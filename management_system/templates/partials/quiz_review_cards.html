@@ -14,15 +14,20 @@ control; its field names are the ones `unpack_quiz_form` parses.
         {% if review_can_grade %}<input type="hidden" name="questions[{{ counter }}][id]" value="{{ question.id }}">{% endif %}
         <div class="sn-review-card-head">
           <span>{{ forloop.counter }}</span>
-          {% if question.is_graded %}
-            {% if question.current_grade == question.grade %}<span class="sn-pill sn-pill--success">{% translate "Correct" %}</span>
-            {% elif question.current_grade %}<span class="sn-pill sn-pill--warning">{% translate "Partially correct" %}</span>
-            {% else %}<span class="sn-pill sn-pill--danger">{% translate "Incorrect" %}</span>{% endif %}
-          {% else %}<span class="sn-pill sn-pill--gold">{% translate "Under review" %}</span>{% endif %}
-          <span class="sn-pill sn-pill--gold"><bdi dir="ltr">{{ question.current_grade }} / {{ question.grade }}</bdi></span>
+          {% if is_management_preview and not review_can_grade %}
+            <span class="sn-pill sn-pill--gold"><bdi dir="ltr">{{ question.grade }}</bdi></span>
+          {% else %}
+            {% if question.is_graded %}
+              {% if question.current_grade == question.grade %}<span class="sn-pill sn-pill--success">{% translate "Correct" %}</span>
+              {% elif question.current_grade %}<span class="sn-pill sn-pill--warning">{% translate "Partially correct" %}</span>
+              {% else %}<span class="sn-pill sn-pill--danger">{% translate "Incorrect" %}</span>{% endif %}
+            {% else %}<span class="sn-pill sn-pill--gold">{% translate "Under review" %}</span>{% endif %}
+            <span class="sn-pill sn-pill--gold"><bdi dir="ltr">{{ question.current_grade }} / {{ question.grade }}</bdi></span>
+          {% endif %}
         </div>
         <h3 dir="auto">{{ question.name }}</h3>
         <div class="sn-review-answer-grid">
+          {% if not is_management_preview or review_can_grade %}
           <div class="sn-review-answer sn-review-answer--given"><span>{% translate "Your answer" %}</span>
             {% if question.type == "order_events" and question.submitted_answer_payload %}
               <ol class="sn-review-list" dir="auto">{% for item in question.submitted_answer_payload %}<li>{{ item }}</li>{% endfor %}</ol>
@@ -30,6 +35,7 @@ control; its field names are the ones `unpack_quiz_form` parses.
               <ul class="sn-review-list" dir="auto">{% for left, right in question.submitted_answer_payload.items %}<li>{{ left }} - {{ right }}</li>{% endfor %}</ul>
             {% elif question.submitted_answer %}<b dir="auto">{{ question.submitted_answer }}</b>{% else %}{% translate "No answer submitted" %}{% endif %}
           </div>
+          {% endif %}
           {% if question.answer_payload or question.correct_answer %}
             <div class="sn-review-answer sn-review-answer--correct"><span>{% translate "Correct answer" %}</span>
               {% if question.type == "order_events" %}<ol class="sn-review-list" dir="auto">{% for item in question.answer_payload %}<li>{{ item }}</li>{% endfor %}</ol>
