@@ -515,6 +515,24 @@ class MobileDownloadPolicyAdmin(AdminOnlyModelAdmin):
         return False
 
 
+@admin.register(MobilePushSettings)
+class MobilePushSettingsAdmin(AdminOnlyModelAdmin):
+    """Editable fallback for the Expo mobile push master switch."""
+
+    list_display = [
+        "singleton",
+        "expo_push_enabled",
+        "updated_at",
+    ]
+    readonly_fields = ["updated_at"]
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
 @admin.register(MobileAppUpdatePolicy)
 class MobileAppUpdatePolicyAdmin(AdminOnlyModelAdmin):
     """Editable fallback for the force/optional update policy per platform."""

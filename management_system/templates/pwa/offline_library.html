@@ -70,6 +70,16 @@
     </template>
   </main>
 
+  <script defer src="{% static 'vendor/pdfjs/3.11.174/pdf.min.js' %}?v={{ static_asset_version }}"></script>
+  <script>
+    // Offline PDFs render with the vendored pdf.js; both files are precached by
+    // the service worker so reading never needs the network.
+    window.pdfViewerAssets = {
+      workerSrc: "{% static 'vendor/pdfjs/3.11.174/pdf.worker.min.js' %}?v={{ static_asset_version }}",
+      cMapUrl: "{% static 'vendor/pdfjs/3.11.174/cmaps/' %}",
+      standardFontDataUrl: "{% static 'vendor/pdfjs/3.11.174/standard_fonts/' %}"
+    };
+  </script>
   <script defer src="{% static 'pwa/offline-library.js' %}?v={{ static_asset_version }}"></script>
 </body>
 </html>

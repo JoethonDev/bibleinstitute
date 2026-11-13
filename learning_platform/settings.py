@@ -346,7 +346,7 @@ CELERY_BEAT_SCHEDULE = {
     },
     "recover-pending-announcements": {
         "task": "management_system.announcement_tasks.recover_pending_announcements",
-        "schedule": 60.0,
+        "schedule": 15.0,
         "kwargs": {"limit": 50},
     },
     "process-due-telegram-notifications": {

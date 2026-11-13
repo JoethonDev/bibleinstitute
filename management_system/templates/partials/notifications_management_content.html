@@ -104,6 +104,12 @@ filter bar is the real paginator count.
                   {% for error in announcement_form.action_url.errors %}<span class="aw-field-error">{{ error }}</span>{% endfor %}
                 </div>
                 <div class="aw-field aw-span-2">
+                  <label class="aw-field-label" for="{{ announcement_form.scheduled_for.id_for_label }}">{{ announcement_form.scheduled_for.label }}</label>
+                  {{ announcement_form.scheduled_for }}
+                  {% if announcement_form.scheduled_for.help_text %}<span class="aw-field-hint">{{ announcement_form.scheduled_for.help_text }}</span>{% endif %}
+                  {% for error in announcement_form.scheduled_for.errors %}<span class="aw-field-error">{{ error }}</span>{% endfor %}
+                </div>
+                <div class="aw-field aw-span-2">
                   <span class="aw-field-label" id="announcement-levels-label">{{ announcement_form.levels.label }}</span>
                   <div class="aw-check-list" role="group" aria-labelledby="announcement-levels-label">
                     {% for checkbox in announcement_form.levels %}
@@ -175,7 +181,15 @@ filter bar is the real paginator count.
             <tbody>
               {% for announcement in page_obj %}
               <tr>
-                <td class="aw-date">{{ announcement.created_at }}<span class="aw-cell-sub">{{ announcement.academic_year.name }}</span></td>
+                <td class="aw-date">
+                  {% if announcement.scheduled_for %}
+                  {{ announcement.scheduled_for }}
+                  <span class="aw-cell-sub">{% translate "Scheduled" %} - {{ announcement.academic_year.name }}</span>
+                  {% else %}
+                  {{ announcement.created_at }}
+                  <span class="aw-cell-sub">{{ announcement.academic_year.name }}</span>
+                  {% endif %}
+                </td>
                 <td>
                   <b>{{ announcement.title|truncatechars:60 }}</b>
                   <span class="aw-cell-sub"><span class="visually-hidden">{% translate "Body" %}: </span>{{ announcement.body|truncatechars:100 }}</span>
@@ -188,7 +202,10 @@ filter bar is the real paginator count.
                 <td>{% if announcement.created_by %}{{ announcement.created_by.get_full_name|default:announcement.created_by.username }}{% else %}-{% endif %}</td>
                 <td class="aw-num">{% if announcement.status == 'completed' %}{{ announcement.recipient_count }}{% else %}-{% endif %}</td>
                 <td>
-                  {% if announcement.status == 'sending' %}
+                  {% if announcement.status == 'queued' and announcement.scheduled_for %}
+                  {% translate "Scheduled" as scheduled_label %}
+                  {% include "partials/components/aw_status_pill.html" with status="scheduled" tone="blue" label=scheduled_label %}
+                  {% elif announcement.status == 'sending' %}
                   {% include "partials/components/aw_status_pill.html" with status=announcement.status tone="blue" label=announcement.get_status_display %}
                   {% else %}
                   {% include "partials/components/aw_status_pill.html" with status=announcement.status label=announcement.get_status_display %}
@@ -210,7 +227,14 @@ filter bar is the real paginator count.
                        aria-label="{% translate 'Preview' %}">
                       <svg class="aw-ico" aria-hidden="true"><use href="#i-eye"></use></svg>
                     </a>
-                    {% if announcement.status == 'failed' %}
+                    {% if announcement.status == 'queued' %}
+                    <form method="post" action="{% url 'announcement-cancel' announcement.pk %}" hx-post="{% url 'announcement-cancel' announcement.pk %}" hx-target="#display-page" hx-select="#page-region" hx-swap="innerHTML" hx-select-oob="#toast-stack" hx-push-url="true" data-confirm-message="{% translate 'Cancel this scheduled or queued notification?' %}" class="aw-inline-form">
+                      {% csrf_token %}
+                      <button type="submit" class="aw-icon-btn" title="{% translate 'Cancel' %}" aria-label="{% translate 'Cancel' %}">
+                        <svg class="aw-ico" aria-hidden="true"><use href="#i-x"></use></svg>
+                      </button>
+                    </form>
+                    {% elif announcement.status == 'failed' %}
                     <form method="post" action="{% url 'announcement-retry' announcement.pk %}" hx-post="{% url 'announcement-retry' announcement.pk %}" hx-target="#display-page" hx-select="#page-region" hx-swap="innerHTML" hx-select-oob="#toast-stack" hx-push-url="true" data-confirm-message="{% translate 'Retry this notification?' %}" class="aw-inline-form">
                       {% csrf_token %}
                       <button type="submit" class="aw-icon-btn" title="{% translate 'Retry' %}" aria-label="{% translate 'Retry' %}">

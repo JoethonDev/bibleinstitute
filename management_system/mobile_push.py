@@ -19,6 +19,7 @@ from .notification_redelivery import eligible_redelivery_notification_ids, redel
 from .models import MobilePushDevice, PushDelivery, StudentNotification
 from .mobile_push_queries import (
     active_push_devices,
+    is_expo_push_enabled,
     missing_push_device_exists,
 )
 
@@ -36,7 +37,7 @@ SAFE_PROVIDER_CODE = re.compile(r"^[A-Za-z0-9_.-]{1,80}$")
 
 
 def _configured() -> bool:
-    return bool(getattr(settings, "EXPO_PUSH_ACCESS_TOKEN", "").strip())
+    return is_expo_push_enabled()
 
 
 def _headers() -> dict[str, str]:

@@ -31,6 +31,7 @@ from management_system.telegram_views import (
     telegram_unlink,
 )
 from management_system.notification_views import (
+    announcement_cancel,
     announcement_retry,
     notification_group_withdraw,
     notification_withdraw,
@@ -122,7 +123,7 @@ urlpatterns = [
     path('offerings/<int:offering_id>/quiz/<int:quiz_id>/', take_exam, name="quiz-details"),
     path('offerings/<int:offering_id>/lesson/<int:lesson_id>/', view_lesson_details, name="lesson-details"),
     path('api/offerings/<int:offering_id>/quiz-status/', api_quiz_status, name="api-quiz-status"),
-    path('offerings/<int:offering_id>/lesson/<int:lesson_id>/<int:file_index>/', stream_lesson, name="lesson-stream"),
+    path('offerings/<int:offering_id>/lesson/<int:lesson_id>/<int:file_index>/document/', lesson_document, name="lesson-document"),
     path('offerings/<int:offering_id>/lesson/<int:lesson_id>/audio/download/', generate_audio_download, name="audio-download"),
 
     # Notifications (student inbox and header bell)
@@ -296,6 +297,7 @@ urlpatterns = [
     # App notifications (admin composer and sent history)
     path('dashboard/notifications/', notifications_management, name="notifications-management"),
     path('dashboard/notifications/recipient-count/', notifications_recipient_count, name="notifications-recipient-count"),
+    path('dashboard/notifications/<int:announcement_id>/cancel/', announcement_cancel, name="announcement-cancel"),
     path('dashboard/notifications/<int:announcement_id>/retry/', announcement_retry, name="announcement-retry"),
 
     # Phase 3 - Student Applications

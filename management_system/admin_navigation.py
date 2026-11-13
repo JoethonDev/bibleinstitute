@@ -410,7 +410,7 @@ ADMIN_DOMAINS: tuple[AdminDomain, ...] = (
                 url_name="notifications-management",
                 icon="i-bell",
                 capability=can_manage_academic_setup,
-                aliases=("announcement-retry", "notifications-recipient-count"),
+                aliases=("announcement-cancel", "announcement-retry", "notifications-recipient-count"),
             ),
             AdminSection(
                 key="telegram-inbox",

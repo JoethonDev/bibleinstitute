@@ -15,8 +15,7 @@ msgstr ""
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"Plural-Forms: nplurals=6; plural=n==0 ? 0 : n==1 ? 1 : n==2 ? 2 : n%100>=3 "
-"&& n%100<=10 ? 3 : n%100>=11 && n%100<=99 ? 4 : 5;\n"
+"Plural-Forms: nplurals=6; plural=n==0 ? 0 : n==1 ? 1 : n==2 ? 2 : n%100>=3 && n%100<=10 ? 3 : n%100>=11 && n%100<=99 ? 4 : 5;\n"
 
 #: .\management_system\academic_access.py:152
 #: .\management_system\academic_access.py:155
@@ -153,7 +152,8 @@ msgstr "يوجد تسجيل عادي مستهدف بالفعل لهذا الطا
 
 #: .\management_system\academic_enrollment.py:357
 #: .\management_system\historical_intake.py:338
-#| msgid "An exceptional enrollment already exists for one selected offering."
+#| msgid ""
+#| "An exceptional enrollment already exists for one selected offering."
 msgid "Exceptional enrollment scope does not match its offering."
 msgstr "لا يتطابق نطاق التسجيل الاستثنائي مع عرضه."
 
@@ -178,12 +178,14 @@ msgid "Review the historical outcome before promotion."
 msgstr "راجع النتيجة التاريخية قبل الترقية."
 
 #: .\management_system\academic_enrollment.py:416
-#| msgid "The destination academic level is not open in the active year."
+#| msgid ""
+#| "The destination academic level is not open in the active year."
 msgid "The destination academic year must be active."
 msgstr "يجب أن تكون السنة الدراسية المستهدفة نشطة."
 
 #: .\management_system\academic_enrollment.py:418
-#| msgid "The destination academic level is not open in the active year."
+#| msgid ""
+#| "The destination academic level is not open in the active year."
 msgid "The destination academic year must be later than the historical year."
 msgstr "يجب أن تكون السنة الدراسية المستهدفة لاحقة للسنة التاريخية."
 
@@ -217,7 +219,8 @@ msgid "The destination level does not match the historical promotion outcome."
 msgstr "لا يتوافق المستوى الوجهة مع نتيجة الترقية التاريخية."
 
 #: .\management_system\academic_enrollment.py:450
-#| msgid "A destination normal enrollment already exists for this student."
+#| msgid ""
+#| "A destination normal enrollment already exists for this student."
 msgid "The destination enrollment is withdrawn."
 msgstr "تم سحب التسجيل المستهدف."
 
@@ -264,9 +267,11 @@ msgstr "يلزم اختيار عرض مقرر لإنشاء خطة تقييم ا�
 #: .\management_system\academic_evaluation.py:254
 #, python-format
 msgid ""
-"%(count)d unresolved manual-grade question(s), excluding %(points)d point(s)."
+"%(count)d unresolved manual-grade question(s), excluding %(points)d "
+"point(s)."
 msgstr ""
-"تم استبعاد %(count)d سؤالًا غير محسوم التصحيح اليدوي، بإجمالي %(points)d نقطة."
+"تم استبعاد %(count)d سؤالًا غير محسوم التصحيح اليدوي، بإجمالي %(points)d "
+"نقطة."
 
 #: .\management_system\academic_evaluation.py:259
 msgid "This course has no published lectures."
@@ -349,7 +354,8 @@ msgstr "يجب أن ينتمي عرض المقرر إلى النطاق الدر�
 msgid "Overall passing threshold must be between 0 and 100."
 msgstr "يجب أن تتراوح نسبة النجاح الإجمالية بين 0 و100."
 
-#: .\management_system\academic_formula.py:96 .\management_system\models.py:985
+#: .\management_system\academic_formula.py:96
+#: .\management_system\models.py:985
 #| msgid "Overall passing threshold must be between 0 and 100."
 msgid "The repeat threshold must be at least 1."
 msgstr "يجب ألا يقل حد إعادة المستوى عن 1."
@@ -360,8 +366,8 @@ msgstr "يجب ألا يقل حد إعادة المستوى عن 1."
 msgid "Evaluation end date must not be before the start date."
 msgstr "يجب ألا يسبق تاريخ انتهاء التقييم تاريخ بدايته."
 
-#: .\management_system\academic_formula.py:101 .\management_system\forms.py:629
-#: .\management_system\models.py:994
+#: .\management_system\academic_formula.py:101
+#: .\management_system\forms.py:629 .\management_system\models.py:994
 #| msgid "Evaluation date must be inside the academic year."
 msgid "Evaluation start date must be inside the academic year."
 msgstr "يجب أن يقع تاريخ بدء التقييم داخل السنة الدراسية."
@@ -371,7 +377,8 @@ msgstr "يجب أن يقع تاريخ بدء التقييم داخل السنة 
 msgid ""
 "Evaluation end date must be inside the academic year and cannot be in the "
 "future."
-msgstr "يجب أن يقع تاريخ انتهاء التقييم داخل السنة الدراسية وألا يكون في المستقبل."
+msgstr ""
+"يجب أن يقع تاريخ انتهاء التقييم داخل السنة الدراسية وألا يكون في المستقبل."
 
 #: .\management_system\admin.py:66 .\management_system\models.py:635
 #: .\management_system\templates\academic_setup.html:55
@@ -556,10 +563,11 @@ msgstr "بدء التقييم"
 msgid "Evaluation End"
 msgstr "انتهاء التقييم"
 
-#: .\management_system\evaluation_export.py:164 .\management_system\forms.py:20
-#: .\management_system\forms.py:25 .\management_system\forms.py:40
-#: .\management_system\forms.py:51 .\management_system\forms.py:744
-#: .\management_system\forms.py:826 .\management_system\models.py:125
+#: .\management_system\evaluation_export.py:164
+#: .\management_system\forms.py:20 .\management_system\forms.py:25
+#: .\management_system\forms.py:40 .\management_system\forms.py:51
+#: .\management_system\forms.py:744 .\management_system\forms.py:826
+#: .\management_system\models.py:125
 #: .\management_system\templates\application_review.html:62
 #: .\management_system\templates\scan_preview.html:20
 #: .\management_system\templates\yearly_transcript_dashboard.html:65
@@ -793,7 +801,8 @@ msgstr "أدخل رقم هاتف دوليًا صحيحًا."
 msgid "This phone number is already in use."
 msgstr "رقم الهاتف مستخدم بالفعل."
 
-#: .\management_system\forms.py:284 .\management_system\utils\csv_export.py:361
+#: .\management_system\forms.py:284
+#: .\management_system\utils\csv_export.py:361
 msgid "Course Name"
 msgstr "اسم الكورس"
 
@@ -1134,7 +1143,8 @@ msgstr "جواز السفر يحتاج إلى صورة الوجه فقط."
 #: .\management_system\historical_intake.py:73
 msgid ""
 "Failed course offering IDs must be positive numbers separated by commas."
-msgstr "يجب أن تكون معرّفات عروض المقررات الراسبة أرقامًا موجبة مفصولة بفواصل."
+msgstr ""
+"يجب أن تكون معرّفات عروض المقررات الراسبة أرقامًا موجبة مفصولة بفواصل."
 
 #: .\management_system\historical_intake.py:83
 #| msgid "The attachment is too large to store."
@@ -1172,7 +1182,8 @@ msgid "The LMS identity fields refer to different accounts."
 msgstr "حقول هوية LMS تشير إلى حسابات مختلفة."
 
 #: .\management_system\historical_intake.py:139
-#| msgid "No eligible LMS account matches this phone number. Contact support."
+#| msgid ""
+#| "No eligible LMS account matches this phone number. Contact support."
 msgid "No LMS account matches the supplied identity."
 msgstr "لا يوجد حساب LMS يطابق بيانات الهوية المقدمة."
 
@@ -1276,7 +1287,8 @@ msgid "Exceptional courses can only be assigned to students."
 msgstr "لا يمكن إسناد المقررات الاستثنائية إلا إلى الطلاب."
 
 #: .\management_system\historical_intake.py:305
-#| msgid "Exactly one active academic year is required before acceptance."
+#| msgid ""
+#| "Exactly one active academic year is required before acceptance."
 msgid "Exactly one active academic year is required."
 msgstr "يلزم وجود سنة دراسية نشطة واحدة بالضبط."
 
@@ -1292,7 +1304,8 @@ msgid ""
 msgstr "يجب أن يكون كل مقرر محدد عرضًا منشورًا في السنة الدراسية النشطة."
 
 #: .\management_system\historical_intake.py:326
-#| msgid "A destination normal enrollment already exists for this student."
+#| msgid ""
+#| "A destination normal enrollment already exists for this student."
 msgid "A full-year enrollment already grants this student's active scope."
 msgstr "يمنح تسجيل السنة الكاملة هذا الطالب نطاقه النشط بالفعل."
 
@@ -1303,13 +1316,13 @@ msgstr "لا يمكن تحويل تسجيل عادي موجود إلى وصول 
 
 #: .\management_system\management\commands\process_telegram_notifications.py:34
 msgid ""
-"Inspect the Telegram notification outbox and optionally retry failed rows or "
-"process due rows. Read-only by default; never calls Telegram without --"
-"process."
+"Inspect the Telegram notification outbox and optionally retry failed rows or"
+" process due rows. Read-only by default; never calls Telegram without "
+"--process."
 msgstr ""
 "يفحص صندوق إشعارات تيليجرام ويعيد محاولة إرسال الصفوف الفاشلة أو يعالج "
-"الصفوف المستحقة عند الطلب. للقراءة فقط افتراضيًا؛ لا يتصل بتيليجرام أبدًا بدون "
-"--process."
+"الصفوف المستحقة عند الطلب. للقراءة فقط افتراضيًا؛ لا يتصل بتيليجرام أبدًا "
+"بدون --process."
 
 #: .\management_system\management\commands\process_telegram_notifications.py:43
 msgid "Maximum rows to retry or process (1-500); default 100."
@@ -1350,16 +1363,16 @@ msgid ""
 "The Telegram notification delivery table is unavailable; apply the pending "
 "migrations before using this command."
 msgstr ""
-"جدول تسليم إشعارات تيليجرام غير متاح؛ طبّق الترحيلات (migrations) المعلقة قبل "
-"استخدام هذا الأمر."
+"جدول تسليم إشعارات تيليجرام غير متاح؛ طبّق الترحيلات (migrations) المعلقة "
+"قبل استخدام هذا الأمر."
 
 #: .\management_system\management\commands\process_telegram_notifications.py:93
 msgid ""
 "The Telegram broadcast tables are unavailable; apply migration 0057 before "
 "using broadcast inspection or processing."
 msgstr ""
-"جداول إعلانات تيليجرام غير متاحة؛ طبّق الترحيل 0057 قبل استخدام فحص الإعلانات "
-"أو معالجتها."
+"جداول إعلانات تيليجرام غير متاحة؛ طبّق الترحيل 0057 قبل استخدام فحص "
+"الإعلانات أو معالجتها."
 
 #: .\management_system\management\commands\process_telegram_notifications.py:113
 msgid "Telegram notification outbox"
@@ -1453,7 +1466,8 @@ msgstr "منشور"
 msgid "Archived"
 msgstr "مؤرشف"
 
-#: .\management_system\models.py:40 .\management_system\telegram\support.py:390
+#: .\management_system\models.py:40
+#: .\management_system\telegram\support.py:390
 #: .\management_system\templates\academic_setup.html:10
 #: .\management_system\templates\application_review.html:12
 #: .\management_system\templates\applications_dashboard.html:10
@@ -1541,7 +1555,8 @@ msgstr "مرفوض"
 msgid "Name"
 msgstr "الاسم"
 
-#: .\management_system\models.py:125 .\management_system\utils\csv_export.py:31
+#: .\management_system\models.py:125
+#: .\management_system\utils\csv_export.py:31
 msgid "Last Login"
 msgstr "آخر تسجيل دخول"
 
@@ -2487,8 +2502,12 @@ msgstr "أيام النشاط"
 msgid "Active watch time"
 msgstr "وقت المشاهدة الفعلي"
 
-msgid "Playback time is credited only while visible playback is advancing; paused and idle time is excluded."
-msgstr "يُحتسب وقت التشغيل أثناء تقدم المشاهدة الظاهرة فقط؛ ولا يُحتسب التوقف أو الخمول."
+msgid ""
+"Playback time is credited only while visible playback is advancing; paused "
+"and idle time is excluded."
+msgstr ""
+"يُحتسب وقت التشغيل أثناء تقدم المشاهدة الظاهرة فقط؛ ولا يُحتسب التوقف أو "
+"الخمول."
 
 msgid "First started"
 msgstr "أول بدء"
@@ -2559,8 +2578,12 @@ msgstr "أكثر الأيام نشاطًا"
 msgid "Most progress"
 msgstr "أكبر تقدم"
 
-msgid "Earlier activity predates active-time tracking. These totals include only activity recorded since"
-msgstr "يسبق النشاط السابق بدء تتبع وقت المشاهدة الفعلي. تشمل هذه المجاميع النشاط المسجل منذ"
+msgid ""
+"Earlier activity predates active-time tracking. These totals include only "
+"activity recorded since"
+msgstr ""
+"يسبق النشاط السابق بدء تتبع وقت المشاهدة الفعلي. تشمل هذه المجاميع النشاط "
+"المسجل منذ"
 
 msgid "No watching activity has been recorded yet."
 msgstr "لم يُسجل نشاط مشاهدة بعد."
@@ -2941,19 +2964,24 @@ msgstr "مطلوب رسالة رد أو مرفق."
 msgid ""
 "This message type is not supported. Text, photos, documents, videos, and "
 "voice messages are accepted."
-msgstr "نوع الرسالة هذا غير مدعوم. تُقبل الرسائل النصية والصور والمستندات ومقاطع الفيديو والرسائل الصوتية."
+msgstr ""
+"نوع الرسالة هذا غير مدعوم. تُقبل الرسائل النصية والصور والمستندات ومقاطع "
+"الفيديو والرسائل الصوتية."
 
 msgid ""
 "Send your message to support. You can send text, photos, documents, videos, "
 "or voice messages."
-msgstr "أرسل رسالتك إلى الدعم. يمكنك إرسال نص أو صور أو مستندات أو مقاطع فيديو أو رسائل صوتية."
+msgstr ""
+"أرسل رسالتك إلى الدعم. يمكنك إرسال نص أو صور أو مستندات أو مقاطع فيديو أو "
+"رسائل صوتية."
 
 msgid "Attach a file"
 msgstr "إرفاق ملف"
 
-msgid ""
-"JPEG, PNG, MP4, or PDF. Images up to 10 MB; other files up to 50 MB."
-msgstr "JPEG أو PNG أو MP4 أو PDF. الصور حتى 10 ميجابايت، والملفات الأخرى حتى 50 ميجابايت."
+msgid "JPEG, PNG, MP4, or PDF. Images up to 10 MB; other files up to 50 MB."
+msgstr ""
+"JPEG أو PNG أو MP4 أو PDF. الصور حتى 10 ميجابايت، والملفات الأخرى حتى 50 "
+"ميجابايت."
 
 msgid "Attachment unavailable"
 msgstr "المرفق غير متاح."
@@ -2978,7 +3006,8 @@ msgstr "رسالة دعم من طالب"
 msgid ""
 "This message type is not supported. Text, photos, documents, and videos are "
 "accepted."
-msgstr "نوع الرسالة هذا غير مدعوم. تُقبل النصوص والصور والمستندات والفيديوهات."
+msgstr ""
+"نوع الرسالة هذا غير مدعوم. تُقبل النصوص والصور والمستندات والفيديوهات."
 
 #: .\management_system\telegram\support.py:334
 msgid "This conversation is no longer available."
@@ -3329,8 +3358,12 @@ msgstr "تعديل"
 msgid "Delete this year?"
 msgstr "حذف هذه السنة؟"
 
-msgid "Delete this lesson and its media links? Telegram delivery history is kept. This cannot be undone."
-msgstr "هل تريد حذف هذا الدرس وروابط الوسائط الخاصة به؟ يتم الاحتفاظ بسجل تسليم تيليجرام. لا يمكن التراجع عن هذا الإجراء."
+msgid ""
+"Delete this lesson and its media links? Telegram delivery history is kept. "
+"This cannot be undone."
+msgstr ""
+"هل تريد حذف هذا الدرس وروابط الوسائط الخاصة به؟ يتم الاحتفاظ بسجل تسليم "
+"تيليجرام. لا يمكن التراجع عن هذا الإجراء."
 
 msgid "Delete lesson"
 msgstr "حذف الدرس"
@@ -4541,7 +4574,8 @@ msgid ""
 "Select enrolled students and a local opening window. This does not change "
 "the normal quiz window."
 msgstr ""
-"اختر الطلاب المقيدين وحدد فترة فتح محلية. لا يغير ذلك فترة الاختبار الأساسية."
+"اختر الطلاب المقيدين وحدد فترة فتح محلية. لا يغير ذلك فترة الاختبار "
+"الأساسية."
 
 #: .\management_system\templates\content_detail.html:156
 msgid "Save exceptional opening"
@@ -4649,8 +4683,12 @@ msgstr "مراجعة"
 msgid "Try Interactive Preview"
 msgstr "تجربة المعاينة التفاعلية"
 
-msgid "Interactive preview: choose, type, reorder, and match answers. Nothing will be submitted or graded."
-msgstr "معاينة تفاعلية: اختر الإجابات واكتبها وأعد ترتيبها وطابق بينها. لن يتم إرسال أي شيء أو تصحيحه."
+msgid ""
+"Interactive preview: choose, type, reorder, and match answers. Nothing will "
+"be submitted or graded."
+msgstr ""
+"معاينة تفاعلية: اختر الإجابات واكتبها وأعد ترتيبها وطابق بينها. لن يتم إرسال"
+" أي شيء أو تصحيحه."
 
 msgid "Quiz preview cannot be submitted."
 msgstr "لا يمكن إرسال معاينة الاختبار."
@@ -4820,7 +4858,8 @@ msgid ""
 "This quiz closed on %(date)s. Answers are not available for quizzes you did "
 "not submit."
 msgstr ""
-"أُغلق هذا الاختبار في %(date)s. الإجابات غير متاحة للاختبارات التي لم ترسلها."
+"أُغلق هذا الاختبار في %(date)s. الإجابات غير متاحة للاختبارات التي لم "
+"ترسلها."
 
 #: .\management_system\templates\display_quiz.html:81
 msgid "Submit Exam"
@@ -4901,7 +4940,8 @@ msgstr "يسعدنا إبلاغك بأنه تمت الموافقة على طلب
 
 #: .\management_system\templates\emails\application_activated.html:6
 msgid ""
-"You can now log in to your account and start accessing courses and materials."
+"You can now log in to your account and start accessing courses and "
+"materials."
 msgstr ""
 "يمكنك الآن تسجيل الدخول إلى حسابك والبدء في الوصول إلى المقررات والمواد "
 "الدراسية."
@@ -4932,7 +4972,8 @@ msgid ""
 "If you believe this is an error or would like more information, please "
 "contact our administration."
 msgstr ""
-"إذا كنت تعتقد أن هذا خطأ أو تريد مزيدًا من المعلومات، يُرجى التواصل مع الإدارة."
+"إذا كنت تعتقد أن هذا خطأ أو تريد مزيدًا من المعلومات، يُرجى التواصل مع "
+"الإدارة."
 
 #: .\management_system\templates\emails\application_declined.html:7
 msgid ""
@@ -4944,7 +4985,8 @@ msgid ""
 "Thank you for applying to Bible Institute. Your application has been "
 "received and is being reviewed by our team."
 msgstr ""
-"شكرًا لتقديمك إلى معهد الكتاب المقدس. تم استلام طلبك وتجري مراجعته من فريقنا."
+"شكرًا لتقديمك إلى معهد الكتاب المقدس. تم استلام طلبك وتجري مراجعته من "
+"فريقنا."
 
 #: .\management_system\templates\emails\application_received.html:6
 msgid ""
@@ -5170,7 +5212,8 @@ msgstr "الرئيس الأعلى للمعهد"
 #: .\management_system\templates\index.html:101
 msgid ""
 "His Holiness Pope Tawadros II, Pope of Alexandria and Patriarch of the See "
-"of St. Mark, and the Supreme Head of the Theological Institutes and Colleges."
+"of St. Mark, and the Supreme Head of the Theological Institutes and "
+"Colleges."
 msgstr ""
 "صاحب القداسة البابا تواضروس الثاني، بابا الإسكندرية وبطريرك الكرازة "
 "المرقسية، والرئيس الأعلى للمعاهد والكليات اللاهوتية."
@@ -5282,8 +5325,8 @@ msgstr "اضغط على الملفات من اليسار لإضافتها"
 
 #: .\management_system\templates\lesson_stream.html:21
 msgid ""
-"To view this video please enable JavaScript, and consider upgrading to a web "
-"browser that"
+"To view this video please enable JavaScript, and consider upgrading to a web"
+" browser that"
 msgstr ""
 "لعرض هذا الفيديو، يرجى تمكين JavaScript، والنظر في الترقية إلى متصفح يدعم"
 
@@ -5435,7 +5478,8 @@ msgstr "بحث"
 
 #: .\management_system\views.py:1502
 msgid "Search username, email, name, phone, or national ID"
-msgstr "ابحث باسم المستخدم أو البريد الإلكتروني أو الاسم أو الهاتف أو الرقم القومي"
+msgstr ""
+"ابحث باسم المستخدم أو البريد الإلكتروني أو الاسم أو الهاتف أو الرقم القومي"
 
 #: .\management_system\templates\partials\components\admin_nav_links.html:39
 #: .\management_system\templates\theme_showcase\admin_proposal.html:40
@@ -5785,8 +5829,7 @@ msgid ""
 "            "
 msgstr ""
 "\n"
-"                عرض %(start)s-%(end)s من أصل %(total)s من المستخدمين "
-"المرتبطين\n"
+"                عرض %(start)s-%(end)s من أصل %(total)s من المستخدمين المرتبطين\n"
 "            "
 
 #: .\management_system\templates\partials\telegram_message_items.html:24
@@ -5974,30 +6017,28 @@ msgstr "منشئ صيغة الترقية"
 #: .\management_system\templates\promotion_evaluation.html:26
 #, python-format
 #| msgid ""
-#| "Configure the promotion evaluation formula for an academic year and "
-#| "level. Set the overall passing threshold and evaluation date, then define "
-#| "weighted rules for quizzes or attendance. Each rule's weight determines "
-#| "its contribution to the final score; for a single rule, a blank weight is "
+#| "Configure the promotion evaluation formula for an academic year and level. "
+#| "Set the overall passing threshold and evaluation date, then define weighted "
+#| "rules for quizzes or attendance. Each rule's weight determines its "
+#| "contribution to the final score; for a single rule, a blank weight is "
 #| "normalized to 100%%. Every applicable rule must meet its minimum pass "
-#| "threshold, and the weighted score must also meet the overall pass "
-#| "threshold."
+#| "threshold, and the weighted score must also meet the overall pass threshold."
 msgid ""
 "Configure the promotion evaluation formula for an academic year and level. "
 "Set the overall passing threshold, evaluation start/end dates, and the "
 "failed-course repeat threshold, then define weighted rules for quizzes or "
 "attendance. Each rule's weight determines its contribution to the final "
 "score; for a single rule, a blank weight is normalized to 100%%. Every "
-"applicable rule must meet its minimum pass threshold, and the weighted score "
-"must also meet the overall pass threshold. A course-specific formula "
+"applicable rule must meet its minimum pass threshold, and the weighted score"
+" must also meet the overall pass threshold. A course-specific formula "
 "overrides the all-courses formula for that offering."
 msgstr ""
 "اضبط صيغة تقييم الترقية للسنة الدراسية والمستوى. حدّد نسبة النجاح الإجمالية "
-"وتاريخي بدء وانتهاء التقييم وحد إعادة المقررات الراسبة، ثم عرّف قواعد موزونة "
-"للاختبارات أو الحضور. يحدد وزن كل قاعدة "
-"مساهمتها في النتيجة النهائية؛ وعند وجود قاعدة واحدة يُطبّع الوزن الفارغ إلى "
-"100%%. يجب أن تحقق كل قاعدة منطبقة حد النجاح الأدنى، كما يجب أن تحقق النتيجة "
-"الموزونة حد النجاح الإجمالي. وتتجاوز الصيغة الخاصة بالمقرر صيغة كل المقررات "
-"لذلك العرض."
+"وتاريخي بدء وانتهاء التقييم وحد إعادة المقررات الراسبة، ثم عرّف قواعد موزونة"
+" للاختبارات أو الحضور. يحدد وزن كل قاعدة مساهمتها في النتيجة النهائية؛ وعند "
+"وجود قاعدة واحدة يُطبّع الوزن الفارغ إلى 100%%. يجب أن تحقق كل قاعدة منطبقة "
+"حد النجاح الأدنى، كما يجب أن تحقق النتيجة الموزونة حد النجاح الإجمالي. "
+"وتتجاوز الصيغة الخاصة بالمقرر صيغة كل المقررات لذلك العرض."
 
 #: .\management_system\templates\promotion_evaluation.html:34
 msgid "Select Academic Scope"
@@ -6012,7 +6053,8 @@ msgid ""
 "Leave empty for an all-courses formula, or select a specific course to "
 "configure a course-specific override."
 msgstr ""
-"اتركه فارغًا لصيغة كل المقررات، أو اختر مقررًا محددًا لإعداد تجاوز خاص بالمقرر."
+"اتركه فارغًا لصيغة كل المقررات، أو اختر مقررًا محددًا لإعداد تجاوز خاص "
+"بالمقرر."
 
 #: .\management_system\templates\promotion_evaluation.html:65
 msgid "Load"
@@ -6179,8 +6221,8 @@ msgstr "لا توجد نتائج محفوظة تطابق معايير التصف
 
 #: .\management_system\templates\promotion_evaluation.html:391
 msgid ""
-"No saved evaluation results yet. Save the formula with evaluation results to "
-"populate this section."
+"No saved evaluation results yet. Save the formula with evaluation results to"
+" populate this section."
 msgstr ""
 "لا توجد نتائج تقييم محفوظة بعد. احفظ الصيغة مع نتائج التقييم لملء هذا القسم."
 
@@ -6197,8 +6239,8 @@ msgid ""
 "Select a specific course to override the all-courses formula for that "
 "offering. Leave as All courses for the aggregate formula."
 msgstr ""
-"اختر مقررًا محددًا لتجاوز صيغة كل المقررات لهذا العرض. اتركه على كل المقررات "
-"للصيغة الإجمالية."
+"اختر مقررًا محددًا لتجاوز صيغة كل المقررات لهذا العرض. اتركه على كل المقررات"
+" للصيغة الإجمالية."
 
 #: .\management_system\templates\promotion_evaluation.html:454
 msgid "The minimum overall percentage a student must achieve to pass."
@@ -6209,8 +6251,8 @@ msgid ""
 "Inclusive start date for the evaluation period. All quizzes, lessons, and "
 "attendance within this range are considered."
 msgstr ""
-"تاريخ بداية شامل لفترة التقييم. تُحتسب كل الاختبارات والدروس والحضور داخل هذا "
-"النطاق."
+"تاريخ بداية شامل لفترة التقييم. تُحتسب كل الاختبارات والدروس والحضور داخل "
+"هذا النطاق."
 
 #: .\management_system\templates\promotion_evaluation.html:474
 msgid "Inclusive end date for the evaluation period. Cannot be a future date."
@@ -6218,12 +6260,13 @@ msgstr "تاريخ نهاية شامل لفترة التقييم. لا يمكن 
 
 #: .\management_system\templates\promotion_evaluation.html:487
 msgid ""
-"If a student fails fewer courses than this threshold, they are promoted with "
-"exceptional enrollments for the failed courses. If they fail at or above "
+"If a student fails fewer courses than this threshold, they are promoted with"
+" exceptional enrollments for the failed courses. If they fail at or above "
 "this threshold, they repeat the entire level."
 msgstr ""
-"إذا رسب الطالب في عدد من المقررات أقل من هذا الحد، يُرفّع مع تسجيلات استثنائية "
-"للمقررات الراسبة. وإذا رسب في هذا الحد أو أكثر، يعيد المستوى كاملًا."
+"إذا رسب الطالب في عدد من المقررات أقل من هذا الحد، يُرفّع مع تسجيلات "
+"استثنائية للمقررات الراسبة. وإذا رسب في هذا الحد أو أكثر، يعيد المستوى "
+"كاملًا."
 
 #: .\management_system\templates\promotion_evaluation.html:496
 msgid "Promotion Rules"
@@ -6283,9 +6326,9 @@ msgid ""
 "applicable quiz weights are normalized automatically."
 msgstr ""
 "الحد الأدنى للنجاح هو النسبة الدنيا المطلوبة لذلك المقياس الفردي. يجب أن "
-"تحقق كل قاعدة منطبقة حدها الأدنى، كما يجب أن تحقق النتيجة الموزونة الإجمالية "
-"حد النجاح العام. لا يُحتسب الحضور للطلاب الأونلاين، وتُطبّع أوزان الاختبارات "
-"المنطبقة تلقائيًا."
+"تحقق كل قاعدة منطبقة حدها الأدنى، كما يجب أن تحقق النتيجة الموزونة الإجمالية"
+" حد النجاح العام. لا يُحتسب الحضور للطلاب الأونلاين، وتُطبّع أوزان "
+"الاختبارات المنطبقة تلقائيًا."
 
 #: .\management_system\templates\promotion_evaluation.html:589
 msgid "Save Formula"
@@ -6884,7 +6927,8 @@ msgstr "تم إرسال الطلب"
 
 #: .\management_system\templates\signup_success.html:22
 msgid ""
-"Your application has been received. You will be notified once it is reviewed."
+"Your application has been received. You will be notified once it is "
+"reviewed."
 msgstr "تم استلام طلبك. سيتم إخطارك بعد مراجعته."
 
 #: .\management_system\templates\signup_success.html:24
@@ -6985,8 +7029,8 @@ msgstr "تفاصيل الإعلان"
 #: .\management_system\templates\telegram_broadcast.html:63
 #, python-format
 msgid ""
-"The message must not exceed %(limit)s characters and will be sent exactly as "
-"written."
+"The message must not exceed %(limit)s characters and will be sent exactly as"
+" written."
 msgstr "يجب ألا تتجاوز الرسالة %(limit)s حرفًا، وستُرسل كما كُتبت تمامًا."
 
 #: .\management_system\templates\telegram_broadcast.html:77
@@ -7094,8 +7138,8 @@ msgstr "إعلانات تُرسل عبر تيليجرام إلى كل طالب �
 
 #: .\management_system\templates\telegram_config.html:22
 msgid ""
-"The bot token is encrypted and never shown again after it is saved. Saving a "
-"token does not activate the bot."
+"The bot token is encrypted and never shown again after it is saved. Saving a"
+" token does not activate the bot."
 msgstr "رمز البوت مشفّر ولن يظهر مرة أخرى بعد حفظه. حفظ الرمز لا يفعّل البوت."
 
 #: .\management_system\templates\telegram_config.html:28
@@ -7120,8 +7164,8 @@ msgid ""
 "Enter a new token to save or replace the current one. The saved token is "
 "encrypted and never displayed again."
 msgstr ""
-"أدخل رمزًا جديدًا لحفظه أو استبدال الرمز الحالي. يتم تشفير الرمز المحفوظ ولا "
-"يظهر مرة أخرى."
+"أدخل رمزًا جديدًا لحفظه أو استبدال الرمز الحالي. يتم تشفير الرمز المحفوظ ولا"
+" يظهر مرة أخرى."
 
 #: .\management_system\templates\telegram_config.html:85
 msgid "Rotate Token"
@@ -7368,8 +7412,8 @@ msgid ""
 "keeps its CSRF token, goes through HTMX, and the row disappears only after "
 "the server agrees."
 msgstr ""
-"هذا هو نمط التأكيد نفسه المستخدم حاليًا في لوحات المعلومات: يحتفظ الطلب برمز "
-"CSRF، ويمر عبر HTMX، ولا يختفي الصف إلا بعد موافقة الخادم."
+"هذا هو نمط التأكيد نفسه المستخدم حاليًا في لوحات المعلومات: يحتفظ الطلب برمز"
+" CSRF، ويمر عبر HTMX، ولا يختفي الصف إلا بعد موافقة الخادم."
 
 #: .\management_system\templates\theme_showcase\admin_proposal.html:161
 msgid "Destructive actions always stay server-confirmed."
@@ -7414,8 +7458,8 @@ msgstr "لا سنة أكاديمية نشطة."
 
 #: .\management_system\templates\theme_showcase\partials\admin\_ad_analytics.html:32
 msgid ""
-"Same SQL aggregation the production report uses - paginated, never one query "
-"per student."
+"Same SQL aggregation the production report uses - paginated, never one query"
+" per student."
 msgstr ""
 "نفس تجميع SQL الذي يستخدمه التقرير الإنتاجي - مقسّم على صفحات، ولا استعلام "
 "لكل طالب أبدًا."
@@ -7605,7 +7649,8 @@ msgstr ""
 msgid ""
 "The archives - database-linked media inventory, without touching live "
 "storage billing."
-msgstr "الأرشيف - جرد وسائط مرتبط بقاعدة البيانات، دون لمس فوترة التخزين الحي."
+msgstr ""
+"الأرشيف - جرد وسائط مرتبط بقاعدة البيانات، دون لمس فوترة التخزين الحي."
 
 #: .\management_system\templates\theme_showcase\partials\admin\_ad_content.html:258
 msgid "Media coverage"
@@ -7951,8 +7996,8 @@ msgstr "يبدأ التقدم مع أول محاضرة في السنة الجد�
 
 #: .\management_system\templates\theme_showcase\partials\admin\_ad_setup.html:5
 msgid ""
-"The three steps of the academic ladder, with courses and enrollments counted "
-"live."
+"The three steps of the academic ladder, with courses and enrollments counted"
+" live."
 msgstr "درجات السلَّم الأكاديمي الثلاث، مع المواد والتسجيلات محسوبة مباشرة."
 
 #: .\management_system\templates\theme_showcase\partials\admin\_ad_setup.html:11
@@ -8015,8 +8060,8 @@ msgid ""
 "A liturgical rhythm for the academic year: meeting days in ink-blue, holy "
 "days in gold, today circled as a seal."
 msgstr ""
-"إيقاع طقسي للسنة الأكاديمية: أيام الاجتماع بالأزرق الحبري، والأعياد بالذهبي، "
-"واليوم محاط كالختَم."
+"إيقاع طقسي للسنة الأكاديمية: أيام الاجتماع بالأزرق الحبري، والأعياد بالذهبي،"
+" واليوم محاط كالختَم."
 
 #: .\management_system\templates\theme_showcase\partials\proposal_calendar.html:17
 #: .\management_system\templates\theme_showcase\partials\proposal_calendar.html:26
@@ -8046,8 +8091,8 @@ msgid ""
 "A focused study desk: ink banner for context, saintly-gold active lesson, "
 "and a media card with real progress beneath the player."
 msgstr ""
-"منضدة دراسة متأنّية: شريط حبري للسياق، والدرس النشط بذهبٍ رهباني، وبطاقة وسائط "
-"تُظهر تقدمًا حقيقيًا تحت المشغّل."
+"منضدة دراسة متأنّية: شريط حبري للسياق، والدرس النشط بذهبٍ رهباني، وبطاقة "
+"وسائط تُظهر تقدمًا حقيقيًا تحت المشغّل."
 
 #: .\management_system\templates\theme_showcase\partials\proposal_course_detail.html:20
 #: .\management_system\templates\theme_showcase\partials\proposal_course_detail.html:49
@@ -8184,8 +8229,8 @@ msgstr "الملف الشخصي ورمز QR"
 
 #: .\management_system\templates\theme_showcase\partials\proposal_profile.html:6
 msgid ""
-"An identity card with a gold seal, the QR one tap away, and courses and quiz "
-"results resting in calm panels."
+"An identity card with a gold seal, the QR one tap away, and courses and quiz"
+" results resting in calm panels."
 msgstr ""
 "بطاقة هوية بختم ذهبي، ورمز QR بلمسة واحدة، والمواد ونتائج الاختبارات في "
 "لوحات هادئة."
@@ -8370,8 +8415,8 @@ msgid ""
 "Logical CSS properties keep every layout perfect in Arabic RTL and English "
 "LTR."
 msgstr ""
-"خصائص CSS المنطقية تُبقي كل تخطيط متقنًا في العربية من اليمين والإنجليزية من "
-"اليسار."
+"خصائص CSS المنطقية تُبقي كل تخطيط متقنًا في العربية من اليمين والإنجليزية من"
+" اليسار."
 
 #: .\management_system\templates\theme_showcase\student_proposal.html:6
 msgid "Student Experience - UI Proposal"
@@ -8387,8 +8432,8 @@ msgid ""
 "surfaces, liturgical gold on deep ink, and generous room for the Word. Same "
 "flows, softer soul."
 msgstr ""
-"موطن أحدث وأكثر سلاسة لكل شاشات الطالب - أسطح هادئة كلون الرُّق، وذهبٌ طقسي فوق "
-"حبر عميق، وفسحة رحبة لكلمة الله. المسارات نفسها، بروح أرقّ."
+"موطن أحدث وأكثر سلاسة لكل شاشات الطالب - أسطح هادئة كلون الرُّق، وذهبٌ طقسي "
+"فوق حبر عميق، وفسحة رحبة لكلمة الله. المسارات نفسها، بروح أرقّ."
 
 #: .\management_system\templates\theme_showcase\student_proposal.html:25
 msgid "5 student screens"
@@ -8918,7 +8963,8 @@ msgstr ""
 
 #: .\management_system\utils\quiz_access.py:47
 msgid ""
-"Every selected student must be actively enrolled in this quiz's course scope."
+"Every selected student must be actively enrolled in this quiz's course "
+"scope."
 msgstr "يجب أن يكون كل طالب مختار مقيدًا حاليًا في نطاق مادة هذا الاختبار."
 
 #: .\management_system\utils\validators.py:8
@@ -10039,8 +10085,8 @@ msgstr "المصادقة مطلوبة."
 
 #: .\management_system/management/commands/process_media_jobs.py:22
 msgid ""
-"Inspect media-processing jobs and optionally recover pending or failed jobs. "
-"Read-only by default."
+"Inspect media-processing jobs and optionally recover pending or failed jobs."
+" Read-only by default."
 msgstr ""
 "افحص مهام معالجة الوسائط، ويمكن استعادة المهام المعلقة أو الفاشلة. القراءة "
 "فقط افتراضيًا."
@@ -10065,7 +10111,8 @@ msgstr "استعد الرفعات المتأخرة وإرسالات العامل
 #, python-format
 msgid ""
 "Retried %(queued)s failed job(s); %(rejected)s source(s) were unavailable."
-msgstr "أُعيدت محاولة %(queued)s مهمة فاشلة؛ تعذر الوصول إلى %(rejected)s مصدر."
+msgstr ""
+"أُعيدت محاولة %(queued)s مهمة فاشلة؛ تعذر الوصول إلى %(rejected)s مصدر."
 
 #: .\management_system/management/commands/process_media_jobs.py:47
 #, python-format
@@ -10075,9 +10122,10 @@ msgstr "استُعيدت %(queued)s مهمة؛ اعتُبرت %(failed)s مهم�
 #: .\management_system/management/commands/process_media_jobs.py:51
 #: .\management_system/management/commands/cleanup_media_jobs.py:55
 msgid ""
-"The media-processing table is unavailable; apply migration 0060 before using "
-"this command."
-msgstr "جدول معالجة الوسائط غير متاح؛ طبّق الترحيل 0060 قبل استخدام هذا الأمر."
+"The media-processing table is unavailable; apply migration 0060 before using"
+" this command."
+msgstr ""
+"جدول معالجة الوسائط غير متاح؛ طبّق الترحيل 0060 قبل استخدام هذا الأمر."
 
 #: .\management_system/management/commands/process_media_jobs.py:70
 #: .\management_system/templates/media_processing_status.html:39
@@ -10097,8 +10145,8 @@ msgid ""
 "Identify expired media staging objects. Dry-run is the default; --apply is "
 "required before any deletion."
 msgstr ""
-"تحديد كائنات الوسائط المؤقتة منتهية الصلاحية. التشغيل التجريبي هو الافتراضي؛ "
-"--apply مطلوب قبل أي حذف."
+"تحديد كائنات الوسائط المؤقتة منتهية الصلاحية. التشغيل التجريبي هو الافتراضي؛"
+" --apply مطلوب قبل أي حذف."
 
 #: .\management_system/management/commands/cleanup_media_jobs.py:32
 msgid "Failed staging retention threshold in hours; default 72."
@@ -10117,7 +10165,8 @@ msgid ""
 "With --apply, purge successful job rows older than the configured 90-day "
 "retention."
 msgstr ""
-"مع --apply، حذف صفوف المهام الناجحة الأقدم من حد الاحتفاظ المحدد وهو 90 يومًا."
+"مع --apply، حذف صفوف المهام الناجحة الأقدم من حد الاحتفاظ المحدد وهو 90 "
+"يومًا."
 
 #: .\management_system/management/commands/cleanup_media_jobs.py:46
 msgid "--older-than-hours must be positive."
@@ -10219,8 +10268,13 @@ msgstr "إيقاف إجباري"
 msgid "Stop processing this upload and any companion files?"
 msgstr "هل تريد إيقاف معالجة هذا الرفع والملفات المصاحبة له؟"
 
-msgid "Remove this upload's server files and R2 objects? Its lesson is deleted only if it was created by this upload and has no other content or student history."
-msgstr "هل تريد حذف ملفات هذا الرفع من الخادم وR2؟ لن يُحذف الدرس إلا إذا أنشأه هذا الرفع ولم يكن له محتوى آخر أو سجل دراسة للطلاب."
+msgid ""
+"Remove this upload's server files and R2 objects? Its lesson is deleted only"
+" if it was created by this upload and has no other content or student "
+"history."
+msgstr ""
+"هل تريد حذف ملفات هذا الرفع من الخادم وR2؟ لن يُحذف الدرس إلا إذا أنشأه هذا "
+"الرفع ولم يكن له محتوى آخر أو سجل دراسة للطلاب."
 
 msgid "Clean up upload"
 msgstr "تنظيف الرفع"
@@ -10237,17 +10291,27 @@ msgstr "سينتظر التنظيف حتى تنتهي صلاحية رابط رف
 msgid "Upload cleanup failed. You can retry cleanup."
 msgstr "فشل تنظيف الرفع. يمكنك إعادة محاولة التنظيف."
 
-msgid "R2 cleanup checked %(checked)s keys: %(found)s found, %(deleted)s deleted, %(missing)s already absent, %(failed)s failed."
-msgstr "فحص تنظيف R2 عدد %(checked)s من المفاتيح: وُجد %(found)s، حُذف %(deleted)s، كان %(missing)s غير موجود مسبقًا، وفشل حذف %(failed)s."
+msgid ""
+"R2 cleanup checked %(checked)s keys: %(found)s found, %(deleted)s deleted, "
+"%(missing)s already absent, %(failed)s failed."
+msgstr ""
+"فحص تنظيف R2 عدد %(checked)s من المفاتيح: وُجد %(found)s، حُذف %(deleted)s، "
+"كان %(missing)s غير موجود مسبقًا، وفشل حذف %(failed)s."
 
-msgid "R2 cleanup could not verify object existence; no R2 objects were deleted. Retry cleanup."
-msgstr "تعذر التحقق من وجود كائنات R2؛ لم تُحذف أي كائنات. أعد محاولة التنظيف."
+msgid ""
+"R2 cleanup could not verify object existence; no R2 objects were deleted. "
+"Retry cleanup."
+msgstr ""
+"تعذر التحقق من وجود كائنات R2؛ لم تُحذف أي كائنات. أعد محاولة التنظيف."
 
 msgid "The lesson created by this upload was deleted."
 msgstr "حُذف الدرس الذي أنشأه هذا الرفع."
 
-msgid "Some files were kept because they are shared or could not be verified as owned by this upload."
-msgstr "أُبقي على بعض الملفات لأنها مشتركة أو تعذر التحقق من ملكية هذا الرفع لها."
+msgid ""
+"Some files were kept because they are shared or could not be verified as "
+"owned by this upload."
+msgstr ""
+"أُبقي على بعض الملفات لأنها مشتركة أو تعذر التحقق من ملكية هذا الرفع لها."
 
 msgid "Stopped by an administrator."
 msgstr "أوقفه مسؤول."
@@ -10690,7 +10754,9 @@ msgstr "أدخل رقم هاتف صحيحًا."
 msgid "A device installation ID is required."
 msgstr "معرّف تثبيت الجهاز مطلوب."
 
-msgid "A push notification is being sent to this device. Try logging out again shortly."
+msgid ""
+"A push notification is being sent to this device. Try logging out again "
+"shortly."
 msgstr "يجري إرسال إشعار إلى هذا الجهاز. أعد تسجيل الخروج بعد لحظات."
 
 msgid "The device installation ID is too long."
@@ -10810,7 +10876,8 @@ msgstr "التحديد لا يطابق هذه القائمة."
 msgid "The selection has invalid types."
 msgstr "نوع بيانات التحديد غير صالح."
 
-msgid "Some selected records are referenced by other data and cannot be deleted."
+msgid ""
+"Some selected records are referenced by other data and cannot be deleted."
 msgstr "بعض السجلات المحددة مرتبطة ببيانات أخرى ولا يمكن حذفها."
 
 msgid "Support message from %(name)s"
@@ -10833,6 +10900,7 @@ msgstr "محذوف"
 
 msgid "Edited"
 msgstr "معدّل"
+
 msgid "Import Quiz from JSON"
 msgstr "استيراد اختبار من JSON"
 
@@ -10842,8 +10910,12 @@ msgstr "إظهار/إخفاء لوحة الاستيراد"
 msgid "Paste a JSON payload or open a .json file, then preview it."
 msgstr "الصق محتوى JSON أو افتح ملف .json ثم اضغط معاينة."
 
-msgid "Preview validates the payload, shows the questions, and loads them into this form. Submit to save the quiz as a draft."
-msgstr "تتحقق المعاينة من المحتوى وتعرض الأسئلة ثم تُحمّلها في هذا النموذج. أرسل النموذج لحفظ الاختبار كمسودة."
+msgid ""
+"Preview validates the payload, shows the questions, and loads them into this"
+" form. Submit to save the quiz as a draft."
+msgstr ""
+"تتحقق المعاينة من المحتوى وتعرض الأسئلة ثم تُحمّلها في هذا النموذج. أرسل "
+"النموذج لحفظ الاختبار كمسودة."
 
 msgid "Paste quiz JSON here..."
 msgstr "الصق JSON الاختبار هنا..."
@@ -10884,8 +10956,10 @@ msgstr "الملف المحدد كبير جدًا للاستيراد."
 msgid "Could not read the selected file."
 msgstr "تعذّرت قراءة الملف المحدد."
 
-msgid "Quiz data loaded into the form. Review it, then submit to save the draft."
-msgstr "تم تحميل بيانات الاختبار في النموذج. راجعها ثم أرسل النموذج لحفظ المسودة."
+msgid ""
+"Quiz data loaded into the form. Review it, then submit to save the draft."
+msgstr ""
+"تم تحميل بيانات الاختبار في النموذج. راجعها ثم أرسل النموذج لحفظ المسودة."
 
 msgid "Some quiz data could not be loaded into the form."
 msgstr "تعذّر تحميل بعض بيانات الاختبار في النموذج."
@@ -10929,20 +11003,32 @@ msgstr "يجب ألا يزيد اسم الاختبار عن %(limit)s حرفًا
 msgid "Unknown status \"%(value)s\". Use one of: %(allowed)s."
 msgstr "حالة غير معروفة \"%(value)s\". استخدم إحدى القيم: %(allowed)s."
 
-msgid "Unknown course offering \"%(value)s\". Use an offering id or the exact label from the form."
-msgstr "مقرر غير معروف \"%(value)s\". استخدم معرّف المقرر أو النص الظاهر في النموذج."
+msgid ""
+"Unknown course offering \"%(value)s\". Use an offering id or the exact label"
+" from the form."
+msgstr ""
+"مقرر غير معروف \"%(value)s\". استخدم معرّف المقرر أو النص الظاهر في النموذج."
 
-msgid "The selected course offering is not available in the active academic year."
+msgid ""
+"The selected course offering is not available in the active academic year."
 msgstr "المقرر المحدد غير متاح في العام الدراسي النشط."
 
-msgid "More than one course offering matches \"%(value)s\". Use the offering id instead."
-msgstr "يوجد أكثر من مقرر مطابق لـ \"%(value)s\". استخدم معرّف المقرر بدلًا من ذلك."
+msgid ""
+"More than one course offering matches \"%(value)s\". Use the offering id "
+"instead."
+msgstr ""
+"يوجد أكثر من مقرر مطابق لـ \"%(value)s\". استخدم معرّف المقرر بدلًا من ذلك."
 
 msgid "Unknown quiz type \"%(value)s\". Use %(codes)s or a quiz type id."
-msgstr "نوع اختبار غير معروف \"%(value)s\". استخدم %(codes)s أو معرّف نوع الاختبار."
+msgstr ""
+"نوع اختبار غير معروف \"%(value)s\". استخدم %(codes)s أو معرّف نوع الاختبار."
 
-msgid "Invalid date \"%(value)s\" for %(field)s. Use ISO format like 2026-09-20T10:00."
-msgstr "تاريخ غير صالح \"%(value)s\" في %(field)s. استخدم صيغة ISO مثل 2026-09-20T10:00."
+msgid ""
+"Invalid date \"%(value)s\" for %(field)s. Use ISO format like "
+"2026-09-20T10:00."
+msgstr ""
+"تاريخ غير صالح \"%(value)s\" في %(field)s. استخدم صيغة ISO مثل "
+"2026-09-20T10:00."
 
 msgid "opening date"
 msgstr "تاريخ الفتح"
@@ -10956,16 +11042,22 @@ msgstr "يجب أن يكون السؤال %(number)s كائنًا."
 msgid "Question %(number)s: unknown field \"%(field)s\" was ignored."
 msgstr "السؤال %(number)s: تم تجاهل الحقل غير المعروف \"%(field)s\"."
 
-msgid "Question %(number)s: unsupported or missing question type \"%(type)s\". Allowed types: %(allowed)s."
-msgstr "السؤال %(number)s: نوع سؤال غير مدعوم أو مفقود \"%(type)s\". الأنواع المسموحة: %(allowed)s."
+msgid ""
+"Question %(number)s: unsupported or missing question type \"%(type)s\". "
+"Allowed types: %(allowed)s."
+msgstr ""
+"السؤال %(number)s: نوع سؤال غير مدعوم أو مفقود \"%(type)s\". الأنواع "
+"المسموحة: %(allowed)s."
 
 msgid "Question %(number)s: the question text is required."
 msgstr "السؤال %(number)s: نص السؤال مطلوب."
 
-msgid "Question %(number)s: the question text must be at most %(limit)s characters."
+msgid ""
+"Question %(number)s: the question text must be at most %(limit)s characters."
 msgstr "السؤال %(number)s: يجب ألا يزيد نص السؤال عن %(limit)s حرفًا."
 
-msgid "Question %(number)s: the grade must be an integer between 0 and %(limit)s."
+msgid ""
+"Question %(number)s: the grade must be an integer between 0 and %(limit)s."
 msgstr "السؤال %(number)s: يجب أن تكون الدرجة عددًا صحيحًا بين 0 و%(limit)s."
 
 msgid "Question %(number)s: %(label)s are required."
@@ -10983,10 +11075,14 @@ msgstr "الاختيارات"
 msgid "order event items"
 msgstr "عناصر ترتيب الأحداث"
 
-msgid "Question %(number)s: multiple choice questions need at least 2 choices."
-msgstr "السؤال %(number)s: أسئلة الاختيار من متعدد تحتاج إلى اختيارين على الأقل."
+msgid ""
+"Question %(number)s: multiple choice questions need at least 2 choices."
+msgstr ""
+"السؤال %(number)s: أسئلة الاختيار من متعدد تحتاج إلى اختيارين على الأقل."
 
-msgid "Question %(number)s: no correct answer was provided, so it will be graded manually."
+msgid ""
+"Question %(number)s: no correct answer was provided, so it will be graded "
+"manually."
 msgstr "السؤال %(number)s: لم تُحدَّد إجابة صحيحة، لذا سيُقيَّم يدويًا."
 
 msgid "Question %(number)s: order events need at least 2 items."
@@ -10995,7 +11091,9 @@ msgstr "السؤال %(number)s: أسئلة ترتيب الأحداث تحتاج
 msgid "Question %(number)s: match related questions need at least 2 pairs."
 msgstr "السؤال %(number)s: أسئلة الوصل تحتاج إلى زوجين على الأقل."
 
-msgid "Question %(number)s: the correct answer \"%(answer)s\" is not one of the choices."
+msgid ""
+"Question %(number)s: the correct answer \"%(answer)s\" is not one of the "
+"choices."
 msgstr "السؤال %(number)s: الإجابة الصحيحة \"%(answer)s\" ليست ضمن الاختيارات."
 
 msgid "Question %(number)s: match related pairs are required."
@@ -11030,8 +11128,12 @@ msgid "Pending attendance records assigned: %(count)s."
 msgstr "تم إسناد %(count)s سجل حضور معلّق."
 
 #: .\management_system\views.py
-msgid "Some selected offerings were skipped because their level already has a meeting on this date."
-msgstr "تم تجاهل بعض المواد المختارة لأن المستوى الخاص بها لديه اجتماع بالفعل في هذا التاريخ."
+msgid ""
+"Some selected offerings were skipped because their level already has a "
+"meeting on this date."
+msgstr ""
+"تم تجاهل بعض المواد المختارة لأن المستوى الخاص بها لديه اجتماع بالفعل في هذا"
+" التاريخ."
 
 #: .\management_system\views.py
 msgid "Some selected offerings do not meet on the selected weekday."
@@ -11057,7 +11159,8 @@ msgid "No academic years are configured."
 msgstr "لا توجد أعوام دراسية مُعدّة بعد."
 
 #: .\management_system\templates\calendar_management.html
-msgid "Select one or more offerings. Each level can have one meeting per date."
+msgid ""
+"Select one or more offerings. Each level can have one meeting per date."
 msgstr "اختر مادة أو أكثر. يمكن أن يكون لكل مستوى اجتماع واحد في نفس التاريخ."
 
 #: .\management_system\templates\partials\calendar_cell_admin.html
@@ -11131,8 +11234,12 @@ msgstr "ترقيم صفحات حسابات تيليجرام"
 msgid "accounts"
 msgstr "حسابات"
 
-msgid "See which accounts linked their Telegram account, which are still unlinked, and whether the phone shared on Telegram matches the website phone."
-msgstr "اطّلع على الحسابات التي ربطت حسابها بتيليجرام والحسابات التي لم تربط بعد، وما إذا كان رقم الهاتف المُشارَك على تيليجرام مطابقًا لهاتف الموقع."
+msgid ""
+"See which accounts linked their Telegram account, which are still unlinked, "
+"and whether the phone shared on Telegram matches the website phone."
+msgstr ""
+"اطّلع على الحسابات التي ربطت حسابها بتيليجرام والحسابات التي لم تربط بعد، "
+"وما إذا كان رقم الهاتف المُشارَك على تيليجرام مطابقًا لهاتف الموقع."
 
 msgid "Media"
 msgstr "الوسائط"
@@ -11221,8 +11328,11 @@ msgstr "تم رفض إذن الكاميرا. اسمح بالوصول إلى ال
 msgid "Camera access is unavailable on this device."
 msgstr "الكاميرا غير متاحة على هذا الجهاز."
 
-msgid "QR scanning is not available in this browser. Type the QR token in the Find Student field as a fallback."
-msgstr "مسح رمز QR غير متاح في هذا المتصفح. أدخل رمز QR في حقل البحث عن طالب كبديل."
+msgid ""
+"QR scanning is not available in this browser. Type the QR token in the Find "
+"Student field as a fallback."
+msgstr ""
+"مسح رمز QR غير متاح في هذا المتصفح. أدخل رمز QR في حقل البحث عن طالب كبديل."
 
 msgid "Recorded at"
 msgstr "تم التسجيل في"
@@ -11236,12 +11346,20 @@ msgid "No missing exits were found for %(date)s."
 msgstr "لا توجد حالات خروج ناقصة بتاريخ %(date)s."
 
 #, python-format
-msgid "Entrance after %(limit)s or exit before %(earliest)s counts as partial attendance."
+msgid ""
+"Entrance after %(limit)s or exit before %(earliest)s counts as partial "
+"attendance."
 msgstr "الدخول بعد %(limit)s أو الخروج قبل %(earliest)s يُحتسب حضورًا جزئيًا."
 
 #, python-format
-msgid "Entrance scans after %(limit)s and exit scans before %(earliest)s count as partial attendance; the buffer is %(buffer)s minutes. Reconciled exits always count as on-time exits."
-msgstr "تُحتسب عمليات الدخول بعد %(limit)s والخروج قبل %(earliest)s حضورًا جزئيًا؛ والهامش %(buffer)s دقيقة. أما حالات الخروج المُسوَّاة فتُحتسب دائمًا خروجًا في الموعد."
+msgid ""
+"Entrance scans after %(limit)s and exit scans before %(earliest)s count as "
+"partial attendance; the buffer is %(buffer)s minutes. Reconciled exits "
+"always count as on-time exits."
+msgstr ""
+"تُحتسب عمليات الدخول بعد %(limit)s والخروج قبل %(earliest)s حضورًا جزئيًا؛ "
+"والهامش %(buffer)s دقيقة. أما حالات الخروج المُسوَّاة فتُحتسب دائمًا خروجًا "
+"في الموعد."
 
 msgid "Only administrators can send announcements."
 msgstr "لا يمكن إرسال الإعلانات إلا للمسؤولين."
@@ -11334,11 +11452,19 @@ msgstr "إشعارات"
 msgid "Announcements"
 msgstr "الإعلانات"
 
-msgid "Send a bilingual announcement to every active student or to specific levels. Sent announcements appear in the student web bell and the mobile app."
-msgstr "أرسل إعلانًا ثنائي اللغة إلى كل طالب نشط أو إلى مستويات محددة. تظهر الإعلانات المرسلة في جرس إشعارات الطالب على الويب وفي تطبيق الهاتف."
+msgid ""
+"Send a bilingual announcement to every active student or to specific levels."
+" Sent announcements appear in the student web bell and the mobile app."
+msgstr ""
+"أرسل إعلانًا ثنائي اللغة إلى كل طالب نشط أو إلى مستويات محددة. تظهر "
+"الإعلانات المرسلة في جرس إشعارات الطالب على الويب وفي تطبيق الهاتف."
 
-msgid "Send an announcement to every active student or to specific levels. Sent announcements appear in the student web bell and the mobile app."
-msgstr "أرسل إعلانًا إلى كل طالب نشط أو إلى مستويات محددة. تظهر الإعلانات المرسلة في جرس إشعارات الطالب على الويب وفي تطبيق الهاتف."
+msgid ""
+"Send an announcement to every active student or to specific levels. Sent "
+"announcements appear in the student web bell and the mobile app."
+msgstr ""
+"أرسل إعلانًا إلى كل طالب نشط أو إلى مستويات محددة. تظهر الإعلانات المرسلة في"
+" جرس إشعارات الطالب على الويب وفي تطبيق الهاتف."
 
 msgid "Compose notification"
 msgstr "إنشاء إشعار"
@@ -11575,7 +11701,9 @@ msgstr "كل المدن"
 msgid "Application Analytics"
 msgstr "تحليلات الطلبات"
 
-msgid "Application submissions over time with study mode, status, and city insights."
+msgid ""
+"Application submissions over time with study mode, status, and city "
+"insights."
 msgstr "الطلبات المقدمة عبر الزمن مع رؤى نظام الدراسة والحالة والمدينة."
 
 msgid "Applications by city"
@@ -11668,8 +11796,12 @@ msgstr "الصف الخاص بـ %(student)s: %(message)s"
 msgid "Add history to existing students"
 msgstr "إضافة سجل تاريخي لطلاب موجودين"
 
-msgid "Select up to 50 existing students, review each row, then apply. Promotion runs after review when enabled."
-msgstr "اختر ما يصل إلى 50 طالبًا موجودًا، وراجع كل صف، ثم طبّق. تُنفَّذ الترقية بعد المراجعة عند تفعيلها."
+msgid ""
+"Select up to 50 existing students, review each row, then apply. Promotion "
+"runs after review when enabled."
+msgstr ""
+"اختر ما يصل إلى 50 طالبًا موجودًا، وراجع كل صف، ثم طبّق. تُنفَّذ الترقية بعد"
+" المراجعة عند تفعيلها."
 
 msgid "Hold Ctrl or Cmd to select multiple students (up to 50)."
 msgstr "اضغط Ctrl أو Cmd لتحديد عدة طلاب (حتى 50)."
@@ -11677,8 +11809,12 @@ msgstr "اضغط Ctrl أو Cmd لتحديد عدة طلاب (حتى 50)."
 msgid "Preview selected students"
 msgstr "معاينة الطلاب المحددين"
 
-msgid "Upload the reviewed template (16 columns, no WordPress fields). The first submission is a dry-run; apply is allowed only when every row is valid."
-msgstr "ارفع القالب المُراجَع (16 عمودًا، بدون حقول ووردبريس). الإرسال الأول تجريبي؛ لا يُسمح بالتطبيق إلا عندما تكون جميع الصفوف صالحة."
+msgid ""
+"Upload the reviewed template (16 columns, no WordPress fields). The first "
+"submission is a dry-run; apply is allowed only when every row is valid."
+msgstr ""
+"ارفع القالب المُراجَع (16 عمودًا، بدون حقول ووردبريس). الإرسال الأول تجريبي؛"
+" لا يُسمح بالتطبيق إلا عندما تكون جميع الصفوف صالحة."
 
 msgid "Expected columns"
 msgstr "الأعمدة المتوقعة"
@@ -11731,8 +11867,12 @@ msgstr "لا توجد ألبومات تخرج متاحة لك بعد."
 msgid "Album (academic year and level)"
 msgstr "الألبوم (السنة الدراسية والمستوى)"
 
-msgid "Uploads go directly to R2 staging (up to 2 GB per zip), then a background job optimizes images and publishes them."
-msgstr "تُرفع الملفات مباشرة إلى التخزين المؤقت (حتى 2 جيجابايت للأرشيف)، ثم تُحسّن الصور وتُنشر عبر مهمة خلفية."
+msgid ""
+"Uploads go directly to R2 staging (up to 2 GB per zip), then a background "
+"job optimizes images and publishes them."
+msgstr ""
+"تُرفع الملفات مباشرة إلى التخزين المؤقت (حتى 2 جيجابايت للأرشيف)، ثم تُحسّن "
+"الصور وتُنشر عبر مهمة خلفية."
 
 msgid "Upload photos or a zip"
 msgstr "ارفع الصور أو أرشيف zip"
@@ -11821,7 +11961,8 @@ msgstr "الملف المرفوع مفقود أو فارغ."
 msgid "No usable images or videos were found."
 msgstr "لم يتم العثور على صور أو فيديوهات صالحة."
 
-msgid "Some files were skipped because they are not supported images or videos."
+msgid ""
+"Some files were skipped because they are not supported images or videos."
 msgstr "تم تخطي بعض الملفات لأنها ليست صورًا أو فيديوهات مدعومة."
 
 msgid "Processing failed. Please retry with a smaller file."
@@ -11909,25 +12050,36 @@ msgstr "تحميل التطبيق"
 msgid "Is this safe to install?"
 msgstr "هل هذا آمن للتثبيت؟"
 
-msgid "Yes. Android shows a warning for every app installed outside Google Play. This file is published here on the institute's official website and is safe to install."
-msgstr "نعم. يعرض أندرويد تحذيرًا لأي تطبيق يُثبت من خارج متجر Google Play. هذا الملف منشور هنا على الموقع الرسمي للمعهد وآمن للتثبيت."
+msgid ""
+"Yes. Android shows a warning for every app installed outside Google Play. "
+"This file is published here on the institute's official website and is safe "
+"to install."
+msgstr ""
+"نعم. يعرض أندرويد تحذيرًا لأي تطبيق يُثبت من خارج متجر Google Play. هذا "
+"الملف منشور هنا على الموقع الرسمي للمعهد وآمن للتثبيت."
 
 msgid "Installation steps"
 msgstr "خطوات التثبيت"
 
-msgid "Tap \"Download the app\" above and wait until the file finishes downloading."
+msgid ""
+"Tap \"Download the app\" above and wait until the file finishes downloading."
 msgstr "اضغط \"تحميل التطبيق\" أعلاه وانتظر حتى يكتمل التنزيل."
 
 msgid "Open the downloaded file from your browser downloads or the Files app."
 msgstr "افتح الملف المُنزّل من تنزيلات المتصفح أو تطبيق الملفات."
 
-msgid "When Android asks, allow \"Install unknown apps\" for Chrome or Files, then tap Install."
-msgstr "عندما يطلب أندرويد، اسمح بـ \"تثبيت التطبيقات غير المعروفة\" لمتصفح كروم أو الملفات، ثم اضغط تثبيت."
+msgid ""
+"When Android asks, allow \"Install unknown apps\" for Chrome or Files, then "
+"tap Install."
+msgstr ""
+"عندما يطلب أندرويد، اسمح بـ \"تثبيت التطبيقات غير المعروفة\" لمتصفح كروم أو "
+"الملفات، ثم اضغط تثبيت."
 
 msgid "Open \"Bible Institute\" and sign in with your website account."
 msgstr "افتح \"Bible Institute\" وسجّل الدخول بحسابك على الموقع."
 
-msgid "After updates, repeat the same steps; your account and data stay unchanged."
+msgid ""
+"After updates, repeat the same steps; your account and data stay unchanged."
 msgstr "بعد التحديثات، كرر نفس الخطوات؛ حسابك وبياناتك لا تتغير."
 
 msgid "The Android app is not published yet. Please check back later."
@@ -11945,8 +12097,12 @@ msgstr "سياسات تحديث تطبيق الهاتف"
 msgid "Forced update policy"
 msgstr "سياسة التحديث الإلزامي"
 
-msgid "Builds below the minimum are blocked (HTTP 426) until updated. Builds below the latest see an optional prompt. The update button opens the link below."
-msgstr "يُمنع تشغيل الإصدارات الأقل من الحد الأدنى (HTTP 426) حتى تحديثها. وتظهر مطالبة اختيارية للإصدارات الأقل من أحدث إصدار. يفتح زر التحديث الرابط أدناه."
+msgid ""
+"Builds below the minimum are blocked (HTTP 426) until updated. Builds below "
+"the latest see an optional prompt. The update button opens the link below."
+msgstr ""
+"يُمنع تشغيل الإصدارات الأقل من الحد الأدنى (HTTP 426) حتى تحديثها. وتظهر "
+"مطالبة اختيارية للإصدارات الأقل من أحدث إصدار. يفتح زر التحديث الرابط أدناه."
 
 msgid "Versioning enabled"
 msgstr "تفعيل إدارة الإصدارات"
@@ -12084,8 +12240,12 @@ msgstr "فشل البحث. حاول مرة أخرى."
 msgid "Type to search. Prefix with u, o, l, q, m, t to scope."
 msgstr "اكتب للبحث. أضف u أو o أو l أو q أو m أو t في البداية للتخصيص."
 
-msgid "Users, courses, lessons, quizzes, media jobs, Telegram. Prefix with u, o, l, q, m, t or press g then a letter to scope."
-msgstr "المستخدمون والدورات والدروس والاختبارات ومهام الوسائط وتيليجرام. أضف u أو o أو l أو q أو m أو t في البداية أو اضغط g ثم حرفا للتخصيص."
+msgid ""
+"Users, courses, lessons, quizzes, media jobs, Telegram. Prefix with u, o, l,"
+" q, m, t or press g then a letter to scope."
+msgstr ""
+"المستخدمون والدورات والدروس والاختبارات ومهام الوسائط وتيليجرام. أضف u أو o "
+"أو l أو q أو m أو t في البداية أو اضغط g ثم حرفا للتخصيص."
 
 msgid "Promotion history"
 msgstr "سجل الترقية"
@@ -12138,8 +12298,12 @@ msgstr "انتقال إلى"
 msgid "then"
 msgstr "ثم"
 
-msgid "Ctrl on Windows, Cmd on macOS. Letter shortcuts use key position, so they work with Arabic layouts too."
-msgstr "Ctrl في ويندوز وCmd في ماك. اختصارات الحروف تعتمد على موضع الزر، لذا تعمل مع لوحة المفاتيح العربية أيضا."
+msgid ""
+"Ctrl on Windows, Cmd on macOS. Letter shortcuts use key position, so they "
+"work with Arabic layouts too."
+msgstr ""
+"Ctrl في ويندوز وCmd في ماك. اختصارات الحروف تعتمد على موضع الزر، لذا تعمل مع"
+" لوحة المفاتيح العربية أيضا."
 
 msgid "Pinned"
 msgstr "مثبتة"
@@ -12155,9 +12319,6 @@ msgstr "فتح الكل"
 
 msgid "No playable content"
 msgstr "لا يوجد محتوى قابل للتشغيل"
-
-#~ msgid "Cannot accept a %(status)s application."
-#~ msgstr "لا يمكن قبول طلب حالته %(status)s."
 
 msgid "Already recorded"
 msgstr "تم تسجيله بالفعل"
@@ -12198,8 +12359,11 @@ msgstr "النطاق الأكاديمي للدفعة الجديدة"
 msgid "Automatic (active year's lowest level)"
 msgstr "تلقائي (أدنى مستوى في السنة النشطة)"
 
-msgid "Accepted applications enroll here. Empty means the active year's lowest level."
-msgstr "تُسجَّل الطلبات المقبولة هنا. تركه فارغًا يعني أدنى مستوى في السنة النشطة."
+msgid ""
+"Accepted applications enroll here. Empty means the active year's lowest "
+"level."
+msgstr ""
+"تُسجَّل الطلبات المقبولة هنا. تركه فارغًا يعني أدنى مستوى في السنة النشطة."
 
 msgid "Select a scope in the active academic year."
 msgstr "اختر نطاقًا من السنة الأكاديمية النشطة."
@@ -12231,8 +12395,11 @@ msgstr "الأداء الأكاديمي"
 msgid "Grades matrix"
 msgstr "مصفوفة الدرجات"
 
-msgid "Review student results across quizzes, weekly totals, and final assessments."
-msgstr "مراجعة نتائج الطلاب عبر الاختبارات والإجماليات الأسبوعية والتقييمات النهائية."
+msgid ""
+"Review student results across quizzes, weekly totals, and final assessments."
+msgstr ""
+"مراجعة نتائج الطلاب عبر الاختبارات والإجماليات الأسبوعية والتقييمات "
+"النهائية."
 
 msgid "Search student"
 msgstr "البحث عن طالب"
@@ -12291,14 +12458,21 @@ msgstr "إجماليات المقرر فقط"
 msgid "Grades matrix pagination"
 msgstr "ترقيم صفحات مصفوفة الدرجات"
 
-msgid "Please ensure your CSV file has the following columns in this exact order:"
-msgstr "يرجى التأكد من أن ملف CSV يحتوي على الأعمدة التالية بهذا الترتيب تمامًا:"
+msgid ""
+"Please ensure your CSV file has the following columns in this exact order:"
+msgstr ""
+"يرجى التأكد من أن ملف CSV يحتوي على الأعمدة التالية بهذا الترتيب تمامًا:"
 
-msgid "The 'role' should be one of the existing roles in the system (e.g., admin, teacher, junior, senior)."
-msgstr "يجب أن يكون الحقل 'role' أحد الأدوار الموجودة في النظام (مثل admin أو teacher أو junior أو senior)."
+msgid ""
+"The 'role' should be one of the existing roles in the system (e.g., admin, "
+"teacher, junior, senior)."
+msgstr ""
+"يجب أن يكون الحقل 'role' أحد الأدوار الموجودة في النظام (مثل admin أو "
+"teacher أو junior أو senior)."
 
 msgid "A completed last-level student does not need a destination enrollment."
-msgstr "لا يحتاج الطالب الذي أكمل المستوى الأخير إلى تسجيل في نطاق دراسي وجهة."
+msgstr ""
+"لا يحتاج الطالب الذي أكمل المستوى الأخير إلى تسجيل في نطاق دراسي وجهة."
 
 msgid "Partial promotion requires a destination academic scope."
 msgstr "تتطلب الترقية الجزئية تحديد نطاق دراسي للوجهة."
@@ -12404,7 +12578,8 @@ msgstr "حالة الحضور"
 msgid "Each matrix cell represents one scheduled course meeting."
 msgstr "تمثل كل خلية في المصفوفة لقاءً واحدًا مجدولًا للمقرر."
 
-msgid "Expand a student row to view meeting times, scanner details, and actions."
+msgid ""
+"Expand a student row to view meeting times, scanner details, and actions."
 msgstr "وسّع صف الطالب لعرض أوقات اللقاءات وتفاصيل المسح والإجراءات."
 
 msgid "Toggle meeting details"
@@ -12444,7 +12619,8 @@ msgid "Invalid quiz question."
 msgstr "سؤال الاختبار غير صالح."
 
 msgid "Regrade saved answers using the current correct answer?"
-msgstr "هل تريد إعادة تصحيح الإجابات المحفوظة باستخدام الإجابة الصحيحة الحالية؟"
+msgstr ""
+"هل تريد إعادة تصحيح الإجابات المحفوظة باستخدام الإجابة الصحيحة الحالية؟"
 
 msgid "Regrade saved answers"
 msgstr "إعادة تصحيح الإجابات المحفوظة"
@@ -12497,8 +12673,12 @@ msgstr "إيقاف"
 msgid "Clean up"
 msgstr "تنظيف"
 
-msgid "Remove this upload's files from the server and R2? An unused draft lesson created by this upload will also be removed."
-msgstr "هل تريد إزالة ملفات هذا الرفع من الخادم وR2؟ ستُزال أيضًا مسودة الدرس التي أنشأها هذا الرفع إذا لم تكن مستخدمة."
+msgid ""
+"Remove this upload's files from the server and R2? An unused draft lesson "
+"created by this upload will also be removed."
+msgstr ""
+"هل تريد إزالة ملفات هذا الرفع من الخادم وR2؟ ستُزال أيضًا مسودة الدرس التي "
+"أنشأها هذا الرفع إذا لم تكن مستخدمة."
 
 msgid "Draft lesson removed."
 msgstr "تمت إزالة مسودة الدرس."
@@ -12575,8 +12755,11 @@ msgstr "يجب أن يختلف الاسم الجديد"
 msgid "Both names must be video manifests"
 msgstr "يجب أن يكون الاسمان لملفي قائمة تشغيل فيديو"
 
-msgid "Segment files cannot be renamed directly. Rename the video file instead."
-msgstr "لا يمكن إعادة تسمية ملفات المقاطع مباشرة. أعد تسمية ملف الفيديو بدلًا من ذلك."
+msgid ""
+"Segment files cannot be renamed directly. Rename the video file instead."
+msgstr ""
+"لا يمكن إعادة تسمية ملفات المقاطع مباشرة. أعد تسمية ملف الفيديو بدلًا من "
+"ذلك."
 
 msgid "Could not start the rename. Please try again."
 msgstr "تعذر بدء إعادة التسمية. حاول مجددًا."
@@ -12679,8 +12862,11 @@ msgstr "تم حفظ الإجابات."
 msgid "Saving answers..."
 msgstr "جارٍ حفظ الإجابات..."
 
-msgid "Finalize saved attempts whose time limit has expired for %(count)s quizzes?"
-msgstr "هل تريد إنهاء المحاولات المحفوظة التي انتهى وقتها لعدد %(count)s من الاختبارات؟"
+msgid ""
+"Finalize saved attempts whose time limit has expired for %(count)s quizzes?"
+msgstr ""
+"هل تريد إنهاء المحاولات المحفوظة التي انتهى وقتها لعدد %(count)s من "
+"الاختبارات؟"
 
 msgid "%(done)s / %(total)s quizzes; %(answers)s snapshots submitted."
 msgstr ""
@@ -12709,12 +12895,15 @@ msgid ""
 msgstr "تعذر قراءة تقدم عملية الاختبار. حدّث الحالة للمحاولة مرة أخرى."
 
 #: Password reset flow (2026-10-21)
-
 msgid "Reset password"
 msgstr "إعادة تعيين كلمة المرور"
 
-msgid "Enter the email address on your account and we will send you a link to set a new password."
-msgstr "أدخل البريد الإلكتروني المسجّل في حسابك وسنرسل إليك رابطًا لتعيين كلمة مرور جديدة."
+msgid ""
+"Enter the email address on your account and we will send you a link to set a"
+" new password."
+msgstr ""
+"أدخل البريد الإلكتروني المسجّل في حسابك وسنرسل إليك رابطًا لتعيين كلمة مرور "
+"جديدة."
 
 msgid "Send reset link"
 msgstr "إرسال رابط إعادة التعيين"
@@ -12728,8 +12917,12 @@ msgstr "تم إرسال رابط إعادة التعيين"
 msgid "Check your inbox"
 msgstr "تحقّق من بريدك الوارد"
 
-msgid "If an account exists for that email address, a password reset link is on its way. The link expires in 15 minutes."
-msgstr "إذا كان هناك حساب بهذا البريد الإلكتروني فسيصلك رابط لإعادة تعيين كلمة المرور. تنتهي صلاحية الرابط بعد ١٥ دقيقة."
+msgid ""
+"If an account exists for that email address, a password reset link is on its"
+" way. The link expires in 15 minutes."
+msgstr ""
+"إذا كان هناك حساب بهذا البريد الإلكتروني فسيصلك رابط لإعادة تعيين كلمة "
+"المرور. تنتهي صلاحية الرابط بعد ١٥ دقيقة."
 
 msgid "Set a new password"
 msgstr "تعيين كلمة مرور جديدة"
@@ -12737,8 +12930,10 @@ msgstr "تعيين كلمة مرور جديدة"
 msgid "Save new password"
 msgstr "حفظ كلمة المرور الجديدة"
 
-msgid "This reset link is invalid or has expired. Request a new one to continue."
-msgstr "رابط إعادة التعيين غير صالح أو انتهت صلاحيته. اطلب رابطًا جديدًا للمتابعة."
+msgid ""
+"This reset link is invalid or has expired. Request a new one to continue."
+msgstr ""
+"رابط إعادة التعيين غير صالح أو انتهت صلاحيته. اطلب رابطًا جديدًا للمتابعة."
 
 msgid "Request a new link"
 msgstr "طلب رابط جديد"
@@ -12746,7 +12941,8 @@ msgstr "طلب رابط جديد"
 msgid "Password updated"
 msgstr "تم تحديث كلمة المرور"
 
-msgid "Your password has been changed. Sign in with your new password to continue."
+msgid ""
+"Your password has been changed. Sign in with your new password to continue."
 msgstr "تم تغيير كلمة المرور. سجّل الدخول بكلمة المرور الجديدة للمتابعة."
 
 msgid "Forgot password?"
@@ -12755,14 +12951,21 @@ msgstr "هل نسيت كلمة المرور؟"
 msgid "Reset your password"
 msgstr "إعادة تعيين كلمة المرور"
 
-msgid "We received a request to reset the password for your Bible Institute account."
+msgid ""
+"We received a request to reset the password for your Bible Institute "
+"account."
 msgstr "تلقّينا طلبًا لإعادة تعيين كلمة المرور لحسابك في معهد الكتاب المقدس."
 
 msgid "This link expires in 15 minutes and can only be used once."
-msgstr "تنتهي صلاحية هذا الرابط بعد ١٥ دقيقة، ولا يمكن استخدامه إلا مرة واحدة."
+msgstr ""
+"تنتهي صلاحية هذا الرابط بعد ١٥ دقيقة، ولا يمكن استخدامه إلا مرة واحدة."
 
-msgid "If you did not request this change, you can safely ignore this email; your password will stay the same."
-msgstr "إذا لم تطلب هذا التغيير فيمكنك تجاهل هذه الرسالة بأمان، وستبقى كلمة المرور كما هي."
+msgid ""
+"If you did not request this change, you can safely ignore this email; your "
+"password will stay the same."
+msgstr ""
+"إذا لم تطلب هذا التغيير فيمكنك تجاهل هذه الرسالة بأمان، وستبقى كلمة المرور "
+"كما هي."
 
 msgid "Reset your Bible Institute password"
 msgstr "إعادة تعيين كلمة المرور لمعهد الكتاب المقدس"
@@ -12776,8 +12979,12 @@ msgstr "الحفظ داخل التطبيق معطّل."
 msgid "Saving on the device is disabled."
 msgstr "الحفظ على الجهاز معطّل."
 
-msgid "Online students would have no applicable weight. Add a quiz rule or lower the attendance weight."
-msgstr "لن يكون لدى طلاب التعليم الإلكتروني أي وزن قابل للتطبيق. أضف قاعدة اختبار أو خفّض وزن الحضور."
+msgid ""
+"Online students would have no applicable weight. Add a quiz rule or lower "
+"the attendance weight."
+msgstr ""
+"لن يكون لدى طلاب التعليم الإلكتروني أي وزن قابل للتطبيق. أضف قاعدة اختبار أو"
+" خفّض وزن الحضور."
 
 msgid "No applicable promotion rules for this student's study mode."
 msgstr "لا توجد قواعد ترقية قابلة للتطبيق على طريقة دراسة هذا الطالب."
@@ -12803,7 +13010,9 @@ msgstr "أسئلة الاختيار من متعدد تحتاج إلى خياري
 msgid "Multiple choice questions can have at most %(limit)s choices."
 msgstr "يمكن أن تحتوي أسئلة الاختيار من متعدد على %(limit)s خيارات كحد أقصى."
 
-msgid "The grading form contains a question that does not belong to this submission."
+msgid ""
+"The grading form contains a question that does not belong to this "
+"submission."
 msgstr "تتضمن استمارة التصحيح سؤالًا لا يتبع هذا التسليم."
 
 msgid "Question %(question)s: enter a whole number."
@@ -12848,14 +13057,22 @@ msgstr "معادلة الترقية لم تعد موجودة."
 msgid "The academic scope no longer exists."
 msgstr "النطاق الأكاديمي لم يعد موجودًا."
 
-msgid "The formula changed after this calculation was queued. Review the formula and try again."
+msgid ""
+"The formula changed after this calculation was queued. Review the formula "
+"and try again."
 msgstr "تغيّرت المعادلة بعد إدراج هذا الحساب. راجع المعادلة وحاول مرة أخرى."
 
-msgid "Promotion formula saved. Recalculation was queued; promotion stays blocked until it completes."
-msgstr "تم حفظ معادلة الترقية. تم إدراج إعادة الحساب؛ تبقى الترقية موقوفة حتى تكتمل."
+msgid ""
+"Promotion formula saved. Recalculation was queued; promotion stays blocked "
+"until it completes."
+msgstr ""
+"تم حفظ معادلة الترقية. تم إدراج إعادة الحساب؛ تبقى الترقية موقوفة حتى تكتمل."
 
-msgid "The formula calculation for this academic scope is incomplete. Finish it before promotion."
-msgstr "حساب المعادلة لهذا النطاق الأكاديمي غير مكتمل. أكمل الحساب قبل الترقية."
+msgid ""
+"The formula calculation for this academic scope is incomplete. Finish it "
+"before promotion."
+msgstr ""
+"حساب المعادلة لهذا النطاق الأكاديمي غير مكتمل. أكمل الحساب قبل الترقية."
 
 msgid "This management operation has not been enabled yet."
 msgstr "هذه العملية الإدارية لم تُفعّل بعد."
@@ -12866,26 +13083,47 @@ msgstr "فشلت العملية. راجع النتائج وحاول مرة أخ�
 msgid "Invalid management operation."
 msgstr "عملية إدارية غير صالحة."
 
-msgid "The archive exceeds the expanded-size budget; remaining files were skipped."
+msgid ""
+"The archive exceeds the expanded-size budget; remaining files were skipped."
 msgstr "يتجاوز الأرشيف حد الحجم بعد فك الضغط؛ تم تخطي الملفات المتبقية."
 
 msgid "A course with this name already exists in the target level."
 msgstr "يوجد مقرر بهذا الاسم بالفعل في المستوى المستهدف."
 
-msgid "Applying queues one row at a time; a failing row is reported without stopping the remaining rows."
-msgstr "التطبيق يضع الصفوف في قائمة المعالجة صفًا واحدًا في كل مرة؛ يُبلَّغ عن الصف الفاشل دون إيقاف بقية الصفوف."
+msgid ""
+"Applying queues one row at a time; a failing row is reported without "
+"stopping the remaining rows."
+msgstr ""
+"التطبيق يضع الصفوف في قائمة المعالجة صفًا واحدًا في كل مرة؛ يُبلَّغ عن الصف "
+"الفاشل دون إيقاف بقية الصفوف."
 
-msgid "Attendance reconciliation for %(date)s was queued. Missing exits are recorded in bounded batches."
-msgstr "تمت جدولة تسوية الحضور ليوم %(date)s. تُسجَّل حالات الخروج الناقصة في دفعات محدودة."
+msgid ""
+"Attendance reconciliation for %(date)s was queued. Missing exits are "
+"recorded in bounded batches."
+msgstr ""
+"تمت جدولة تسوية الحضور ليوم %(date)s. تُسجَّل حالات الخروج الناقصة في دفعات "
+"محدودة."
 
-msgid "Copying %(count)d offering(s) as drafts was queued. Progress is available while it runs; the copy commits all offerings together."
-msgstr "تمت جدولة نسخ %(count)d من المقررات المطروحة كمسودات. يمكن متابعة التقدم أثناء التنفيذ؛ ويُحفظ النسخ لجميع المقررات معًا."
+msgid ""
+"Copying %(count)d offering(s) as drafts was queued. Progress is available "
+"while it runs; the copy commits all offerings together."
+msgstr ""
+"تمت جدولة نسخ %(count)d من المقررات المطروحة كمسودات. يمكن متابعة التقدم "
+"أثناء التنفيذ؛ ويُحفظ النسخ لجميع المقررات معًا."
 
-msgid "Course duplication was queued. The source offering content is copied as drafts and progress is available while it runs."
-msgstr "تمت جدولة تكرار المقرر. يُنسخ محتوى المقرر المطروح المصدر كمسودات ويمكن متابعة التقدم أثناء التنفيذ."
+msgid ""
+"Course duplication was queued. The source offering content is copied as "
+"drafts and progress is available while it runs."
+msgstr ""
+"تمت جدولة تكرار المقرر. يُنسخ محتوى المقرر المطروح المصدر كمسودات ويمكن "
+"متابعة التقدم أثناء التنفيذ."
 
-msgid "Historical intake was queued for %(count)d row(s). Rows are applied one at a time; review progress below."
-msgstr "تمت جدولة الإدخال التاريخي لعدد %(count)d صفًا. تُطبق الصفوف واحدًا تلو الآخر؛ راجع التقدم أدناه."
+msgid ""
+"Historical intake was queued for %(count)d row(s). Rows are applied one at a"
+" time; review progress below."
+msgstr ""
+"تمت جدولة الإدخال التاريخي لعدد %(count)d صفًا. تُطبق الصفوف واحدًا تلو "
+"الآخر؛ راجع التقدم أدناه."
 
 msgid "Invalid copy option."
 msgstr "خيار نسخ غير صالح."
@@ -12902,8 +13140,10 @@ msgstr "حالة عملية إدارية غير صالحة."
 msgid "Line"
 msgstr "السطر"
 
-msgid "Line %(line)d: User '%(username)s' appears more than once in this file."
-msgstr "السطر %(line)d: المستخدم '%(username)s' مكرر أكثر من مرة في هذا الملف."
+msgid ""
+"Line %(line)d: User '%(username)s' appears more than once in this file."
+msgstr ""
+"السطر %(line)d: المستخدم '%(username)s' مكرر أكثر من مرة في هذا الملف."
 
 msgid "Line %(line)d: Username is required."
 msgstr "السطر %(line)d: اسم المستخدم مطلوب."
@@ -12914,14 +13154,22 @@ msgstr "اسم المقرر الجديد طويل جدًا."
 msgid "No users were created because the file has %(count)d invalid row(s)."
 msgstr "لم يُنشأ أي مستخدم لأن الملف يحتوي على %(count)d صفًا غير صالح."
 
-msgid "No users were created because the file has %(count)d invalid row(s). Correct the file and try again."
-msgstr "لم يُنشأ أي مستخدم لأن الملف يحتوي على %(count)d صفًا غير صالح. صحح الملف وحاول مرة أخرى."
+msgid ""
+"No users were created because the file has %(count)d invalid row(s). Correct"
+" the file and try again."
+msgstr ""
+"لم يُنشأ أي مستخدم لأن الملف يحتوي على %(count)d صفًا غير صالح. صحح الملف "
+"وحاول مرة أخرى."
 
 msgid "One or more roles no longer exist."
 msgstr "دور واحد أو أكثر لم يعد موجودًا."
 
-msgid "One or more usernames were created after this file was validated. No users were created; review the file and try again."
-msgstr "تم إنشاء اسم مستخدم واحد أو أكثر بعد التحقق من هذا الملف. لم يُنشأ أي مستخدم؛ راجع الملف وحاول مرة أخرى."
+msgid ""
+"One or more usernames were created after this file was validated. No users "
+"were created; review the file and try again."
+msgstr ""
+"تم إنشاء اسم مستخدم واحد أو أكثر بعد التحقق من هذا الملف. لم يُنشأ أي "
+"مستخدم؛ راجع الملف وحاول مرة أخرى."
 
 msgid "Only content managers can duplicate a course."
 msgstr "يمكن لمديري المحتوى فقط تكرار المقرر."
@@ -12929,8 +13177,11 @@ msgstr "يمكن لمديري المحتوى فقط تكرار المقرر."
 msgid "Private import storage is not available. Try again later."
 msgstr "مخزن الاستيراد الخاص غير متاح. حاول مرة أخرى لاحقًا."
 
-msgid "Promotion was queued for %(count)d student(s). Progress is available while it runs."
-msgstr "تمت جدولة الترقية لعدد %(count)d طالبًا. يمكن متابعة التقدم أثناء التنفيذ."
+msgid ""
+"Promotion was queued for %(count)d student(s). Progress is available while "
+"it runs."
+msgstr ""
+"تمت جدولة الترقية لعدد %(count)d طالبًا. يمكن متابعة التقدم أثناء التنفيذ."
 
 msgid "Queue reviewed upload"
 msgstr "ضع الرفع المراجع في قائمة المعالجة"
@@ -13013,11 +13264,19 @@ msgstr "يجب أن يكون ملف CSV للمستخدمين بترميز UTF-8.
 msgid "The user CSV file must contain at most 1,000 data rows."
 msgstr "يجب ألا يزيد ملف CSV للمستخدمين عن 1,000 صف بيانات."
 
-msgid "The user import was queued for %(count)d row(s). Accounts are created only after the whole file validates; progress is available below."
-msgstr "تمت جدولة استيراد المستخدمين لعدد %(count)d صفًا. لا تُنشأ الحسابات إلا بعد التحقق من الملف بالكامل؛ التقدم متاح أدناه."
+msgid ""
+"The user import was queued for %(count)d row(s). Accounts are created only "
+"after the whole file validates; progress is available below."
+msgstr ""
+"تمت جدولة استيراد المستخدمين لعدد %(count)d صفًا. لا تُنشأ الحسابات إلا بعد "
+"التحقق من الملف بالكامل؛ التقدم متاح أدناه."
 
-msgid "The whole file is validated first. Any invalid row creates no accounts at all; the import runs on the management worker."
-msgstr "يُتحقق من الملف بالكامل أولًا. أي صف غير صالح يمنع إنشاء أي حساب؛ ويعمل الاستيراد على عامل الإدارة."
+msgid ""
+"The whole file is validated first. Any invalid row creates no accounts at "
+"all; the import runs on the management worker."
+msgstr ""
+"يُتحقق من الملف بالكامل أولًا. أي صف غير صالح يمنع إنشاء أي حساب؛ ويعمل "
+"الاستيراد على عامل الإدارة."
 
 msgid "This media job is already being cleaned up."
 msgstr "تجري بالفعل عملية تنظيف مهمة الوسائط هذه."
@@ -13046,8 +13305,12 @@ msgstr "تم تولي العملية من قبل عامل آخر."
 msgid "%(title)s (part %(number)d)"
 msgstr "%(title)s (الجزء %(number)d)"
 
-msgid "Evaluation export was queued. The download link appears here when it is ready."
-msgstr "تم وضع تصدير التقييم في قائمة الانتظار. سيظهر رابط التنزيل هنا عندما يكون جاهزًا."
+msgid ""
+"Evaluation export was queued. The download link appears here when it is "
+"ready."
+msgstr ""
+"تم وضع تصدير التقييم في قائمة الانتظار. سيظهر رابط التنزيل هنا عندما يكون "
+"جاهزًا."
 
 msgid "Start a whole-scope export from the promotion formula page."
 msgstr "ابدأ تصدير النطاق الكامل من صفحة صيغة الترقية."
@@ -13085,8 +13348,11 @@ msgstr "تصدير تقرير الدرجات"
 msgid "Completed with failures"
 msgstr "اكتمل مع أخطاء"
 
-msgid "Report export was queued. The download link appears here when it is ready."
-msgstr "تم وضع تصدير التقرير في قائمة الانتظار. سيظهر رابط التنزيل هنا عندما يكون جاهزًا."
+msgid ""
+"Report export was queued. The download link appears here when it is ready."
+msgstr ""
+"تم وضع تصدير التقرير في قائمة الانتظار. سيظهر رابط التنزيل هنا عندما يكون "
+"جاهزًا."
 
 msgid "Start the report export from the reports page."
 msgstr "ابدأ تصدير التقرير من صفحة التقارير."
@@ -13217,8 +13483,11 @@ msgstr "فشلت إعادة تسمية المجلد وتمت استعادة ال
 msgid "Start the quiz export from the submissions page."
 msgstr "ابدأ تصدير الاختبار من صفحة التسليمات."
 
-msgid "Quiz export was queued. The download link appears here when it is ready."
-msgstr "تم وضع تصدير الاختبار في قائمة الانتظار. سيظهر رابط التنزيل هنا عندما يكون جاهزًا."
+msgid ""
+"Quiz export was queued. The download link appears here when it is ready."
+msgstr ""
+"تم وضع تصدير الاختبار في قائمة الانتظار. سيظهر رابط التنزيل هنا عندما يكون "
+"جاهزًا."
 
 msgid "You are no longer allowed to export quiz submissions."
 msgstr "لم يعد مسموحًا لك بتصدير تسليمات الاختبار."
@@ -13229,7 +13498,9 @@ msgstr "الاختبار لم يعد موجودًا."
 msgid "You are no longer allowed to run this operation."
 msgstr "لم يعد مسموحا لك بتنفيذ هذه العملية."
 
-msgid "Another operation with different input is already running. Wait for it to finish."
+msgid ""
+"Another operation with different input is already running. Wait for it to "
+"finish."
 msgstr "توجد عملية قيد التنفيذ ببيانات مختلفة. انتظر حتى تنتهي."
 
 msgid "Last updated"
@@ -13274,8 +13545,12 @@ msgstr "فئة المهمة"
 msgid "Job details"
 msgstr "تفاصيل المهمة"
 
-msgid "Jobs shown here update automatically. Refresh to load new jobs. Scheduled maintenance without saved history is not listed."
-msgstr "يتم تحديث المهام المعروضة تلقائيا. حدث الصفحة لعرض المهام الجديدة. لا تظهر أعمال الصيانة المجدولة التي لا تحتفظ بسجل."
+msgid ""
+"Jobs shown here update automatically. Refresh to load new jobs. Scheduled "
+"maintenance without saved history is not listed."
+msgstr ""
+"يتم تحديث المهام المعروضة تلقائيا. حدث الصفحة لعرض المهام الجديدة. لا تظهر "
+"أعمال الصيانة المجدولة التي لا تحتفظ بسجل."
 
 msgid "Lesson attachment: %(status)s"
 msgstr "الإرفاق بالدرس: %(status)s"
@@ -13283,8 +13558,12 @@ msgstr "الإرفاق بالدرس: %(status)s"
 msgid "Management operations"
 msgstr "العمليات الإدارية"
 
-msgid "Management, quizzes, media, gallery uploads, announcements and Telegram batches."
-msgstr "العمليات الإدارية والاختبارات والوسائط ورفع ملفات المعرض والإعلانات والإرسال الجماعي عبر تيليجرام."
+msgid ""
+"Management, quizzes, media, gallery uploads, announcements and Telegram "
+"batches."
+msgstr ""
+"العمليات الإدارية والاختبارات والوسائط ورفع ملفات المعرض والإعلانات والإرسال"
+" الجماعي عبر تيليجرام."
 
 msgid "Matching jobs: %(count)s"
 msgstr "المهام المطابقة: %(count)s"
@@ -13397,8 +13676,12 @@ msgstr "المحتوى الإنجليزي"
 msgid "Exact Telegram message text"
 msgstr "النص الدقيق لرسالة تيليجرام"
 
-msgid "Exact text was not recorded for older Telegram attempts. The saved notification content is shown above."
-msgstr "لم يُسجل النص الدقيق لمحاولات تيليجرام القديمة. يظهر محتوى الإشعار المحفوظ أعلاه."
+msgid ""
+"Exact text was not recorded for older Telegram attempts. The saved "
+"notification content is shown above."
+msgstr ""
+"لم يُسجل النص الدقيق لمحاولات تيليجرام القديمة. يظهر محتوى الإشعار المحفوظ "
+"أعلاه."
 
 msgid "Finish notification generation before resending."
 msgstr "أكمل إنشاء الإشعارات قبل إعادة الإرسال."
@@ -13419,7 +13702,8 @@ msgid "Matching jobs: {{ count }}"
 msgstr "المهام المطابقة: {{ count }}"
 
 msgid "No eligible failed delivery, or another delivery is still pending."
-msgstr "لا توجد عملية تسليم فاشلة مؤهلة، أو لا تزال عملية تسليم أخرى قيد الانتظار."
+msgstr ""
+"لا توجد عملية تسليم فاشلة مؤهلة، أو لا تزال عملية تسليم أخرى قيد الانتظار."
 
 msgid "No external channel attempts recorded yet."
 msgstr "لم تُسجل أي محاولات عبر قنوات خارجية بعد."
@@ -13445,8 +13729,12 @@ msgstr "نوع الإشعار"
 msgid "Only administrators can resend notifications."
 msgstr "يمكن للمسؤولين فقط إعادة إرسال الإشعارات."
 
-msgid "Original audience: {{ count }} recipients. Current access and channel eligibility will be checked again."
-msgstr "المستلمون الأصليون: {{ count }}. ستتم إعادة التحقق من صلاحية الوصول وأهلية قنوات الإرسال."
+msgid ""
+"Original audience: {{ count }} recipients. Current access and channel "
+"eligibility will be checked again."
+msgstr ""
+"المستلمون الأصليون: {{ count }}. ستتم إعادة التحقق من صلاحية الوصول وأهلية "
+"قنوات الإرسال."
 
 msgid "Original recipients of this saved content"
 msgstr "المستلمون الأصليون لهذا المحتوى المحفوظ"
@@ -13457,11 +13745,18 @@ msgstr "إيقاف التحديثات مؤقتًا"
 msgid "Preparing delivery records"
 msgstr "جارٍ تجهيز سجلات التسليم"
 
-msgid "Push success means a confirmed provider receipt, not that the student opened the message. Pending receipts keep polling; terminal failures can be retried."
-msgstr "نجاح الإشعارات الفورية يعني تأكيد إيصال مزود الخدمة، ولا يعني أن الطالب فتح الرسالة. تستمر متابعة الإيصالات المعلقة، ويمكن إعادة محاولة حالات الفشل النهائية."
+msgid ""
+"Push success means a confirmed provider receipt, not that the student opened"
+" the message. Pending receipts keep polling; terminal failures can be "
+"retried."
+msgstr ""
+"نجاح الإشعارات الفورية يعني تأكيد إيصال مزود الخدمة، ولا يعني أن الطالب فتح "
+"الرسالة. تستمر متابعة الإيصالات المعلقة، ويمكن إعادة محاولة حالات الفشل "
+"النهائية."
 
 msgid "Queue another delivery using this saved content?"
-msgstr "هل تريد وضع عملية تسليم أخرى في قائمة الانتظار باستخدام هذا المحتوى المحفوظ؟"
+msgstr ""
+"هل تريد وضع عملية تسليم أخرى في قائمة الانتظار باستخدام هذا المحتوى المحفوظ؟"
 
 msgid "Read in the inbox"
 msgstr "تمت القراءة في صندوق الوارد"
@@ -13505,13 +13800,19 @@ msgstr "سحب"
 msgid "Notification withdrawal"
 msgstr "سحب الإشعارات"
 
-msgid "Withdraw this notification for every recipient? It leaves their inbox, pending push and Telegram sends are cancelled, and bot copies are removed where the 48-hour window allows."
-msgstr "هل تريد سحب هذا الإشعار من جميع المستلمين؟ سيُزال من صندوقهم، وتُلغى إرسالات Push وتيليجرام المعلّقة، وتُحذف نسخ البوت حيث تسمح نافذة الـ 48 ساعة."
+msgid ""
+"Withdraw this notification for every recipient? It leaves their inbox, "
+"pending push and Telegram sends are cancelled, and bot copies are removed "
+"where the 48-hour window allows."
+msgstr ""
+"هل تريد سحب هذا الإشعار من جميع المستلمين؟ سيُزال من صندوقهم، وتُلغى إرسالات"
+" Push وتيليجرام المعلّقة، وتُحذف نسخ البوت حيث تسمح نافذة الـ 48 ساعة."
 
 msgid "Withdraw %(title)s for every recipient"
 msgstr "سحب %(title)s من جميع المستلمين"
 
-msgid "Withdrawing this notification for %(count)s recipient(s). Track it below."
+msgid ""
+"Withdrawing this notification for %(count)s recipient(s). Track it below."
 msgstr "جارٍ سحب هذا الإشعار من %(count)s مستلمًا. تابع الحالة أدناه."
 
 msgid "Every recipient of this notification is already withdrawn."
@@ -13523,7 +13824,9 @@ msgstr "لم يعد مسموحًا لك بسحب الإشعارات."
 msgid "Invalid notification message."
 msgstr "رسالة الإشعار غير صحيحة."
 
-msgid "Each row is one message; open it to see every recipient and delivery outcome."
+msgid ""
+"Each row is one message; open it to see every recipient and delivery "
+"outcome."
 msgstr "كل صف هو رسالة واحدة؛ افتحه لعرض جميع المستلمين ونتائج التسليم."
 
 msgid "Open this message to load its recipients."
@@ -13545,7 +13848,9 @@ msgid "withdrawn"
 msgstr "مسحوبة"
 
 msgid "Redelivery queued. Final progress includes delivery receipts."
-msgstr "تمت إضافة إعادة الإرسال إلى قائمة الانتظار. يشمل التقدم النهائي إيصالات التسليم."
+msgstr ""
+"تمت إضافة إعادة الإرسال إلى قائمة الانتظار. يشمل التقدم النهائي إيصالات "
+"التسليم."
 
 msgid "Resend all"
 msgstr "إعادة إرسال الكل"
@@ -13559,14 +13864,23 @@ msgstr "إعادة محاولة إنشاء الإشعارات"
 msgid "Retry or resend"
 msgstr "إعادة المحاولة أو الإرسال"
 
-msgid "Retry targets only the latest failed channel attempts. Resend all creates new copies for the selected original recipients. Pending deliveries are not duplicated; earlier results stay in history."
-msgstr "تعيد المحاولة إرسال أحدث المحاولات الفاشلة عبر القنوات فقط. ينشئ خيار إعادة إرسال الكل نسخًا جديدة للمستلمين الأصليين المحددين. لا تُكرر عمليات التسليم المعلقة، وتبقى النتائج السابقة في السجل."
+msgid ""
+"Retry targets only the latest failed channel attempts. Resend all creates "
+"new copies for the selected original recipients. Pending deliveries are not "
+"duplicated; earlier results stay in history."
+msgstr ""
+"تعيد المحاولة إرسال أحدث المحاولات الفاشلة عبر القنوات فقط. ينشئ خيار إعادة "
+"إرسال الكل نسخًا جديدة للمستلمين الأصليين المحددين. لا تُكرر عمليات التسليم "
+"المعلقة، وتبقى النتائج السابقة في السجل."
 
 msgid "Saved notification content"
 msgstr "محتوى الإشعار المحفوظ"
 
-msgid "Saved system and admin notifications, per-recipient delivery progress and original content."
-msgstr "إشعارات النظام والمسؤول المحفوظة، وتقدم التسليم لكل مستلم، والمحتوى الأصلي."
+msgid ""
+"Saved system and admin notifications, per-recipient delivery progress and "
+"original content."
+msgstr ""
+"إشعارات النظام والمسؤول المحفوظة، وتقدم التسليم لكل مستلم، والمحتوى الأصلي."
 
 msgid "Scheduled for later"
 msgstr "مجدول لوقت لاحق"
@@ -13602,7 +13916,8 @@ msgid "This redelivery's recipients"
 msgstr "مستلمو إعادة الإرسال هذه"
 
 msgid "Transport retry only; no duplicate inbox notification was created."
-msgstr "إعادة محاولة لقناة الإرسال فقط؛ لم يتم إنشاء إشعار مكرر في صندوق الوارد."
+msgstr ""
+"إعادة محاولة لقناة الإرسال فقط؛ لم يتم إنشاء إشعار مكرر في صندوق الوارد."
 
 msgid "Unavailable"
 msgstr "غير متاح"
@@ -13616,8 +13931,12 @@ msgstr "التحديثات متوقفة مؤقتًا"
 msgid "View delivery history"
 msgstr "عرض سجل التسليم"
 
-msgid "Initial delivery records are still being prepared. Resend all will be available when they finish."
-msgstr "لا تزال سجلات الإرسال الأولية قيد الإعداد. سيصبح خيار إعادة الإرسال متاحًا بعد اكتمالها."
+msgid ""
+"Initial delivery records are still being prepared. Resend all will be "
+"available when they finish."
+msgstr ""
+"لا تزال سجلات الإرسال الأولية قيد الإعداد. سيصبح خيار إعادة الإرسال متاحًا "
+"بعد اكتمالها."
 
 msgid "Wait for the original delivery records to finish before resending all."
 msgstr "انتظر حتى تنتهي سجلات الإرسال الأصلية قبل إعادة إرسال الجميع."
@@ -13664,14 +13983,20 @@ msgstr "تستخدم جميع مواعيد الاختبار المنطقة ال�
 msgid "All schedule times use %(timezone)s."
 msgstr "تستخدم جميع المواعيد المنطقة الزمنية %(timezone)s."
 
-msgid "%(count)s Telegram message(s) are older than 48 hours and remain in Telegram."
+msgid ""
+"%(count)s Telegram message(s) are older than 48 hours and remain in "
+"Telegram."
 msgstr "عدد %(count)s من رسائل Telegram تجاوزت 48 ساعة وما زالت في Telegram."
 
 msgid "A reply to this message is already being sent."
 msgstr "يجري إرسال رد على هذه الرسالة بالفعل."
 
-msgid "After sending, admins can remove every message delivered to a selected recipient. Telegram limits bot message deletion to the first 48 hours."
-msgstr "بعد الإرسال، يمكن للمسؤولين إزالة كل الرسائل التي وصلت إلى مستلم محدد. يسمح Telegram بحذف رسائل البوت خلال أول 48 ساعة فقط."
+msgid ""
+"After sending, admins can remove every message delivered to a selected "
+"recipient. Telegram limits bot message deletion to the first 48 hours."
+msgstr ""
+"بعد الإرسال، يمكن للمسؤولين إزالة كل الرسائل التي وصلت إلى مستلم محدد. يسمح "
+"Telegram بحذف رسائل البوت خلال أول 48 ساعة فقط."
 
 msgid "Alert marked as replied in Telegram"
 msgstr "تم وضع علامة على التنبيه بأنه تمت الإجابة عليه في Telegram"
@@ -13721,7 +14046,9 @@ msgstr "هل تريد حذف كل رسائل البث المسجلة لهذا ا
 msgid "Delete from Telegram"
 msgstr "حذف من Telegram"
 
-msgid "Delete this message from Telegram? The local conversation history will remain."
+msgid ""
+"Delete this message from Telegram? The local conversation history will "
+"remain."
 msgstr "هل تريد حذف هذه الرسالة من Telegram؟ سيبقى سجل المحادثة المحلي."
 
 msgid "Deleted %(count)s Telegram message(s) for this recipient."
@@ -13737,7 +14064,8 @@ msgid "Message deleted from Telegram."
 msgstr "تم حذف الرسالة من Telegram."
 
 msgid "Message deleted from Telegram. The conversation is open again."
-msgstr "تم حذف الرسالة من Telegram. عادت المحادثة إلى قائمة الانتظار المفتوحة."
+msgstr ""
+"تم حذف الرسالة من Telegram. عادت المحادثة إلى قائمة الانتظار المفتوحة."
 
 msgid "Only a sent Telegram reply can be deleted."
 msgstr "يمكن حذف رد أُرسل بالفعل إلى Telegram فقط."
@@ -13760,8 +14088,12 @@ msgstr "يمكن للمسؤولين فقط سحب الإشعارات."
 msgid "Only the assigned administrator can release this conversation."
 msgstr "يمكن للمسؤول المعيّن فقط إعادة هذه المحادثة إلى قائمة الانتظار."
 
-msgid "Original audience: %(count)s recipients. Current access and channel eligibility will be checked again."
-msgstr "الجمهور الأصلي: %(count)s مستلمين. ستتم إعادة التحقق من صلاحية الوصول وقنوات التسليم الحالية."
+msgid ""
+"Original audience: %(count)s recipients. Current access and channel "
+"eligibility will be checked again."
+msgstr ""
+"الجمهور الأصلي: %(count)s مستلمين. ستتم إعادة التحقق من صلاحية الوصول وقنوات"
+" التسليم الحالية."
 
 msgid "Read"
 msgstr "مقروءة"
@@ -13799,11 +14131,19 @@ msgstr "فشل حذف الرسالة من Telegram"
 msgid "Telegram deletion window expired"
 msgstr "انتهت مهلة الحذف في Telegram"
 
-msgid "Telegram limits bot message deletion to the first 48 hours. Expired messages remain in Telegram."
-msgstr "يسمح Telegram بحذف رسائل البوت خلال أول 48 ساعة فقط. ستبقى الرسائل التي تجاوزت المهلة في Telegram."
+msgid ""
+"Telegram limits bot message deletion to the first 48 hours. Expired messages"
+" remain in Telegram."
+msgstr ""
+"يسمح Telegram بحذف رسائل البوت خلال أول 48 ساعة فقط. ستبقى الرسائل التي "
+"تجاوزت المهلة في Telegram."
 
-msgid "Telegram limits bot message deletion to the first 48 hours. Mobile push is removed from the device the next time the app syncs."
-msgstr "يسمح Telegram بحذف رسائل البوت خلال أول 48 ساعة فقط. سيزيل التطبيق إشعار الهاتف عند المزامنة التالية."
+msgid ""
+"Telegram limits bot message deletion to the first 48 hours. Mobile push is "
+"removed from the device the next time the app syncs."
+msgstr ""
+"يسمح Telegram بحذف رسائل البوت خلال أول 48 ساعة فقط. سيزيل التطبيق إشعار "
+"الهاتف عند المزامنة التالية."
 
 msgid "Telegram message identifiers are unavailable."
 msgstr "معرّفات رسالة Telegram غير متاحة."
@@ -13853,8 +14193,10 @@ msgstr "لم يعد هذا الإشعار متاحا."
 msgid "This sent message is no longer available."
 msgstr "لم تعد هذه الرسالة المرسلة متاحة."
 
-msgid "Wait for the pending reply to finish before releasing this conversation."
-msgstr "انتظر حتى يكتمل إرسال الرد المعلّق قبل إعادة المحادثة إلى قائمة الانتظار."
+msgid ""
+"Wait for the pending reply to finish before releasing this conversation."
+msgstr ""
+"انتظر حتى يكتمل إرسال الرد المعلّق قبل إعادة المحادثة إلى قائمة الانتظار."
 
 msgid "Wait for this recipient's broadcast delivery to finish."
 msgstr "انتظر حتى يكتمل إرسال البث إلى هذا المستلم."
@@ -13862,8 +14204,12 @@ msgstr "انتظر حتى يكتمل إرسال البث إلى هذا المس�
 msgid "Withdraw recipient notification"
 msgstr "سحب إشعار المستلم"
 
-msgid "Withdraw this recipient notification, cancel pending sends, and attempt to remove its Telegram and mobile push copies?"
-msgstr "هل تريد سحب إشعار هذا المستلم وإلغاء عمليات الإرسال المعلّقة ومحاولة إزالة نسخه من Telegram وإشعارات الهاتف؟"
+msgid ""
+"Withdraw this recipient notification, cancel pending sends, and attempt to "
+"remove its Telegram and mobile push copies?"
+msgstr ""
+"هل تريد سحب إشعار هذا المستلم وإلغاء عمليات الإرسال المعلّقة ومحاولة إزالة "
+"نسخه من Telegram وإشعارات الهاتف؟"
 
 msgid "You can delete only a Telegram alert sent to your linked account."
 msgstr "يمكنك حذف تنبيه Telegram المرسل إلى حسابك المرتبط فقط."
@@ -13871,8 +14217,11 @@ msgstr "يمكنك حذف تنبيه Telegram المرسل إلى حسابك ا�
 msgid "You can delete only a reply you sent."
 msgstr "يمكنك حذف رد أرسلته أنت فقط."
 
-msgid "%(deleted)s of %(total)s removed; %(expired)s expired; %(failed)s failed"
-msgstr "تمت إزالة %(deleted)s من أصل %(total)s؛ انتهت مهلة %(expired)s؛ وفشل حذف %(failed)s."
+msgid ""
+"%(deleted)s of %(total)s removed; %(expired)s expired; %(failed)s failed"
+msgstr ""
+"تمت إزالة %(deleted)s من أصل %(total)s؛ انتهت مهلة %(expired)s؛ وفشل حذف "
+"%(failed)s."
 
 msgid "The notification was cancelled before delivery."
 msgstr "تم إلغاء الإشعار قبل تسليمه."
@@ -13880,8 +14229,12 @@ msgstr "تم إلغاء الإشعار قبل تسليمه."
 msgid "Delivery outcome unknown"
 msgstr "نتيجة التسليم غير معروفة"
 
-msgid "The delivery outcome could not be confirmed after an interrupted send. Check Telegram before replying."
-msgstr "تعذر تأكيد نتيجة الإرسال بعد انقطاع العملية. تحقق من Telegram قبل إرسال رد آخر."
+msgid ""
+"The delivery outcome could not be confirmed after an interrupted send. Check"
+" Telegram before replying."
+msgstr ""
+"تعذر تأكيد نتيجة الإرسال بعد انقطاع العملية. تحقق من Telegram قبل إرسال رد "
+"آخر."
 
 #: management_system/admin_navigation.py
 msgid "Curriculum"
@@ -14170,7 +14523,8 @@ msgid "Years, year levels, meeting weekdays and course offerings."
 msgstr "السنوات ومستويات السنة وأيام الاجتماعات والمقررات المطروحة."
 
 #: management_system/templates/partials/academic_setup_content.html
-msgid "Academic levels with their linked years, courses, offerings and enrollments."
+msgid ""
+"Academic levels with their linked years, courses, offerings and enrollments."
 msgstr "المستويات الأكاديمية وما يرتبط بها من سنوات ومقررات وطرح وتسجيلات."
 
 #: management_system/templates/partials/academic_setup_content.html
@@ -14218,8 +14572,12 @@ msgid "Allow saving on the device (share / gallery downloads)"
 msgstr "السماح بالحفظ على الجهاز (المشاركة / تنزيلات المعرض)"
 
 #: management_system/templates/partials/app_release_manage_content.html
-msgid "Turn off a switch to hide the matching save buttons in the app and refuse new saves. Files already saved stay readable."
-msgstr "أوقف أي مفتاح لإخفاء أزرار الحفظ المطابقة في التطبيق ورفض الحفظ الجديد. تبقى الملفات المحفوظة قابلة للقراءة."
+msgid ""
+"Turn off a switch to hide the matching save buttons in the app and refuse "
+"new saves. Files already saved stay readable."
+msgstr ""
+"أوقف أي مفتاح لإخفاء أزرار الحفظ المطابقة في التطبيق ورفض الحفظ الجديد. تبقى"
+" الملفات المحفوظة قابلة للقراءة."
 
 #: management_system/templates/partials/app_release_manage_content.html
 msgid "Published app builds"
@@ -14261,8 +14619,12 @@ msgstr "كان التسجيل فارغًا. حاول مرة أخرى."
 msgid "The attachment field is unavailable."
 msgstr "حقل المرفق غير متاح."
 
-msgid "JPEG, PNG, MP4, PDF, OGG/Opus, MP3, M4A, or WebM. Images up to 10 MB; video/PDF up to 50 MB; audio up to 20 MB and 5 minutes."
-msgstr "JPEG أو PNG أو MP4 أو PDF أو OGG/Opus أو MP3 أو M4A أو WebM. الصور حتى 10 ميغابايت، والفيديو/PDF حتى 50 ميغابايت، والصوت حتى 20 ميغابايت و5 دقائق."
+msgid ""
+"JPEG, PNG, MP4, PDF, OGG/Opus, MP3, M4A, or WebM. Images up to 10 MB; "
+"video/PDF up to 50 MB; audio up to 20 MB and 5 minutes."
+msgstr ""
+"JPEG أو PNG أو MP4 أو PDF أو OGG/Opus أو MP3 أو M4A أو WebM. الصور حتى 10 "
+"ميغابايت، والفيديو/PDF حتى 50 ميغابايت، والصوت حتى 20 ميغابايت و5 دقائق."
 
 msgid "Audio messages must be 5 minutes or shorter."
 msgstr "يجب ألا تتجاوز الرسائل الصوتية 5 دقائق."
@@ -14288,8 +14650,12 @@ msgstr "نوع الصوت هذا غير مدعوم."
 msgid "Reply to a support digest to send media."
 msgstr "رد على تنبيه الدعم لإرسال الوسائط."
 
-msgid "The attachment must be a JPEG, PNG, MP4, PDF, OGG/Opus, MP3, M4A, or WebM file."
-msgstr "يجب أن يكون المرفق ملف JPEG أو PNG أو MP4 أو PDF أو OGG/Opus أو MP3 أو M4A أو WebM."
+msgid ""
+"The attachment must be a JPEG, PNG, MP4, PDF, OGG/Opus, MP3, M4A, or WebM "
+"file."
+msgstr ""
+"يجب أن يكون المرفق ملف JPEG أو PNG أو MP4 أو PDF أو OGG/Opus أو MP3 أو M4A "
+"أو WebM."
 
 msgid "Exam not open yet"
 msgstr "لم يفتح الامتحان بعد"
@@ -14300,11 +14666,32 @@ msgstr "بدء الامتحان"
 msgid "Choice"
 msgstr "خيار"
 
-msgid "Configure the promotion evaluation formula for an academic year and level. Set the overall passing threshold, evaluation start/end dates, and the failed-course repeat threshold, then define weighted rules for quizzes or attendance. Each rule's weight determines its contribution to the final score; for a single rule, a blank weight is normalized to 100%. Every applicable rule must meet its minimum pass threshold, and the weighted score must also meet the overall pass threshold. A course-specific formula overrides the all-courses formula for that offering."
-msgstr "اضبط معادلة تقييم الترقية لسنة ومستوى دراسي. حدد حد النجاح العام وتاريخي بدء وانتهاء التقييم وحد إعادة المقرر الراسب، ثم عرّف القواعد المرجحة للاختبارات أو الحضور. يحدد وزن كل قاعدة مساهمتها في الدرجة النهائية؛ وعند وجود قاعدة واحدة يعامل الوزن الفارغ كـ 100%. يجب أن تحقق كل قاعدة قابلة للتطبيق حد النجاح الأدنى الخاص بها، كما يجب أن تحقق الدرجة المرجحة حد النجاح العام. وتتجاوز معادلة المقرر المحدد معادلة جميع المقررات لذلك العرض."
+msgid ""
+"Configure the promotion evaluation formula for an academic year and level. "
+"Set the overall passing threshold, evaluation start/end dates, and the "
+"failed-course repeat threshold, then define weighted rules for quizzes or "
+"attendance. Each rule's weight determines its contribution to the final "
+"score; for a single rule, a blank weight is normalized to 100%. Every "
+"applicable rule must meet its minimum pass threshold, and the weighted score"
+" must also meet the overall pass threshold. A course-specific formula "
+"overrides the all-courses formula for that offering."
+msgstr ""
+"اضبط معادلة تقييم الترقية لسنة ومستوى دراسي. حدد حد النجاح العام وتاريخي بدء"
+" وانتهاء التقييم وحد إعادة المقرر الراسب، ثم عرّف القواعد المرجحة للاختبارات"
+" أو الحضور. يحدد وزن كل قاعدة مساهمتها في الدرجة النهائية؛ وعند وجود قاعدة "
+"واحدة يعامل الوزن الفارغ كـ 100%. يجب أن تحقق كل قاعدة قابلة للتطبيق حد "
+"النجاح الأدنى الخاص بها، كما يجب أن تحقق الدرجة المرجحة حد النجاح العام. "
+"وتتجاوز معادلة المقرر المحدد معادلة جميع المقررات لذلك العرض."
 
-msgid "Each rule's weight determines its contribution to the weighted final score. With a single rule, a blank weight is normalized to 100%. With multiple rules, each weight must be entered explicitly and the total must equal exactly 100%."
-msgstr "يحدد وزن كل قاعدة مساهمتها في الدرجة النهائية المرجحة. وعند وجود قاعدة واحدة يعامل الوزن الفارغ كـ 100%. وعند وجود قواعد متعددة يجب إدخال كل وزن صراحةً ويجب أن يكون المجموع 100% بالضبط."
+msgid ""
+"Each rule's weight determines its contribution to the weighted final score. "
+"With a single rule, a blank weight is normalized to 100%. With multiple "
+"rules, each weight must be entered explicitly and the total must equal "
+"exactly 100%."
+msgstr ""
+"يحدد وزن كل قاعدة مساهمتها في الدرجة النهائية المرجحة. وعند وجود قاعدة واحدة"
+" يعامل الوزن الفارغ كـ 100%. وعند وجود قواعد متعددة يجب إدخال كل وزن صراحةً "
+"ويجب أن يكون المجموع 100% بالضبط."
 
 msgid "Audio validation is unavailable on this server."
 msgstr "التحقق من الصوت غير متاح على هذا الخادم."
@@ -14351,7 +14738,9 @@ msgstr "اختر فيديو أو تسجيلًا صوتيًا أو كتابًا �
 msgid "Files sharing a part number are grouped into one part."
 msgstr "تُجمع الملفات التي تحمل رقم الجزء نفسه في جزء واحد."
 
-msgid "The total grade is calculated from the question points when the quiz is saved."
+msgid ""
+"The total grade is calculated from the question points when the quiz is "
+"saved."
 msgstr "تُحسب الدرجة الكلية من درجات الأسئلة عند حفظ الاختبار."
 
 msgid "A fast, read-only sweep for the content problems students feel first."
@@ -14387,7 +14776,8 @@ msgstr "لا يوجد حد زمني: تنتهي محاولتك عند إغلاق
 msgid "No time limit: your attempt ends at closing time."
 msgstr "لا يوجد حد زمني: تنتهي محاولتك عند وقت الإغلاق."
 
-msgid "0 means no time limit: the attempt is bounded only by the quiz closing date."
+msgid ""
+"0 means no time limit: the attempt is bounded only by the quiz closing date."
 msgstr "0 تعني عدم وجود حد زمني: تنتهي المحاولة عند تاريخ إغلاق الاختبار فقط."
 
 msgid "Please enter a duration"
@@ -14681,7 +15071,8 @@ msgstr "انتهاء رابط الرفع"
 msgid "Cleanup last dispatched"
 msgstr "آخر إرسال للتنظيف"
 
-msgid "A calendar appears when you have an active or completed normal enrollment."
+msgid ""
+"A calendar appears when you have an active or completed normal enrollment."
 msgstr "يظهر التقويم عند وجود تسجيل عادي نشط أو مكتمل."
 
 msgid "A few details still need your attention."
@@ -14714,8 +15105,12 @@ msgstr "صفحات الألبومات"
 msgid "Albums"
 msgstr "الألبومات"
 
-msgid "Albums are grouped by the academic year and level you completed. Download an original file to keep a copy."
-msgstr "تجمع الألبومات حسب السنة الدراسية والمستوى اللذين أتممتهما. نزل الملف الأصلي للاحتفاظ بنسخة."
+msgid ""
+"Albums are grouped by the academic year and level you completed. Download an"
+" original file to keep a copy."
+msgstr ""
+"تجمع الألبومات حسب السنة الدراسية والمستوى اللذين أتممتهما. نزل الملف الأصلي"
+" للاحتفاظ بنسخة."
 
 msgid "Albums will appear here after you complete a graduation year or level."
 msgstr "ستظهر الألبومات هنا بعد إتمام سنة دراسية أو مستوى يتيح التخرج."
@@ -14729,8 +15124,12 @@ msgstr "تطبيق أندرويد"
 msgid "Android may ask for permission before installing."
 msgstr "قد يطلب أندرويد إذنا قبل التثبيت."
 
-msgid "Android may show a warning for apps installed outside Google Play. Install only the official file linked from this student page."
-msgstr "قد يعرض أندرويد تحذيرا عند تثبيت تطبيق من خارج متجر Google Play. ثبت الملف الرسمي المرتبط بهذه الصفحة الطلابية فقط."
+msgid ""
+"Android may show a warning for apps installed outside Google Play. Install "
+"only the official file linked from this student page."
+msgstr ""
+"قد يعرض أندرويد تحذيرا عند تثبيت تطبيق من خارج متجر Google Play. ثبت الملف "
+"الرسمي المرتبط بهذه الصفحة الطلابية فقط."
 
 msgid "Answers are saved automatically while you work."
 msgstr "تحفظ الإجابات تلقائيا أثناء الحل."
@@ -14879,14 +15278,22 @@ msgstr "طريقة الاستخدام"
 msgid "How to read the calendar"
 msgstr "كيفية قراءة التقويم"
 
-msgid "If Android asks, allow your browser or Files app to install this app, then continue."
-msgstr "إذا طلب أندرويد ذلك، فاسمح للمتصفح أو تطبيق الملفات بتثبيت التطبيق، ثم تابع."
+msgid ""
+"If Android asks, allow your browser or Files app to install this app, then "
+"continue."
+msgstr ""
+"إذا طلب أندرويد ذلك، فاسمح للمتصفح أو تطبيق الملفات بتثبيت التطبيق، ثم تابع."
 
-msgid "If something looks wrong, contact your academic office before the quiz closes."
+msgid ""
+"If something looks wrong, contact your academic office before the quiz "
+"closes."
 msgstr "إذا لاحظت مشكلة، فتواصل مع مكتب الشؤون الأكاديمية قبل إغلاق الاختبار."
 
-msgid "If the download does not start or Android blocks the file, contact the academic office."
-msgstr "إذا لم يبدأ التنزيل أو منع أندرويد الملف، فتواصل مع مكتب الشؤون الأكاديمية."
+msgid ""
+"If the download does not start or Android blocks the file, contact the "
+"academic office."
+msgstr ""
+"إذا لم يبدأ التنزيل أو منع أندرويد الملف، فتواصل مع مكتب الشؤون الأكاديمية."
 
 msgid "Incorrect"
 msgstr "غير صحيح"
@@ -15038,8 +15445,12 @@ msgstr "متوفر"
 msgid "One account"
 msgstr "حساب واحد"
 
-msgid "Only students with access to the completed year and level can view these files."
-msgstr "يمكن للطلاب الذين لديهم صلاحية الوصول إلى السنة والمستوى المكتملين فقط عرض هذه الملفات."
+msgid ""
+"Only students with access to the completed year and level can view these "
+"files."
+msgstr ""
+"يمكن للطلاب الذين لديهم صلاحية الوصول إلى السنة والمستوى المكتملين فقط عرض "
+"هذه الملفات."
 
 msgid "Only the years and levels you completed appear here."
 msgstr "تظهر هنا السنوات والمستويات التي أتممتها فقط."
@@ -15053,8 +15464,12 @@ msgstr "افتح صفحة تعلّمي"
 msgid "Open album"
 msgstr "فتح الألبوم"
 
-msgid "Open an album to view its photos and videos. Use the download control to save an original file."
-msgstr "افتح ألبوما لعرض صوره ومقاطع الفيديو فيه. استخدم زر التنزيل لحفظ الملف الأصلي."
+msgid ""
+"Open an album to view its photos and videos. Use the download control to "
+"save an original file."
+msgstr ""
+"افتح ألبوما لعرض صوره ومقاطع الفيديو فيه. استخدم زر التنزيل لحفظ الملف "
+"الأصلي."
 
 msgid "Open calendar"
 msgstr "فتح التقويم"
@@ -15068,8 +15483,10 @@ msgstr "فتح السجل الدراسي"
 msgid "Open video"
 msgstr "فتح الفيديو"
 
-msgid "Open your browser downloads or the Files app and select the downloaded file."
-msgstr "افتح التنزيلات في المتصفح أو تطبيق الملفات، ثم اختر الملف الذي تم تنزيله."
+msgid ""
+"Open your browser downloads or the Files app and select the downloaded file."
+msgstr ""
+"افتح التنزيلات في المتصفح أو تطبيق الملفات، ثم اختر الملف الذي تم تنزيله."
 
 msgid "Partially correct"
 msgstr "صحيح جزئيا"
@@ -15212,11 +15629,19 @@ msgstr "تابع دروسك واختباراتك وإشعاراتك على أن�
 msgid "Tap Download the app and wait for the APK file to finish downloading."
 msgstr "اضغط على تنزيل التطبيق وانتظر حتى يكتمل تنزيل ملف APK."
 
-msgid "The app uses the same student account as the website. Your courses, grades and notifications remain connected to your account."
-msgstr "يستخدم التطبيق حساب الطالب نفسه المستخدم على الموقع. وتظل مقرراتك ودرجاتك وإشعاراتك مرتبطة بحسابك."
+msgid ""
+"The app uses the same student account as the website. Your courses, grades "
+"and notifications remain connected to your account."
+msgstr ""
+"يستخدم التطبيق حساب الطالب نفسه المستخدم على الموقع. وتظل مقرراتك ودرجاتك "
+"وإشعاراتك مرتبطة بحسابك."
 
-msgid "The calendar shows the active academic scope. Meeting dates and institute holidays come from the current academic schedule."
-msgstr "يعرض التقويم النطاق الدراسي النشط. وتستمد مواعيد اللقاءات وعطلات المعهد من الجدول الدراسي الحالي."
+msgid ""
+"The calendar shows the active academic scope. Meeting dates and institute "
+"holidays come from the current academic schedule."
+msgstr ""
+"يعرض التقويم النطاق الدراسي النشط. وتستمد مواعيد اللقاءات وعطلات المعهد من "
+"الجدول الدراسي الحالي."
 
 msgid "The course outline shows the first 20 lessons."
 msgstr "تعرض قائمة المقرر أول 20 درسا."
@@ -15227,8 +15652,12 @@ msgstr "تعرض قائمة المقرر أول 20 اختبارا."
 msgid "The latest official Android build."
 msgstr "أحدث إصدار رسمي لأندرويد."
 
-msgid "The official Bible Institute app keeps your lessons, quiz alerts and student record close at hand."
-msgstr "يبقيك تطبيق معهد الكتاب المقدس الرسمي قريبا من دروسك وتنبيهات الاختبارات وسجلك الدراسي."
+msgid ""
+"The official Bible Institute app keeps your lessons, quiz alerts and student"
+" record close at hand."
+msgstr ""
+"يبقيك تطبيق معهد الكتاب المقدس الرسمي قريبا من دروسك وتنبيهات الاختبارات "
+"وسجلك الدراسي."
 
 msgid "The timer starts when you press Start and cannot be paused."
 msgstr "يبدأ المؤقت عند الضغط على بدء ولا يمكن إيقافه مؤقتا."
@@ -15245,7 +15674,8 @@ msgstr "لا توجد أيام قابلة للاختيار في هذا الشه�
 msgid "There are no upcoming quiz deadlines."
 msgstr "لا توجد مواعيد نهائية قريبة للاختبارات."
 
-msgid "This question is unanswered. You can continue, but it will be marked blank."
+msgid ""
+"This question is unanswered. You can continue, but it will be marked blank."
 msgstr "لم تجب عن هذا السؤال. يمكنك المتابعة، لكن ستحتسب إجابته فارغة."
 
 msgid "This quiz may use any of these response formats."
@@ -15260,8 +15690,12 @@ msgstr "بلا إجابة"
 msgid "Under review"
 msgstr "قيد المراجعة"
 
-msgid "Unread messages are marked with a gold edge. Open a message to follow its related course or quiz."
-msgstr "تميز الرسائل غير المقروءة بحافة ذهبية. افتح الرسالة للانتقال إلى المقرر أو الاختبار المرتبط بها."
+msgid ""
+"Unread messages are marked with a gold edge. Open a message to follow its "
+"related course or quiz."
+msgstr ""
+"تميز الرسائل غير المقروءة بحافة ذهبية. افتح الرسالة للانتقال إلى المقرر أو "
+"الاختبار المرتبط بها."
 
 msgid "Upload documents"
 msgstr "رفع المستندات"
@@ -15461,10 +15895,15 @@ msgstr "عرض %(start)s-%(end)s من أصل %(total)s ملفا"
 msgid "The quiz closes at %(date)s."
 msgstr "يغلق الاختبار في %(date)s."
 
-msgid "The timer begins when you start. You have %(minutes)s minutes or until %(date)s, whichever comes first."
-msgstr "يبدأ المؤقت عند بدء الاختبار. لديك %(minutes)s دقيقة أو حتى %(date)s، أيهما يحل أولا."
+msgid ""
+"The timer begins when you start. You have %(minutes)s minutes or until "
+"%(date)s, whichever comes first."
+msgstr ""
+"يبدأ المؤقت عند بدء الاختبار. لديك %(minutes)s دقيقة أو حتى %(date)s، أيهما "
+"يحل أولا."
 
-msgid "This quiz opens on %(date)s. Questions will be available after it opens."
+msgid ""
+"This quiz opens on %(date)s. Questions will be available after it opens."
 msgstr "يفتح هذا الاختبار في %(date)s. وستتاح الأسئلة بعد فتحه."
 
 msgid "Updated %(date)s - Your account and data stay the same."
@@ -15482,7 +15921,6 @@ msgstr "لديك %(count)s إشعارا غير مقروء."
 msgid "You still have __count__ unanswered questions."
 msgstr "ما زال لديك __count__ سؤالا بلا إجابة."
 
-
 msgid "%(count)s photo"
 msgid_plural "%(count)s photos"
 msgstr[0] "لا توجد صور"
@@ -15491,7 +15929,6 @@ msgstr[2] "صورتان"
 msgstr[3] "%(count)s صور"
 msgstr[4] "%(count)s صورة"
 msgstr[5] "%(count)s صورة"
-
 
 msgid "%(count)s video"
 msgid_plural "%(count)s videos"
@@ -15502,7 +15939,6 @@ msgstr[3] "%(count)s مقاطع فيديو"
 msgstr[4] "%(count)s مقطع فيديو"
 msgstr[5] "%(count)s مقطع فيديو"
 
-
 msgid "%(count)s question"
 msgid_plural "%(count)s questions"
 msgstr[0] "لا توجد أسئلة"
@@ -15512,7 +15948,6 @@ msgstr[3] "%(count)s أسئلة"
 msgstr[4] "%(count)s سؤالا"
 msgstr[5] "%(count)s سؤال"
 
-
 msgid "%(minutes)s minute"
 msgid_plural "%(minutes)s minutes"
 msgstr[0] "%(minutes)s دقيقة"
@@ -15521,7 +15956,6 @@ msgstr[2] "دقيقتان"
 msgstr[3] "%(minutes)s دقائق"
 msgstr[4] "%(minutes)s دقيقة"
 msgstr[5] "%(minutes)s دقيقة"
-
 
 msgid "and %(count)s video"
 msgid_plural "and %(count)s videos"
@@ -15553,16 +15987,29 @@ msgstr "وضع الدخول"
 msgid "Exit mode"
 msgstr "وضع الخروج"
 
-msgid "The camera opens automatically; a scan saves entrance immediately and keeps the camera running."
-msgstr "تُفتح الكاميرا تلقائيًا؛ وتحفظ المسحة الدخول فورًا مع بقاء الكاميرا تعمل."
+msgid ""
+"The camera opens automatically; a scan saves entrance immediately and keeps "
+"the camera running."
+msgstr ""
+"تُفتح الكاميرا تلقائيًا؛ وتحفظ المسحة الدخول فورًا مع بقاء الكاميرا تعمل."
 
-msgid "Press the exit toggle to record exit for the next scan only; it returns to entrance automatically."
-msgstr "اضغط زر الخروج لتسجيل الخروج في المسحة القادمة فقط؛ ثم يعود تلقائيًا إلى الدخول."
+msgid ""
+"Press the exit toggle to record exit for the next scan only; it returns to "
+"entrance automatically."
+msgstr ""
+"اضغط زر الخروج لتسجيل الخروج في المسحة القادمة فقط؛ ثم يعود تلقائيًا إلى "
+"الدخول."
 
-msgid "A repeated scan is rejected and the recorded entrance or exit is kept. The same code is ignored for five seconds."
-msgstr "تُرفض المسحة المتكررة ويُحتفظ بالدخول أو الخروج المسجل. يُتجاهل نفس الكود لمدة خمس ثوانٍ."
+msgid ""
+"A repeated scan is rejected and the recorded entrance or exit is kept. The "
+"same code is ignored for five seconds."
+msgstr ""
+"تُرفض المسحة المتكررة ويُحتفظ بالدخول أو الخروج المسجل. يُتجاهل نفس الكود "
+"لمدة خمس ثوانٍ."
 
-msgid "If the QR code is rejected, use the manual lookup; it records with the current scan mode."
+msgid ""
+"If the QR code is rejected, use the manual lookup; it records with the "
+"current scan mode."
 msgstr "إذا رُفض رمز QR استخدم البحث اليدوي؛ ويسجل حسب وضع المسح الحالي."
 
 msgid "The scan was rejected."
@@ -15571,7 +16018,8 @@ msgstr "تم رفض المسحة."
 msgid "The scan could not be saved. Check the connection and try again."
 msgstr "تعذر حفظ المسحة. تحقق من الاتصال وحاول مرة أخرى."
 
-msgid "Camera access is unavailable on this device. Tap the button to try again."
+msgid ""
+"Camera access is unavailable on this device. Tap the button to try again."
 msgstr "تعذر الوصول إلى الكاميرا على هذا الجهاز. اضغط الزر للمحاولة مرة أخرى."
 
 msgid "The lookup failed. Check the connection and try again."
@@ -16159,16 +16607,6 @@ msgid ""
 "progress."
 msgstr "تُحفظ نتيجتك في سجلك الدراسي وتظهر في تقدمك في المادة."
 
-#, python-format
-#~ msgid "%(watched)s of %(total)s parts watched"
-#~ msgstr "%(watched)s من %(total)s أجزاء تمت مشاهدتها"
-
-#~ msgid "Overall progress"
-#~ msgstr "التقدم الإجمالي"
-
-#~ msgid "Lesson %(position)s of %(total)s - %(course)s"
-#~ msgstr "الدرس %(position)s من %(total)s - %(course)s"
-
 #: management_system/templates/student_next/base.html
 msgid "Mobile student navigation"
 msgstr "تنقل الطالب على الجوال"
@@ -16222,8 +16660,13 @@ msgid "Install the Bible Institute app"
 msgstr "تثبيت تطبيق معهد الكتاب المقدس"
 
 #: management_system/pwa_views.py
-msgid "Install this website on your phone or computer for a full-screen app experience, saved audio and PDFs, and browser notifications. No separate download is needed."
-msgstr "ثبّت هذا الموقع على هاتفك أو حاسوبك للحصول على تجربة تطبيق كاملة الشاشة، وملفات صوت وPDF محفوظة، وإشعارات المتصفح. لا حاجة إلى تنزيل منفصل."
+msgid ""
+"Install this website on your phone or computer for a full-screen app "
+"experience, saved audio and PDFs, and browser notifications. No separate "
+"download is needed."
+msgstr ""
+"ثبّت هذا الموقع على هاتفك أو حاسوبك للحصول على تجربة تطبيق كاملة الشاشة، "
+"وملفات صوت وPDF محفوظة، وإشعارات المتصفح. لا حاجة إلى تنزيل منفصل."
 
 #: management_system/pwa_views.py
 msgid "Install app"
@@ -16234,8 +16677,12 @@ msgid "Notification settings"
 msgstr "إعدادات الإشعارات"
 
 #: management_system/pwa_views.py
-msgid "If the install button does not appear, use your browser menu and choose Install app or Add to Home Screen."
-msgstr "إذا لم يظهر زر التثبيت، استخدم قائمة المتصفح واختر تثبيت التطبيق أو إضافة إلى الشاشة الرئيسية."
+msgid ""
+"If the install button does not appear, use your browser menu and choose "
+"Install app or Add to Home Screen."
+msgstr ""
+"إذا لم يظهر زر التثبيت، استخدم قائمة المتصفح واختر تثبيت التطبيق أو إضافة "
+"إلى الشاشة الرئيسية."
 
 #: management_system/pwa_views.py
 msgid "Android and desktop Chrome or Edge"
@@ -16246,7 +16693,8 @@ msgid "Open this page in Chrome or Edge."
 msgstr "افتح هذه الصفحة في كروم أو إيدج."
 
 #: management_system/pwa_views.py
-msgid "Tap Install app above, or open the browser menu and choose Install app."
+msgid ""
+"Tap Install app above, or open the browser menu and choose Install app."
 msgstr "اضغط تثبيت التطبيق أعلاه، أو افتح قائمة المتصفح واختر تثبيت التطبيق."
 
 #: management_system/pwa_views.py
@@ -16266,20 +16714,35 @@ msgid "Tap Share, then Add to Home Screen."
 msgstr "اضغط مشاركة، ثم إضافة إلى الشاشة الرئيسية."
 
 #: management_system/pwa_views.py
-msgid "Open the new Home Screen app and sign in. Browser notifications require iOS or iPadOS 16.4 or later."
-msgstr "افتح التطبيق من الشاشة الرئيسية وسجّل الدخول. تتطلب إشعارات المتصفح iOS أو iPadOS 16.4 أو أحدث."
+msgid ""
+"Open the new Home Screen app and sign in. Browser notifications require iOS "
+"or iPadOS 16.4 or later."
+msgstr ""
+"افتح التطبيق من الشاشة الرئيسية وسجّل الدخول. تتطلب إشعارات المتصفح iOS أو "
+"iPadOS 16.4 أو أحدث."
 
 #: management_system/pwa_views.py
 msgid "What works offline"
 msgstr "ما يعمل دون اتصال"
 
 #: management_system/pwa_views.py
-msgid "Only audio and PDF files you explicitly save from a lesson are available offline. They are encrypted on this device and unlock with your screen lock or biometrics. Lessons you did not save, quizzes, calendar, results, forms and messages remain online-only."
-msgstr "تتاح دون اتصال ملفات الصوت وPDF التي تحفظها صراحةً من الدرس فقط. وهي مشفرة على هذا الجهاز وتُفتح بقفل الشاشة أو البصمة. الدروس غير المحفوظة والاختبارات والتقويم والنتائج والنماذج والرسائل تحتاج إلى اتصال."
+msgid ""
+"Only audio and PDF files you explicitly save from a lesson are available "
+"offline. They are encrypted on this device and unlock with your screen lock "
+"or biometrics. Lessons you did not save, quizzes, calendar, results, forms "
+"and messages remain online-only."
+msgstr ""
+"تتاح دون اتصال ملفات الصوت وPDF التي تحفظها صراحةً من الدرس فقط. وهي مشفرة "
+"على هذا الجهاز وتُفتح بقفل الشاشة أو البصمة. الدروس غير المحفوظة والاختبارات"
+" والتقويم والنتائج والنماذج والرسائل تحتاج إلى اتصال."
 
 #: management_system/pwa_views.py
-msgid "Saving offline media can be disabled by the institute. Existing saved files remain readable while you still have access to the lesson."
-msgstr "يمكن للمعهد تعطيل حفظ الوسائط دون اتصال. تبقى الملفات المحفوظة قابلة للقراءة ما دام لديك حق الوصول إلى الدرس."
+msgid ""
+"Saving offline media can be disabled by the institute. Existing saved files "
+"remain readable while you still have access to the lesson."
+msgstr ""
+"يمكن للمعهد تعطيل حفظ الوسائط دون اتصال. تبقى الملفات المحفوظة قابلة للقراءة"
+" ما دام لديك حق الوصول إلى الدرس."
 
 #: management_system/pwa_views.py
 msgid "Sign in with a passkey"
@@ -16290,8 +16753,12 @@ msgid "Passkeys"
 msgstr "مفاتيح المرور"
 
 #: management_system/pwa_views.py
-msgid "Use Face ID, fingerprint, Windows Hello or your device PIN to sign in without a password. Your biometric data never leaves your device."
-msgstr "استخدم Face ID أو البصمة أو Windows Hello أو رمز جهازك لتسجيل الدخول دون كلمة مرور. لا تغادر بياناتك الحيوية جهازك."
+msgid ""
+"Use Face ID, fingerprint, Windows Hello or your device PIN to sign in "
+"without a password. Your biometric data never leaves your device."
+msgstr ""
+"استخدم Face ID أو البصمة أو Windows Hello أو رمز جهازك لتسجيل الدخول دون "
+"كلمة مرور. لا تغادر بياناتك الحيوية جهازك."
 
 #: management_system/pwa_views.py
 msgid "Sign in again before adding or removing a passkey."
@@ -16330,8 +16797,12 @@ msgid "Browser notifications"
 msgstr "إشعارات المتصفح"
 
 #: management_system/pwa_views.py
-msgid "Get lesson, quiz and announcement alerts on this device. You can turn them off at any time."
-msgstr "احصل على تنبيهات الدروس والاختبارات والإعلانات على هذا الجهاز. يمكنك إيقافها في أي وقت."
+msgid ""
+"Get lesson, quiz and announcement alerts on this device. You can turn them "
+"off at any time."
+msgstr ""
+"احصل على تنبيهات الدروس والاختبارات والإعلانات على هذا الجهاز. يمكنك إيقافها"
+" في أي وقت."
 
 #: management_system/pwa_views.py
 msgid "Enable notifications"
@@ -16354,8 +16825,12 @@ msgid "Your saved audio and PDF files"
 msgstr "ملفات الصوت وPDF المحفوظة"
 
 #: management_system/pwa_views.py
-msgid "These files are stored encrypted on this device. Unlock once with your device screen lock or biometrics to listen or read without internet."
-msgstr "تُخزَّن هذه الملفات مشفرة على هذا الجهاز. افتحها مرة واحدة بقفل الشاشة أو البصمة للاستماع أو القراءة دون إنترنت."
+msgid ""
+"These files are stored encrypted on this device. Unlock once with your "
+"device screen lock or biometrics to listen or read without internet."
+msgstr ""
+"تُخزَّن هذه الملفات مشفرة على هذا الجهاز. افتحها مرة واحدة بقفل الشاشة أو "
+"البصمة للاستماع أو القراءة دون إنترنت."
 
 #: management_system/pwa_views.py
 msgid "Unlock downloads"
@@ -16382,7 +16857,9 @@ msgid "Unlock required"
 msgstr "يلزم الفتح"
 
 #: management_system/pwa_views.py
-msgid "Confirm with your device screen lock or biometrics before opening saved files."
+msgid ""
+"Confirm with your device screen lock or biometrics before opening saved "
+"files."
 msgstr "أكّد بقفل الشاشة أو البصمة قبل فتح الملفات المحفوظة."
 
 #: management_system/pwa_views.py
@@ -16418,8 +16895,11 @@ msgid "Android, Chrome or Edge"
 msgstr "أندرويد أو كروم أو إيدج"
 
 #: management_system/pwa_views.py
-msgid "Open this page, tap Install app, or choose Install app from the browser menu."
-msgstr "افتح هذه الصفحة واضغط تثبيت التطبيق أو اختر تثبيت التطبيق من قائمة المتصفح."
+msgid ""
+"Open this page, tap Install app, or choose Install app from the browser "
+"menu."
+msgstr ""
+"افتح هذه الصفحة واضغط تثبيت التطبيق أو اختر تثبيت التطبيق من قائمة المتصفح."
 
 #: management_system/pwa_views.py
 msgid "Open the installed app and use your existing student account."
@@ -16430,23 +16910,37 @@ msgid "Save what you need"
 msgstr "احفظ ما تحتاجه"
 
 #: management_system/pwa_views.py
-msgid "Open a lesson audio or PDF and choose Save offline before going offline."
+msgid ""
+"Open a lesson audio or PDF and choose Save offline before going offline."
 msgstr "افتح صوت درس أو PDF واختر حفظ دون اتصال قبل الانقطاع."
 
 #: management_system/pwa_views.py
-msgid "Only audio and PDF files you explicitly save are available offline. They are encrypted on this device and unlock with your screen lock or biometrics. Lessons you did not save, quizzes, calendar and forms stay online-only."
-msgstr "تتاح دون اتصال ملفات الصوت وPDF التي تحفظها صراحةً فقط. وهي مشفرة على هذا الجهاز وتُفتح بقفل الشاشة أو البصمة. الدروس غير المحفوظة والاختبارات والتقويم والنماذج تحتاج إلى اتصال."
+msgid ""
+"Only audio and PDF files you explicitly save are available offline. They are"
+" encrypted on this device and unlock with your screen lock or biometrics. "
+"Lessons you did not save, quizzes, calendar and forms stay online-only."
+msgstr ""
+"تتاح دون اتصال ملفات الصوت وPDF التي تحفظها صراحةً فقط. وهي مشفرة على هذا "
+"الجهاز وتُفتح بقفل الشاشة أو البصمة. الدروس غير المحفوظة والاختبارات "
+"والتقويم والنماذج تحتاج إلى اتصال."
 
 #: management_system/pwa_views.py
 msgid "Optional browser alerts."
 msgstr "تنبيهات متصفح اختيارية."
 
 #: management_system/pwa_views.py
-msgid "Turn on lesson, quiz and announcement alerts from the notifications page. iPhone and iPad require iOS or iPadOS 16.4 or later after adding the app to the Home Screen."
-msgstr "فعّل تنبيهات الدروس والاختبارات والإعلانات من صفحة الإشعارات. يتطلب آيفون وآيباد iOS أو iPadOS 16.4 أو أحدث بعد إضافة التطبيق إلى الشاشة الرئيسية."
+msgid ""
+"Turn on lesson, quiz and announcement alerts from the notifications page. "
+"iPhone and iPad require iOS or iPadOS 16.4 or later after adding the app to "
+"the Home Screen."
+msgstr ""
+"فعّل تنبيهات الدروس والاختبارات والإعلانات من صفحة الإشعارات. يتطلب آيفون "
+"وآيباد iOS أو iPadOS 16.4 أو أحدث بعد إضافة التطبيق إلى الشاشة الرئيسية."
 
 #: management_system/pwa_views.py
-msgid "Your saved audio and PDFs are available on this device even without internet."
+msgid ""
+"Your saved audio and PDFs are available on this device even without "
+"internet."
 msgstr "ملفات الصوت وPDF المحفوظة متاحة على هذا الجهاز حتى دون إنترنت."
 
 #: management_system/pwa_views.py
@@ -16553,11 +17047,17 @@ msgstr "لم يتم العثور على مفتاح المرور."
 msgid "The passkey is invalid."
 msgstr "مفتاح المرور غير صالح."
 
-msgid "Add the Bible Institute to your home screen. No separate download is needed."
+msgid ""
+"Add the Bible Institute to your home screen. No separate download is needed."
 msgstr "أضف معهد الكتاب المقدس إلى الشاشة الرئيسية. لا حاجة إلى تنزيل منفصل."
 
-msgid "Install this website for a full-screen app, saved audio and PDFs, and browser notifications. It uses the same student account and stays up to date automatically."
-msgstr "ثبّت هذا الموقع للحصول على تطبيق كامل الشاشة، وصوت وPDF محفوظين، وإشعارات المتصفح. يستخدم حساب الطالب نفسه ويبقى محدثاً تلقائياً."
+msgid ""
+"Install this website for a full-screen app, saved audio and PDFs, and "
+"browser notifications. It uses the same student account and stays up to date"
+" automatically."
+msgstr ""
+"ثبّت هذا الموقع للحصول على تطبيق كامل الشاشة، وصوت وPDF محفوظين، وإشعارات "
+"المتصفح. يستخدم حساب الطالب نفسه ويبقى محدثاً تلقائياً."
 
 msgid "Installable web app"
 msgstr "تطبيق ويب قابل للتثبيت"
@@ -16571,7 +17071,8 @@ msgstr "افتح هذه الصفحة في سفاري، واضغط مشاركة،
 msgid "Type the items in order, separated by |"
 msgstr "اكتب العناصر بالترتيب مفصولة بـ |"
 
-msgid "Without JavaScript, type the items in the correct order separated by |."
+msgid ""
+"Without JavaScript, type the items in the correct order separated by |."
 msgstr "دون JavaScript، اكتب العناصر بالترتيب الصحيح مفصولة بـ |."
 
 msgid "Type each pair as Left = Right, one per line"
@@ -16596,7 +17097,9 @@ msgstr "دون اتصال"
 msgid "Installed on this device"
 msgstr "مثبت على هذا الجهاز"
 
-msgid "Used is the space taken by saved files; available is this browser's storage limit."
+msgid ""
+"Used is the space taken by saved files; available is this browser's storage "
+"limit."
 msgstr "المستخدم هو حجم الملفات المحفوظة، والمتاح هو حد تخزين هذا المتصفح."
 
 msgid "Security"
@@ -16623,23 +17126,40 @@ msgstr "إيقاف فرض الواجهة على جميع الطلاب"
 msgid "Force selected view for all students"
 msgstr "فرض الواجهة المختارة على جميع الطلاب"
 
-msgid "Force mode applies the selected view to every student account and ignores per-account overrides."
-msgstr "يطبق وضع الفرض الواجهة المختارة على كل حساب طالب ويتجاهل التخصيصات الفردية."
+msgid ""
+"Force mode applies the selected view to every student account and ignores "
+"per-account overrides."
+msgstr ""
+"يطبق وضع الفرض الواجهة المختارة على كل حساب طالب ويتجاهل التخصيصات الفردية."
 
-msgid "Force mode is active. Every student uses the selected global view and per-account overrides are ignored."
-msgstr "وضع الفرض مفعّل. يستخدم كل طالب الواجهة العامة المختارة ويتم تجاهل تخصيصات الحسابات."
+msgid ""
+"Force mode is active. Every student uses the selected global view and per-"
+"account overrides are ignored."
+msgstr ""
+"وضع الفرض مفعّل. يستخدم كل طالب الواجهة العامة المختارة ويتم تجاهل تخصيصات "
+"الحسابات."
 
 msgid "All students are now forced to the selected student view."
 msgstr "تم فرض الواجهة المختارة على جميع الطلاب."
 
-msgid "Forced view disabled. Per-account overrides and the global default apply again."
-msgstr "تم إيقاف وضع الفرض. تعود تخصيصات الحسابات والواجهة الافتراضية العامة للعمل."
+msgid ""
+"Forced view disabled. Per-account overrides and the global default apply "
+"again."
+msgstr ""
+"تم إيقاف وضع الفرض. تعود تخصيصات الحسابات والواجهة الافتراضية العامة للعمل."
 
-msgid "Every student currently uses the selected forced view. Per-account overrides are ignored."
-msgstr "يستخدم كل طالب حاليا الواجهة المفروضة المختارة. يتم تجاهل تخصيصات الحسابات."
+msgid ""
+"Every student currently uses the selected forced view. Per-account overrides"
+" are ignored."
+msgstr ""
+"يستخدم كل طالب حاليا الواجهة المفروضة المختارة. يتم تجاهل تخصيصات الحسابات."
 
-msgid "This is the default for students who inherit the global setting. Use the force action to apply it to every student and ignore per-account overrides."
-msgstr "هذه هي الواجهة الافتراضية للطلاب الذين يتبعون الإعداد العام. استخدم زر الفرض لتطبيقها على كل طالب وتجاهل التخصيصات الفردية."
+msgid ""
+"This is the default for students who inherit the global setting. Use the "
+"force action to apply it to every student and ignore per-account overrides."
+msgstr ""
+"هذه هي الواجهة الافتراضية للطلاب الذين يتبعون الإعداد العام. استخدم زر الفرض"
+" لتطبيقها على كل طالب وتجاهل التخصيصات الفردية."
 
 # In-app support chat (student experience)
 msgid "Support"
@@ -16648,7 +17168,9 @@ msgstr "الدعم"
 msgid "Bible Institute team"
 msgstr "فريق المعهد"
 
-msgid "Your own conversation with the institute. Messages sent from Telegram appear here too."
+msgid ""
+"Your own conversation with the institute. Messages sent from Telegram appear"
+" here too."
 msgstr "محادثتك الخاصة مع المعهد. تظهر هنا أيضا الرسائل المرسلة من تيليجرام."
 
 msgid "Support conversation"
@@ -16660,7 +17182,9 @@ msgstr "تحميل الرسائل الأقدم"
 msgid "Start the conversation"
 msgstr "ابدأ المحادثة"
 
-msgid "Write a message, attach an image, or record a voice note. The institute team replies here."
+msgid ""
+"Write a message, attach an image, or record a voice note. The institute team"
+" replies here."
 msgstr "اكتب رسالة أو أرفق صورة أو سجل رسالة صوتية. يرد فريق المعهد هنا."
 
 msgid "Write a message to the institute team"
@@ -16744,12 +17268,87 @@ msgstr "رسالة دعم"
 msgid "Support chat"
 msgstr "محادثة الدعم"
 
-msgid "Microphone access was refused. Allow it in the browser settings, then try again."
-msgstr "تم رفض الوصول إلى الميكروفون. اسمح به من إعدادات المتصفح ثم أعد المحاولة."
+msgid ""
+"Microphone access was refused. Allow it in the browser settings, then try "
+"again."
+msgstr ""
+"تم رفض الوصول إلى الميكروفون. اسمح به من إعدادات المتصفح ثم أعد المحاولة."
 
 msgid "This browser cannot record audio."
 msgstr "هذا المتصفح لا يستطيع تسجيل الصوت."
 
-
 msgid "Invalid message cursor."
 msgstr "مرجع تحميل الرسائل غير صالح."
+
+msgid "Mobile Push Settings"
+msgstr "إعدادات إشعارات الجوال"
+
+msgid "Expo mobile push enabled."
+msgstr "تم تفعيل إشعارات Expo للجوال."
+
+msgid "Expo mobile push disabled."
+msgstr "تم تعطيل إشعارات Expo للجوال."
+
+msgid "Expo mobile push notifications"
+msgstr "إشعارات Expo للجوال"
+
+msgid ""
+"Turn off Expo mobile push to stop sending push notifications to the mobile "
+"app through Expo while keeping web push, Telegram, and the student bell "
+"active."
+msgstr ""
+"أوقف إشعارات Expo للجوال لإيقاف إرسال الإشعارات إلى تطبيق الجوال عبر Expo مع"
+" إبقاء إشعارات الويب وتيليجرام وجرس الطالب نشطة."
+
+msgid ""
+"No Expo access token is configured on the server; Expo pushes will stay "
+"inactive even when turned on."
+msgstr ""
+"لا يوجد رمز وصول Expo مضبوط على الخادم؛ ستبقى إشعارات Expo غير نشطة حتى عند "
+"تفعيلها."
+
+msgid "Enable Expo mobile push notifications"
+msgstr "تفعيل إشعارات Expo للجوال"
+
+msgid "Save push setting"
+msgstr "حفظ إعداد الإشعارات"
+
+msgid "Send at (optional)"
+msgstr "تاريخ الإرسال (اختياري)"
+
+msgid ""
+"Leave blank to send immediately, or choose a future Cairo date and time."
+msgstr ""
+"اتركه فارغا للإرسال الفوري، أو اختر تاريخا ووقتا مستقبليا بتوقيت القاهرة."
+
+msgid "Scheduled time must be in the future."
+msgstr "يجب أن يكون الوقت المجدول في المستقبل."
+
+msgid ""
+"Only queued notifications that have not started sending can be cancelled."
+msgstr "يمكن إلغاء الإشعارات المجدولة أو المنتظرة التي لم يبدأ إرسالها فقط."
+
+msgid "Notification scheduled for delivery."
+msgstr "تمت جدولة الإشعار للإرسال."
+
+msgid "Notification cancelled."
+msgstr "تم إلغاء الإشعار."
+
+msgid "Scheduled"
+msgstr "مجدول"
+
+msgid "Cancel this scheduled or queued notification?"
+msgstr "هل تريد إلغاء هذا الإشعار المجدول أو المنتظر؟"
+
+#~ msgid "Cannot accept a %(status)s application."
+#~ msgstr "لا يمكن قبول طلب حالته %(status)s."
+
+#, python-format
+#~ msgid "%(watched)s of %(total)s parts watched"
+#~ msgstr "%(watched)s من %(total)s أجزاء تمت مشاهدتها"
+
+#~ msgid "Overall progress"
+#~ msgstr "التقدم الإجمالي"
+
+#~ msgid "Lesson %(position)s of %(total)s - %(course)s"
+#~ msgstr "الدرس %(position)s من %(total)s - %(course)s"

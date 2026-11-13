@@ -32,7 +32,6 @@ from .utils.file_validator import downloadable_audio_key, validate_downloadable_
 from .utils.lesson_access import lesson_is_available
 from .utils.helpers import user_has_management_role
 from .utils.hls_parser import get_segment_number
-from .utils.storage_operations import generate_unique_url
 
 logger = logging.getLogger(__name__)
 
@@ -266,12 +265,6 @@ def resolve_media_link(
         media_key=media_key,
         part_id=str(part_id) if isinstance(part_id, str) else "",
     )
-
-
-def resolve_book_url(*, media: MediaLink, cloud_client, bucket_name: str) -> str | None:
-    if media.file_type != "book":
-        raise MediaAccessError("invalid_media", _("Invalid media file."))
-    return generate_unique_url(cloud_client, bucket_name, media.media_key, expires_in=3600)
 
 
 def resolve_audio_download(

@@ -20,6 +20,7 @@ from django.views.decorators.http import require_GET, require_POST, require_http
 from .announcements import (
     AnnouncementError,
     active_announcement_levels,
+    cancel_announcement,
     count_announcement_recipients,
     retry_announcement,
     send_announcement,
@@ -494,6 +495,7 @@ def notifications_management(request):
     status = 200
     if request.method == "POST":
         if form.is_valid():
+            scheduled_for = form.cleaned_data["scheduled_for"]
             try:
                 send_announcement(
                     actor=request.user,
@@ -502,12 +504,16 @@ def notifications_management(request):
                     action_label=form.cleaned_data["action_label"],
                     action_url=form.cleaned_data["action_url"],
                     level_ids=form.cleaned_data["levels"],
+                    scheduled_for=scheduled_for,
                 )
             except AnnouncementError as exc:
                 form.add_error(None, str(exc))
             else:
                 messages.success(
-                    request, _("Notification queued for delivery.")
+                    request,
+                    _("Notification scheduled for delivery.")
+                    if scheduled_for is not None
+                    else _("Notification queued for delivery."),
                 )
                 return redirect("notifications-management")
         status = 400
@@ -551,6 +557,19 @@ def announcement_retry(request, announcement_id):
         messages.error(request, str(exc))
     else:
         messages.success(request, _("Notification queued for delivery."))
+    return redirect("notifications-management")
+
+
+@capability_required(can_manage_academic_setup)
+@require_POST
+def announcement_cancel(request, announcement_id):
+    """Cancel one queued announcement before fan-out begins."""
+    try:
+        cancel_announcement(announcement_id, request.user)
+    except AnnouncementError as exc:
+        messages.error(request, str(exc))
+    else:
+        messages.success(request, _("Notification cancelled."))
     return redirect("notifications-management")
 
 

@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 import unicodedata
 from collections.abc import Iterable
-from datetime import timedelta
+from datetime import datetime, timedelta
 from urllib.parse import urlsplit
 
 from celery import current_app
@@ -25,6 +25,7 @@ from .models import (
     User,
 )
 from .student_notifications import TELEGRAM_NOTIFICATION_TASK
+from .utils.timezones import ensure_aware
 
 
 ANNOUNCEMENT_BATCH_SIZE = 500
@@ -182,6 +183,7 @@ def send_announcement(
     action_label: str,
     action_url: str,
     level_ids: Iterable[int] | None = None,
+    scheduled_for: datetime | None = None,
 ) -> Announcement:
     """Queue one announcement; the inbox fan-out runs in a background task."""
     _require_admin(actor)
@@ -189,6 +191,10 @@ def send_announcement(
     body = _clean_content(body, max_length=MAX_ANNOUNCEMENT_BODY)
     action_label, action_url = clean_announcement_action(action_label, action_url)
     levels = resolve_announcement_levels(level_ids or [])
+    if scheduled_for is not None:
+        scheduled_for = ensure_aware(scheduled_for)
+        if scheduled_for <= timezone.now():
+            raise AnnouncementError(_("Scheduled time must be in the future."))
 
     with transaction.atomic():
         academic_year = (
@@ -213,28 +219,31 @@ def send_announcement(
             body=body,
             action_label=action_label,
             action_url=action_url,
+            scheduled_for=scheduled_for,
         )
         if levels:
             announcement.levels.set(levels)
-        transaction.on_commit(
-            lambda: current_app.send_task(
-                ANNOUNCEMENT_FANOUT_TASK,
-                args=[announcement.pk],
+        if scheduled_for is None:
+            transaction.on_commit(
+                lambda: current_app.send_task(
+                    ANNOUNCEMENT_FANOUT_TASK,
+                    args=[announcement.pk],
+                )
             )
-        )
     logger.info(
         "announcement queued",
         extra={
             "event": "announcement_queued",
             "announcement_id": announcement.pk,
             "level_count": len(levels),
+            "scheduled_for": scheduled_for.isoformat() if scheduled_for else None,
         },
     )
     return announcement
 
 
 def _claim_announcement(announcement_id: int) -> Announcement | None:
-    """Claim one queued (or stale) announcement for exactly one worker."""
+    """Claim one due queued (or stale) announcement for exactly one worker."""
     now = timezone.now()
     stale_before = now - ANNOUNCEMENT_STALE_AFTER
     with transaction.atomic():
@@ -246,7 +255,10 @@ def _claim_announcement(announcement_id: int) -> Announcement | None:
         if announcement is None or announcement.status in (
             Announcement.Status.COMPLETED,
             Announcement.Status.FAILED,
+            Announcement.Status.CANCELLED,
         ):
+            return None
+        if announcement.scheduled_for is not None and announcement.scheduled_for > now:
             return None
         if (
             announcement.status == Announcement.Status.SENDING
@@ -350,6 +362,7 @@ def fan_out_announcement(announcement_id: int) -> int:
 def retry_announcement(announcement_id: int, actor: User) -> Announcement:
     """Requeue one failed announcement for another background attempt."""
     _require_admin(actor)
+    now = timezone.now()
     with transaction.atomic():
         announcement = (
             Announcement.objects.select_for_update()
@@ -363,14 +376,15 @@ def retry_announcement(announcement_id: int, actor: User) -> Announcement:
         Announcement.objects.filter(pk=announcement.pk).update(
             status=Announcement.Status.QUEUED,
             last_error="",
-            updated_at=timezone.now(),
+            updated_at=now,
         )
-        transaction.on_commit(
-            lambda: current_app.send_task(
-                ANNOUNCEMENT_FANOUT_TASK,
-                args=[announcement.pk],
+        if announcement.scheduled_for is None or announcement.scheduled_for <= now:
+            transaction.on_commit(
+                lambda: current_app.send_task(
+                    ANNOUNCEMENT_FANOUT_TASK,
+                    args=[announcement.pk],
+                )
             )
-        )
         announcement.status = Announcement.Status.QUEUED
     logger.info(
         "announcement retry queued",
@@ -379,15 +393,51 @@ def retry_announcement(announcement_id: int, actor: User) -> Announcement:
     return announcement
 
 
+def cancel_announcement(announcement_id: int, actor: User) -> Announcement:
+    """Cancel one queued announcement before fan-out begins."""
+    _require_admin(actor)
+    now = timezone.now()
+    with transaction.atomic():
+        announcement = (
+            Announcement.objects.select_for_update()
+            .filter(pk=announcement_id)
+            .first()
+        )
+        if announcement is None:
+            raise AnnouncementError(_("This notification does not exist."))
+        if announcement.status != Announcement.Status.QUEUED:
+            raise AnnouncementError(
+                _("Only queued notifications that have not started sending can be cancelled.")
+            )
+        Announcement.objects.filter(pk=announcement.pk).update(
+            status=Announcement.Status.CANCELLED,
+            last_error="",
+            updated_at=now,
+        )
+        announcement.status = Announcement.Status.CANCELLED
+        announcement.updated_at = now
+    logger.info(
+        "announcement cancelled",
+        extra={"event": "announcement_cancelled", "announcement_id": announcement.pk},
+    )
+    return announcement
+
+
 def pending_announcement_ids(limit: int) -> list[int]:
-    """Return queued or stale sending announcements for recovery."""
+    """Return due scheduled, stale queued, or stale sending announcements."""
     now = timezone.now()
     bounded = max(1, min(int(limit), ANNOUNCEMENT_RECOVERY_LIMIT))
     return list(
         Announcement.objects.filter(
             Q(
                 status=Announcement.Status.QUEUED,
+                scheduled_for__isnull=True,
                 updated_at__lt=now - ANNOUNCEMENT_RECOVERY_GRACE,
+            )
+            | Q(
+                status=Announcement.Status.QUEUED,
+                scheduled_for__isnull=False,
+                scheduled_for__lte=now,
             )
             | Q(
                 status=Announcement.Status.SENDING,

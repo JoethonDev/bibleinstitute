@@ -26,7 +26,7 @@ from .student_notifications import (
     is_active_published_lesson,
     is_active_published_quiz,
 )
-from .mobile_push_queries import active_push_devices
+from .mobile_push_queries import active_push_devices, expo_push_toggle_enabled
 from .telegram.broadcasts import (
     BroadcastError,
     _validate_target,
@@ -227,7 +227,11 @@ def execute_notification_redelivery(job, token) -> dict:
             ).filter(pk__in=[n.pk for n in batch]).order_by("pk"))
             locked_ids = [row.pk for row in locked_batch]
             eligible_ids = eligible_redelivery_notification_ids(locked_batch)
-            devices = list(active_push_devices().filter(user_id__in=[row.student_id for row in locked_batch]).only("pk", "user_id"))
+            devices = (
+                list(active_push_devices().filter(user_id__in=[row.student_id for row in locked_batch]).only("pk", "user_id"))
+                if expo_push_toggle_enabled()
+                else []
+            )
             by_student = defaultdict(list)
             for device in devices:
                 by_student[device.user_id].append(device)

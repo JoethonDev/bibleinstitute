@@ -1,12 +1,31 @@
 """Bounded device query scopes shared by push delivery and history reads."""
 
+from django.conf import settings
 from django.db.models import Count, Exists, F, OuterRef, Q, Subquery, Window
 from django.db.models.functions import Coalesce, RowNumber
 
-from .models import MobilePushDevice, PushDelivery
+from .models import MobilePushDevice, MobilePushSettings, PushDelivery
 
 
 MAX_DEVICES_PER_STUDENT = 10
+
+
+def expo_push_toggle_enabled() -> bool:
+    """Return the admin master switch state without forcing a database write."""
+    enabled = (
+        MobilePushSettings.objects.filter(singleton="default")
+        .values_list("expo_push_enabled", flat=True)
+        .first()
+    )
+    return True if enabled is None else bool(enabled)
+
+
+def is_expo_push_enabled() -> bool:
+    """Return True only when Expo Push is configured and enabled in admin settings."""
+    return (
+        bool(getattr(settings, "EXPO_PUSH_ACCESS_TOKEN", "").strip())
+        and expo_push_toggle_enabled()
+    )
 
 
 def missing_push_device_exists():

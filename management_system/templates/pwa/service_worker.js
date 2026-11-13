@@ -13,6 +13,22 @@ const PRECACHE_URLS = [
   "{% static 'pwa/pwa.css' %}?v={{ pwa_version|urlencode }}",
   "{% static 'pwa/offline-library.js' %}?v={{ pwa_version|urlencode }}",
   "{% static 'pwa/offline.html' %}",
+  "{% static 'vendor/pdfjs/3.11.174/pdf.min.js' %}?v={{ pwa_version|urlencode }}",
+  "{% static 'vendor/pdfjs/3.11.174/pdf.worker.min.js' %}?v={{ pwa_version|urlencode }}",
+  "{% static 'vendor/pdfjs/3.11.174/standard_fonts/FoxitDingbats.pfb' %}",
+  "{% static 'vendor/pdfjs/3.11.174/standard_fonts/FoxitFixed.pfb' %}",
+  "{% static 'vendor/pdfjs/3.11.174/standard_fonts/FoxitFixedBold.pfb' %}",
+  "{% static 'vendor/pdfjs/3.11.174/standard_fonts/FoxitFixedBoldItalic.pfb' %}",
+  "{% static 'vendor/pdfjs/3.11.174/standard_fonts/FoxitFixedItalic.pfb' %}",
+  "{% static 'vendor/pdfjs/3.11.174/standard_fonts/FoxitSerif.pfb' %}",
+  "{% static 'vendor/pdfjs/3.11.174/standard_fonts/FoxitSerifBold.pfb' %}",
+  "{% static 'vendor/pdfjs/3.11.174/standard_fonts/FoxitSerifBoldItalic.pfb' %}",
+  "{% static 'vendor/pdfjs/3.11.174/standard_fonts/FoxitSerifItalic.pfb' %}",
+  "{% static 'vendor/pdfjs/3.11.174/standard_fonts/FoxitSymbol.pfb' %}",
+  "{% static 'vendor/pdfjs/3.11.174/standard_fonts/LiberationSans-Bold.ttf' %}",
+  "{% static 'vendor/pdfjs/3.11.174/standard_fonts/LiberationSans-BoldItalic.ttf' %}",
+  "{% static 'vendor/pdfjs/3.11.174/standard_fonts/LiberationSans-Italic.ttf' %}",
+  "{% static 'vendor/pdfjs/3.11.174/standard_fonts/LiberationSans-Regular.ttf' %}",
   "{% static 'pwa/icons/icon-192.png' %}",
   "{% static 'pwa/icons/icon-512.png' %}",
 ];
@@ -67,7 +83,10 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  if (url.pathname.startsWith("/static/pwa/") || url.pathname === "/manifest.webmanifest") {
+  // Static assets are cache-first: the offline library must open a saved PDF
+  // with no network, so the vendored pdf.js reader is served from this cache
+  // (precached at install, refreshed on demand).
+  if (url.pathname.startsWith("/static/") || url.pathname === "/manifest.webmanifest") {
     event.respondWith(
       caches.match(request).then((cached) => {
         if (cached) return cached;

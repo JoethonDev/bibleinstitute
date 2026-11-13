@@ -5,8 +5,14 @@ It carries the breadcrumbs together with the page content so the
 #display-page innerHTML swap keeps them in sync.
 Admin page navigation also refreshes the persistent rail, contextual
 sidebar, mobile navigation and top-bar crumbs through hx-select-oob.
+
+hx-history-elt marks this element as the unit that HTMX history restore
+re-swaps on Back/Forward. Without it the runtime restores the whole <body>,
+which discards the shell (workspace rail, global confirmation modal, drawer,
+loading overlay) and leaves every cached script reference detached, so
+confirm dialogs stop appearing after history navigation.
 {% endcomment %}
-<div id="page-region">
+<div id="page-region" hx-history-elt>
     {% if breadcrumb_items and page_region_breadcrumbs != False %}
     {% include "partials/breadcrumbs.html" %}
     {% endif %}

@@ -233,8 +233,8 @@ from .media_delivery import (
     MediaAccessError,
     build_manifest_playlist,
     create_viewing_session,
+    open_book_document,
     resolve_audio_download,
-    resolve_book_url,
     resolve_media_link,
     sign_media_message,
     sign_session,
@@ -959,7 +959,7 @@ def view_lesson_details(request, offering_id, lesson_id):
         "management_preview": management_preview,
         "links": [{
             "url": reverse(
-                "lesson-manifest" if file.get("file_type") in {"video", "audio"} else "lesson-stream",
+                "lesson-manifest" if file.get("file_type") in {"video", "audio"} else "lesson-document",
                 args=[offering.pk, lesson_id, file_index],
             ),
             "name": file.get("name", ""),
@@ -1014,31 +1014,67 @@ def view_lesson_details(request, offering_id, lesson_id):
     return render(request, "lesson_stream.html", context)
 
 @login_required(login_url=LOGIN_URL)
-def stream_lesson(request, offering_id, lesson_id, file_index):
+@require_GET
+def lesson_document(request, offering_id, lesson_id, file_index):
+    """Stream one authorized lesson PDF through the app, never an object-store URL.
+
+    The reader loads the document with same-origin credentials and Range
+    requests, so every read is re-authorized here and the storage key never
+    reaches the browser. `allow_unpublished` only widens access for management
+    roles, which need it to preview drafts from the lesson editor.
+    """
     try:
         media = resolve_media_link(
             user=request.user,
             offering_id=offering_id,
             lesson_id=lesson_id,
             file_index=file_index,
+            allowed_types=("book",),
             allow_unpublished=True,
         )
     except MediaAccessError as exc:
         if exc.code == "forbidden":
             raise PermissionDenied(exc.message)
-        raise Http404
-    if media.file_type == "book":
-        return JsonResponse({
-            "url": resolve_book_url(
-                media=media,
-                cloud_client=CLOUD_CLIENT,
-                bucket_name=bucket_name,
-            )
-        })
-    return JsonResponse(
-        {"error": _("Media playback requires a viewing session.")},
-        status=410,
+        if exc.code == "not_found":
+            raise Http404(exc.message)
+        return JsonResponse({"error": exc.message}, status=400)
+    try:
+        document = open_book_document(
+            media=media,
+            range_header=request.headers.get("Range", ""),
+            cloud_client=CLOUD_CLIENT,
+            bucket_name=bucket_name,
+        )
+    except MediaAccessError as exc:
+        if exc.code in {"invalid_range", "invalid_media"}:
+            return JsonResponse({"error": exc.message}, status=400)
+        if exc.code == "range_not_satisfiable":
+            return HttpResponse(status=416)
+        return JsonResponse({"error": exc.message}, status=503)
+
+    body = document.body
+
+    def stream_chunks():
+        try:
+            yield from body.iter_chunks(chunk_size=64 * 1024)
+        finally:
+            body.close()
+
+    response = StreamingHttpResponse(
+        stream_chunks(),
+        status=document.status_code,
+        content_type=document.content_type,
     )
+    response["Cache-Control"] = "private, no-store, max-age=0"
+    response["Pragma"] = "no-cache"
+    response["X-Content-Type-Options"] = "nosniff"
+    response["Accept-Ranges"] = document.accept_ranges
+    response["Content-Disposition"] = "inline"
+    if document.content_length is not None:
+        response["Content-Length"] = str(document.content_length)
+    if document.content_range:
+        response["Content-Range"] = document.content_range
+    return response
     
 
 @login_required(login_url=LOGIN_URL)
@@ -1527,6 +1563,34 @@ def _content_filter_fields(*, scope, academic_years, selected_year, subjects):
             "value": str(scope["offering"]) if scope["offering"] else "",
             "all_label": _("All Courses"),
             "groups": subjects,
+        },
+    ]
+
+
+def _quiz_content_filter_fields(scope):
+    """Return the quiz-only level and quiz-type filter bar entries."""
+    level_options = [
+        {"value": str(level.ordering), "label": level.display_name}
+        for level in Level.objects.order_by("ordering")
+    ]
+    quiz_type_options = [
+        {"value": quiz_type.code, "label": quiz_type.name_en or quiz_type.code}
+        for quiz_type in QuizType.objects.filter(code__in=QUIZ_TYPE_CODES).order_by("code")
+    ]
+    return [
+        {
+            "name": "level",
+            "label": _("Level"),
+            "value": str(scope["level"]) if scope["level"] is not None else "",
+            "all_label": _("All levels"),
+            "options": level_options,
+        },
+        {
+            "name": "quiz_type",
+            "label": _("Quiz Type"),
+            "value": scope["quiz_type"],
+            "all_label": _("All quiz types"),
+            "options": quiz_type_options,
         },
     ]
 
@@ -2636,7 +2700,7 @@ def lesson_dashboard(request):
     except ValidationError as exc:
         return HttpResponse("; ".join(str(message) for message in exc.messages), status=400)
 
-    scope = content_scope(request, year_id=selected_year.pk)
+    scope = content_scope(request, year_id=selected_year.pk, view="lesson")
     lessons = lesson_queryset(scope).select_related(
         "course_offering__course",
         "course_offering__academic_year_level__level",
@@ -2804,13 +2868,20 @@ def _edit_lesson(request: HttpRequest, lesson: Lesson | None = None) -> HttpResp
                     and saved.status == PublicationStatus.PUBLISHED
                     and previous_notification_facts != current_notification_facts
                 )
+                unpublish = (
+                    bool(saved.pk)
+                    and previous_status == PublicationStatus.PUBLISHED
+                    and saved.status != PublicationStatus.PUBLISHED
+                )
                 publish = saved.status == PublicationStatus.PUBLISHED and (
                     not saved.pk or previous_status != PublicationStatus.PUBLISHED or reschedule
                 )
                 if publish:
                     saved.publication_event_version += 1
                 saved.save()
-                if publish:
+                if unpublish:
+                    cancel_future_lesson_publication_events(saved)
+                elif publish:
                     if reschedule:
                         cancel_future_lesson_publication_events(saved)
                     create_lesson_publication_event(saved)
@@ -4058,7 +4129,7 @@ def quiz_dashboard(request):
     except ValidationError as exc:
         return HttpResponse("; ".join(str(message) for message in exc.messages), status=400)
 
-    scope = content_scope(request, year_id=selected_year.pk)
+    scope = content_scope(request, year_id=selected_year.pk, view="quiz")
     quizzes = quiz_queryset(scope).annotate(
         submissions_count=Count("grade", distinct=True),
         question_count=Count("questions", distinct=True),
@@ -4070,24 +4141,28 @@ def quiz_dashboard(request):
     )
     status_counts = content_status_counts(view, scope)
     subjects = _content_offering_filter_options(selected_year.pk)
+    filter_fields = _content_filter_fields(
+        scope=scope,
+        academic_years=academic_years,
+        selected_year=selected_year,
+        subjects=subjects,
+    )
+    filter_fields.extend(_quiz_content_filter_fields(scope))
 
     logger.info(
-        "User %s filters quizzes using %s name, academic year %s, %s course and %s status",
+        "User %s filters quizzes using %s name, academic year %s, %s course, %s level, %s quiz type and %s status",
         user,
         scope["search"],
         selected_year.pk,
         scope["offering"],
+        scope["level"],
+        scope["quiz_type"],
         scope["status"],
     )
 
     context = {
         "name_value" : scope["search"],
-        "filter_fields": _content_filter_fields(
-            scope=scope,
-            academic_years=academic_years,
-            selected_year=selected_year,
-            subjects=subjects,
-        ),
+        "filter_fields": filter_fields,
         "filter_tabs": _content_status_tabs(
             request, view=view, scope=scope, counts=status_counts
         ),
@@ -4987,7 +5062,12 @@ def submission_user(request, quiz_id, user_id):
             grade_student.get_full_name() or grade_student.username
         )
 
-        return render(request, "submission_detail.html", {
+        # HTMX navigation targets #display-page and selects #page-region, so the
+        # submission detail must answer through render_page() like every other
+        # admin page; a bare render() returned the whole shell and the swap
+        # silently dropped it. Breadcrumbs are omitted in both render modes,
+        # matching the full-page template's empty breadcrumbs block.
+        return render_page(request, "submission_detail.html", "partials/submission_detail_content.html", {
             "quiz_name": quiz.name,
             "username": student_label,
             "questions": questions,
@@ -4997,6 +5077,7 @@ def submission_user(request, quiz_id, user_id):
             "id": "content",
             "total_grade": grade.total_grade,
             "back_url": reverse("submission-dashboard", args=[quiz_id, ]),
+            "page_region_breadcrumbs": False,
         })
     
     elif request.method == "POST":

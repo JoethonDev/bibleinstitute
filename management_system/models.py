@@ -694,6 +694,7 @@ class Announcement(models.Model):
         SENDING = "sending", _("Sending")
         COMPLETED = "completed", _("Completed")
         FAILED = "failed", _("Failed")
+        CANCELLED = "cancelled", _("Cancelled")
 
     academic_year = models.ForeignKey(
         "AcademicYear",
@@ -722,6 +723,7 @@ class Announcement(models.Model):
         choices=Status.choices,
         default=Status.QUEUED,
     )
+    scheduled_for = models.DateTimeField(null=True, blank=True)
     recipient_count = models.PositiveIntegerField(default=0)
     completed_at = models.DateTimeField(null=True, blank=True)
     last_error = models.CharField(max_length=500, blank=True, default="")
@@ -749,6 +751,7 @@ class Announcement(models.Model):
         indexes = [
             models.Index(fields=["-created_at", "-id"], name="announcement_recent_idx"),
             models.Index(fields=["status", "updated_at"], name="announcement_status_idx"),
+            models.Index(fields=["status", "scheduled_for"], name="announcement_sched_idx"),
         ]
 
     def __str__(self):
@@ -3550,6 +3553,32 @@ class MobileDownloadPolicy(models.Model):
 
     @classmethod
     def load(cls) -> "MobileDownloadPolicy":
+        return cls.objects.get_or_create(singleton="default")[0]
+
+
+class MobilePushSettings(models.Model):
+    """Backend-controlled master switch for Expo mobile push delivery."""
+
+    singleton = models.CharField(max_length=20, unique=True, default="default", editable=False)
+    expo_push_enabled = models.BooleanField(default=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    updated_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="mobile_push_settings_updates",
+    )
+
+    class Meta:
+        verbose_name = _("Mobile Push Settings")
+        verbose_name_plural = _("Mobile Push Settings")
+
+    def __str__(self):
+        return str(_("Mobile Push Settings"))
+
+    @classmethod
+    def load(cls) -> "MobilePushSettings":
         return cls.objects.get_or_create(singleton="default")[0]
 
 

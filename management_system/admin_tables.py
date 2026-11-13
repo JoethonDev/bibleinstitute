@@ -26,7 +26,9 @@ from .models import (
     Lesson,
     Level,
     PublicationStatus,
+    QUIZ_TYPE_CODES,
     Quiz,
+    QuizType,
     Role,
     User,
 )
@@ -182,7 +184,7 @@ def course_queryset(scope: dict[str, Any]) -> QuerySet:
     return Course.objects.select_related("level").filter(query)
 
 
-def content_scope(request, *, year_id: int) -> dict[str, Any]:
+def content_scope(request, *, year_id: int, view: str) -> dict[str, Any]:
     """Normalize the lesson/quiz dashboard filters for one selected academic year."""
     search = _clean_search(request.GET.get("name"))
     raw_offering = str(request.GET.get("course") or "").strip()
@@ -195,12 +197,30 @@ def content_scope(request, *, year_id: int) -> dict[str, Any]:
     status = str(request.GET.get("status") or "").strip()[:24]
     if status not in PublicationStatus.values:
         status = ""
-    return {
+    scope: dict[str, Any] = {
         "year": int(year_id),
         "search": search,
         "offering": offering_id,
         "status": status,
     }
+    if view == "quiz":
+        scope.update(_quiz_content_scope_filters(request))
+    return scope
+
+
+def _quiz_content_scope_filters(request) -> dict[str, Any]:
+    """Normalize the quiz-only level and quiz-type filters.
+
+    Both values are checked against stored rows before they reach a queryset,
+    so a stale or crafted query string filters nothing instead of failing.
+    """
+    level_ordering = _int_or_none(str(request.GET.get("level") or "").strip()[:12])
+    if level_ordering is None or not Level.objects.filter(ordering=level_ordering).exists():
+        level_ordering = None
+    quiz_type = str(request.GET.get("quiz_type") or "").strip()[:32]
+    if quiz_type not in QUIZ_TYPE_CODES or not QuizType.objects.filter(code=quiz_type).exists():
+        quiz_type = ""
+    return {"level": level_ordering, "quiz_type": quiz_type}
 
 
 def content_status_counts(view: str, scope: dict[str, Any]) -> dict[str, int]:
@@ -246,6 +266,12 @@ def quiz_queryset(scope: dict[str, Any]) -> QuerySet:
     status = str(scope.get("status") or "")
     if status:
         query &= Q(status=status)
+    level_ordering = _int_or_none(scope.get("level"))
+    if level_ordering is not None:
+        query &= Q(course_offering__academic_year_level__level__ordering=level_ordering)
+    quiz_type = str(scope.get("quiz_type") or "")
+    if quiz_type:
+        query &= Q(quiz_type__code=quiz_type)
     return Quiz.objects.filter(query)
 
 

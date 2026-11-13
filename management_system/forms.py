@@ -1605,6 +1605,17 @@ class AnnouncementForm(AwForm):
             }
         ),
     )
+    scheduled_for = forms.CharField(
+        required=False,
+        label=_("Send at (optional)"),
+        help_text=_("Leave blank to send immediately, or choose a future Cairo date and time."),
+        widget=forms.DateTimeInput(
+            attrs={
+                "type": "datetime-local",
+                "dir": "ltr",
+            }
+        ),
+    )
     levels = forms.MultipleChoiceField(
         required=False,
         label=_("Target levels"),
@@ -1633,6 +1644,18 @@ class AnnouncementForm(AwForm):
 
     def clean_body(self) -> str:
         return self._clean_required_text("body")
+
+    def clean_scheduled_for(self):
+        value = (self.cleaned_data.get("scheduled_for") or "").strip()
+        if not value:
+            return None
+        try:
+            scheduled = parse_application_datetime(value)
+        except (TypeError, ValueError):
+            raise ValidationError(_("Enter a valid date and time."))
+        if scheduled <= timezone.now():
+            raise ValidationError(_("Scheduled time must be in the future."))
+        return scheduled
 
     def clean(self):
         cleaned_data = super().clean()

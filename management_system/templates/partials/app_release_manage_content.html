@@ -151,6 +151,42 @@ no endpoint was invented.
         </form>
     </section>
 
+    <section class="aw-card">
+        <div class="aw-card-head">
+            <div class="aw-card-title">
+                <svg class="aw-ico" aria-hidden="true"><use href="#i-bell"></use></svg>
+                <h3>{% translate "Expo mobile push notifications" %}</h3>
+            </div>
+        </div>
+        <div class="aw-card-body aw-card-body--tight">
+            <div class="aw-alert aw-alert--info" role="note">
+                <svg class="aw-ico" aria-hidden="true"><use href="#i-alert"></use></svg>
+                <div>
+                    {% translate "Turn off Expo mobile push to stop sending push notifications to the mobile app through Expo while keeping web push, Telegram, and the student bell active." %}
+                    {% if not expo_token_configured %}
+                    <span class="aw-cell-sub">{% translate "No Expo access token is configured on the server; Expo pushes will stay inactive even when turned on." %}</span>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        <form method="post" action="{% url 'app-release-manage' %}" hx-post="{% url 'app-release-manage' %}" hx-target="#content" hx-swap="outerHTML" hx-select="#content" hx-select-oob="#toast-stack" hx-push-url="true">
+            {% csrf_token %}
+            <input type="hidden" name="push_policy" value="1">
+            <div class="aw-form-section">
+                <div class="aw-stack">
+                    <label class="aw-switch">
+                        <input type="checkbox" id="id_expo_push_enabled" name="expo_push_enabled" value="1"{% if push_settings.expo_push_enabled %} checked{% endif %}>
+                        <span class="aw-switch-track" aria-hidden="true"></span>
+                        <span>{% translate "Enable Expo mobile push notifications" %}</span>
+                    </label>
+                </div>
+                <div class="aw-form-actions">
+                    <button type="submit" class="aw-btn aw-btn--primary aw-btn--sm">{% translate "Save push setting" %}</button>
+                </div>
+            </div>
+        </form>
+    </section>
+
     {% if show_form %}
     <section class="aw-card">
         <div class="aw-card-head">

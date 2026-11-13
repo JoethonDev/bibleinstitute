@@ -127,6 +127,11 @@ def _projection(family: str, *, ids: list[str] | None = None, search: str = "", 
         total = F("recipient_count")
         processed = Case(When(status="completed", then=F("recipient_count")), default=Value(0))
         target, error_field = F("title"), "last_error"
+        next_poll = F("scheduled_for")
+        phase = Case(
+            When(status=Announcement.Status.QUEUED, scheduled_for__gt=timezone.now(), then=Value("scheduled")),
+            default=Value(""),
+        )
     elif family == "telegram":
         query = query.exclude(status=TelegramBroadcast.Status.DRAFT)
         processed, total = F("sent_count") + F("failed_count") + F("skipped_count"), F("recipient_count")
@@ -299,7 +304,11 @@ def readable_job(row: dict) -> dict:
                          or (job["status"] == "completed" and job["attachment"] == "pending"))
     job["phase_label"] = " / ".join(note for note in notes if note)
     if family == "announcement":
-        job["phase_label"] = str(_("Inbox generation; view notification history for delivery receipts."))
+        job["phase_label"] = (
+            str(_("Scheduled for later"))
+            if job["phase"] == "scheduled"
+            else str(_("Inbox generation; view notification history for delivery receipts."))
+        )
     if family == "notification" and job["phase"] == "scheduled":
         job["phase_label"] = str(_("Scheduled for later"))
     job["target"] = (job["target"] or "").strip(" / ") or str(_("Not specified"))

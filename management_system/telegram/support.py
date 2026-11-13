@@ -547,6 +547,131 @@ def _message_text(message: TelegramMessage) -> str:
     return body
 
 
+def _digest_attachment_source(attachment: TelegramAttachment):
+    """Return the Telegram send handle for one stored digest attachment.
+
+    A file id is reused when the student sent the media through Telegram and
+    the same bot stored it. Media uploaded from the website has no provider
+    file id, so its bounded private copy is read here and uploaded by the bot.
+    The bucket is the support bucket on the canonical
+    ``TELEGRAM_R2_BUCKET_NAME`` setting; there is no media-bucket fallback
+    because support storage is deliberately separate. Returns ``None`` when
+    the bytes cannot be prepared safely.
+    """
+    if attachment.telegram_file_id:
+        return str(attachment.telegram_file_id)
+    if attachment.media_type not in {"photo", "video", "voice", "audio", "document"}:
+        return None
+    if attachment.size_bytes and attachment.size_bytes > SUPPORT_MAX_MEDIA_BYTES:
+        return None
+    if not attachment.r2_key:
+        return None
+    client = _r2_client()
+    bucket = getattr(settings, "TELEGRAM_R2_BUCKET_NAME", "")
+    if client is None or not bucket:
+        return None
+    try:
+        response = client.get_object(Bucket=bucket, Key=attachment.r2_key)
+    except Exception:
+        logger.warning("Telegram support digest attachment read failed.")
+        return None
+    body = response.get("Body")
+    if body is None:
+        return None
+    try:
+        content = body.read(SUPPORT_MAX_MEDIA_BYTES + 1)
+    except Exception:
+        return None
+    finally:
+        try:
+            body.close()
+        except Exception:  # noqa: BLE001 - provider boundary
+            pass
+    if not content or len(content) > SUPPORT_MAX_MEDIA_BYTES:
+        return None
+    filename = safe_filename(
+        attachment.original_name,
+        f"support-{attachment.media_type}",
+    )
+    return telebot.types.InputFile(io.BytesIO(content), file_name=filename)
+
+
+def _send_digest_media(
+    bot: telebot.TeleBot,
+    chat_id: int,
+    media_kind: str,
+    media,
+    caption: str,
+):
+    """Send one digest attachment with the canonical caption."""
+    send_kwargs = {"caption": caption} if caption else {}
+    if media_kind == "photo":
+        return bot.send_photo(chat_id, media, **send_kwargs)
+    if media_kind == "video":
+        return bot.send_video(chat_id, media, **send_kwargs)
+    if media_kind == "voice":
+        return bot.send_voice(chat_id, media, **send_kwargs)
+    if media_kind == "audio":
+        return bot.send_audio(chat_id, media, **send_kwargs)
+    return bot.send_document(chat_id, media, **send_kwargs)
+
+
+def _send_digest(bot: telebot.TeleBot, chat_id: int, text: str, message: TelegramMessage):
+    """Deliver one support digest, forwarding the student's media.
+
+    A message that carries a supported attachment is forwarded as the real
+    photo/video/voice/audio/document with the digest text as its caption, so
+    an admin sees the media itself instead of a text-only summary. The single
+    digest row keeps referring to the one provider message, so deleting the
+    digest still removes the whole alert. When the media cannot be prepared the
+    digest still goes out as text rather than being lost.
+    """
+    attachments = list(message.attachments.all())
+    media = _digest_attachment_source(attachments[0]) if attachments else None
+    if media is None:
+        return bot.send_message(chat_id, text)
+    caption = text
+    if len(caption) > CAPTION_MAX_LENGTH:
+        caption = caption[: CAPTION_MAX_LENGTH - 3] + "..."
+    stream = getattr(media, "file", None)
+    try:
+        try:
+            return _send_digest_media(
+                bot, chat_id, attachments[0].media_type, media, caption
+            )
+        except Exception:
+            # WebM browser recordings and other provider-specific containers
+            # may be rejected by the dedicated endpoint; the same bytes are
+            # always deliverable as a document.
+            logger.warning(
+                "telegram_support_digest_media_fallback message=%s kind=%s",
+                message.pk,
+                attachments[0].media_type,
+            )
+        if stream is not None:
+            try:
+                stream.seek(0)
+            except Exception:  # noqa: BLE001 - provider boundary
+                return bot.send_message(chat_id, text)
+        try:
+            return _send_digest_media(bot, chat_id, "document", media, caption)
+        except Exception:
+            # Both attempts were refused, so degrade to the text alert instead
+            # of leaving the admin without the digest.
+            logger.warning(
+                "telegram_support_digest_document_failed message=%s kind=%s",
+                message.pk,
+                attachments[0].media_type,
+            )
+            return bot.send_message(chat_id, text)
+    finally:
+        if stream is not None:
+            try:
+                stream.close()
+            except Exception:  # noqa: BLE001 - provider boundary
+                pass
+
+
 def _admin_accounts():
     return TelegramAccount.objects.select_related("user", "user__role").filter(
         is_active=True,
@@ -679,7 +804,7 @@ def send_support_digest(bot: telebot.TeleBot, conversation_id: int, message_id: 
                     digest.delivery_error = ""
                     digest.save(update_fields=["text", "delivery_status", "delivery_error"])
             try:
-                result = bot.send_message(account.telegram_chat_id, text)
+                result = _send_digest(bot, account.telegram_chat_id, text, message)
                 telegram_message_id = getattr(result, "message_id", None)
                 if telegram_message_id is None:
                     raise ValueError("Telegram did not return a message identifier.")

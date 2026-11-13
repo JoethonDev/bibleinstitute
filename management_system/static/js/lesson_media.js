@@ -504,12 +504,12 @@
         };
 
         try {
-            const response = await fetch(viewer.dataset.url, {credentials: 'same-origin'});
-            if (!response.ok) throw new Error(`PDF request failed (${response.status})`);
-            const result = await response.json();
-            if (disposed) return;
-            if (!result?.url) throw new Error('PDF source is unavailable');
-            loadingTask = pdfjsLib.getDocument(pdfDocumentOptions(result.url));
+            // The document endpoint streams the authorized PDF from the app
+            // origin. pdf.js sends the session cookie itself, so no
+            // object-store URL is ever handed to the browser.
+            const documentUrl = viewer.dataset.url;
+            if (!documentUrl) throw new Error('PDF source is unavailable');
+            loadingTask = pdfjsLib.getDocument(pdfDocumentOptions(documentUrl));
             pdfDoc = await loadingTask.promise;
             if (disposed) {
                 loadingTask.destroy();

@@ -101,7 +101,7 @@
                  every HTMX page navigation swaps them as one fragment; #content
                  alone is not enough because the breadcrumbs live outside it. -->
             <main id="display-page" class="aw-workspace">
-                <div id="page-region">
+                <div id="page-region" hx-history-elt>
                 {% block breadcrumbs %}{% include 'partials/breadcrumbs.html' %}{% endblock %}
                 {% block body %}
 {% include 'partials/today_content.html' %}

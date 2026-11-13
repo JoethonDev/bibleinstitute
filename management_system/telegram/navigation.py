@@ -335,8 +335,8 @@ def back_home_keyboard(back_action: str, *parts: int | str) -> telebot.types.Inl
 # ---------------------------------------------------------------------------
 
 # Only named routes verified in management_system/urls.py. Each accepts the
-# integer IDs a formatter has at hand; lesson-stream/lesson-manifest require a
-# file index and are therefore intentionally not used here.
+# integer IDs a formatter has at hand; the lesson document and manifest routes
+# require a file index and are therefore intentionally not used here.
 _TRUSTED_ROUTES = frozenset({"course-details", "lesson-details", "quiz-details"})
 
 

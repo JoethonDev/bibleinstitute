@@ -8,6 +8,166 @@ Earlier detailed evidence is preserved in the
 and the [5 November archive](docs/archive/2026-11-05/history/IMPLEMENTATION_MEMORY.md).
 Historical open/done statements there are superseded by the current disposition.
 
+## Scheduled notifications, announcement scheduling, Expo push toggle and offline PDF fonts
+
+Reported:
+- Scheduled lesson/quiz publishing timing needed end-to-end verification and any gaps closed (unpublishing a future published lesson left pending notifications alive).
+- Admin announcements (`Announcement`) needed an optional future `scheduled_for` date/time plus cancellation before dispatch.
+- Admins needed an admin-dashboard switch to disable Expo mobile push without disrupting Web Push, Telegram, or the student bell.
+- Offline PDF viewer font assets (`standard_fonts/`) needed service-worker precaching parity with the online pdf.js configuration for Arabic/standard PDF rendering.
+
+Changes and decisions:
+- Lesson unpublish fix (`views.py::_edit_lesson`): moving an already-published lesson to `draft` or `archived` now calls `cancel_future_lesson_publication_events(saved)`, cancelling pending future `StudentNotification`, `PushDelivery`, and `TelegramNotificationDelivery` rows consistently with `update_quiz`.
+- Scheduled announcements (`models.py::Announcement`, `announcements.py`, `forms.py::AnnouncementForm`, `notification_views.py`, `urls.py`, `admin_navigation.py`, `job_monitor.py`, `aw_ui.py`, `notifications_management_content.html`, `learning_platform/settings.py`):
+  - Migration `0125_announcement_schedule_and_mobile_push_settings` adds `Announcement.scheduled_for` (`DateTimeField`, nullable), `Announcement.Status.CANCELLED`, `announcement_sched_idx`, and `MobilePushSettings`.
+  - `AnnouncementForm.scheduled_for` accepts an optional Cairo local `datetime-local` value validated strictly in the future via `parse_application_datetime`. When set, `send_announcement` stores `scheduled_for` and does not enqueue immediate fan-out; `recover-pending-announcements` runs every 15s and `pending_announcement_ids` selects due `QUEUED` scheduled announcements without waiting for `ANNOUNCEMENT_RECOVERY_GRACE`. `_claim_announcement` refuses rows whose `scheduled_for > now` or status is `CANCELLED`.
+  - `cancel_announcement` + `announcement-cancel` POST route (`can_manage_academic_setup`, CSRF, `select_for_update`) cancel `QUEUED` announcements before fan-out starts.
+- Expo mobile push switch (`models.py::MobilePushSettings`, `admin.py`, `mobile_push_queries.py`, `mobile_push.py`, `notification_redelivery.py`, `portal_views.py`, `app_release_manage_content.html`):
+  - `MobilePushSettings` singleton (`expo_push_enabled`, default `True`) managed from `Site & Apps -> App Releases` (`app-release-manage` POST `push_policy=1` and `/admin/`).
+  - `is_expo_push_enabled()` gates `mobile_push._configured()` so `dispatch_due_mobile_push` and `process_mobile_push_receipts` become no-ops when disabled, and `expo_push_toggle_enabled()` stops `notification_redelivery` from queueing `PushDelivery` rows while keeping Web Push, Telegram, and in-app inbox active.
+- Offline PDF standard fonts (`templates/pwa/service_worker.js`):
+  - `PRECACHE_URLS` now precaches all 14 files under `vendor/pdfjs/3.11.174/standard_fonts/` using unversioned paths matching `window.pdfViewerAssets.standardFontDataUrl` so `caches.match(request)` hits offline.
+- Arabic translation catalog (`locale/ar/LC_MESSAGES/django.po`, `django.mo`): updated with the 16 new UI/validation strings and compiled via `compilemessages`.
+- Verification (disposable SQLite via `tmp/` harnesses; PostgreSQL/Docker/Redis unavailable offline):
+  - `tmp/scheduled_notifications/harness.py`: 34/34 checks passed (quiz/lesson opening scheduling across inbox/Telegram/mobile/web push, immediate lesson without `opening_date`, admin `quiz-create` and `lesson-create` HTTP POSTs, HTTP `lesson-update` unpublish cancellation, moving future date cancellation, scheduled `Announcement` HTTP create/hold-before-due/recovery-and-fanout-after-due/HTTP cancel, `app-release-manage` HTTP Expo push flag off/on blocking `PushDelivery` & receipts while keeping Web Push/Telegram/inbox, and `/service-worker.js` unversioned `standard_fonts/` precache check).
+  - Re-ran existing harnesses: `tmp/offline_pdf/harness.py` 15/15, `tmp/pdf_quiz_filters/smoke.py` 27/27, `tmp/telegram_digest/smoke.py` 24/24, `tmp/submission_detail/smoke.py` 14/14, `tmp/pwa_save_media/smoke.py` 16/16, `tmp/htmx_history/harness.py` 7/7, `tmp/quiz_spacing/harness.py` 6/6.
+
+## Offline lesson PDFs open inside the installed app
+
+Reported: lesson PDFs had to be saved like audio and then opened only inside
+the app while offline. Saving already worked (`pwa_save_media` stores the PDF
+as an encrypted blob), but opening used an `<iframe src="blob:...">` plus an
+"open file" link with `target="_blank"`, so on phones the document went to the
+device PDF viewer or a new tab and the reader could fail on a blank frame.
+
+- `static/pwa/offline-library.js`: a saved document is decrypted into memory and
+  rendered page by page on a canvas by the vendored pdf.js reader, with in-viewer
+  previous/next controls and a page counter. There is no blob URL, iframe, new
+  tab or `target="_blank"` link for documents; `closeViewer()` cancels the render
+  and destroys the document so the decrypted buffer is released. Audio keeps its
+  existing `<audio>` path.
+- `templates/pwa/offline_library.html` loads
+  `static/vendor/pdfjs/3.11.174/pdf.min.js` and supplies
+  `window.pdfViewerAssets` (worker, cmaps, standard fonts).
+- `templates/pwa/service_worker.js` precaches `pdf.min.js` and
+  `pdf.worker.min.js` with `pwa_version` and serves `/static/` cache-first, so
+  the reader itself is available offline; images, CSS and the library script
+  keep the same on-demand refresh.
+- `static/pwa/pwa.css`: `.pwa-pdf*` viewer styles replace the removed iframe and
+  open-link rules.
+- `views.lesson_document` keeps `allow_unpublished=True` (management only inside
+  `resolve_media_link`) so the lesson editor can still preview a draft PDF; the
+  endpoint is otherwise restricted to `allowed_types=("book",)` and streams the
+  same-origin document.
+- Verification: `tmp/offline_pdf/harness.py` 15/15 - saves the PDF through
+  `PWALibrary.save`, registers the real service worker, reloads with the network
+  forced offline, opens the item and asserts a rendering canvas (11585 dark
+  pixels), "Page 1 of 2" -> next page re-renders, no iframe, no link, no popup,
+  and the document is released on close.
+  `tmp/pwa_save_media/smoke.py` 16/16 (PDF bytes, attachment name, media header,
+  413/403/404/503 paths, audio unchanged) and `tmp/pdf_quiz_filters/smoke.py`
+  27/27 still pass. `manage.py check`, `makemigrations --check --dry-run`,
+  `compileall`, `audit_text_encoding`, `node --check` (including the rendered
+  service worker) and `git diff --check` are clean.
+- Known limits: cmaps (169 CJK files) are not precached; `standard_fonts/`
+  (14 files) are precached on install without query strings to match
+  `standardFontDataUrl`. iOS Safari and a real device were not exercised
+  (no runnable stack), and no PostgreSQL, Redis, or live Telegram bot was used.
+
+## Support digest media, quiz spacing, submission detail and HTMX history
+
+Reported: support alerts arriving in Telegram showed only text instead of the
+student's image/audio; the MCQ answer rows in the quiz editor had no spacing;
+the admin submissions view was broken; modal buttons stopped responding after
+HTMX navigation; all admin POST actions needed a readable audit.
+
+- `telegram/support.py`: `send_support_digest` now delivers one attachment
+  through `_send_digest`. A Telegram-hosted attachment reuses its
+  `telegram_file_id`; a website upload has no file id, so its bounded private
+  bytes are read from `TELEGRAM_R2_BUCKET_NAME` and re-uploaded as an
+  `InputFile`. The digest text becomes the caption (truncated to
+  `CAPTION_MAX_LENGTH`). A rejected media endpoint retries the same bytes as a
+document and any other failure still sends the text digest, so an alert is
+  never lost. The support bucket has no media-bucket fallback.
+- `static/css/admin_workspace.css`: `.mcq-choices` is a column flex list with an
+  8px gap and collapses when empty, so stacked answer rows are separated in both
+  the server-rendered and `buildChoiceRow()` editors.
+- `views.submission_user` (GET) answers through `render_page(...)` with
+  `partials/submission_detail_content.html` instead of a bare `render()`. The
+  row button targets `#display-page` and selects `#page-region`; the detail page
+  previously returned the whole shell, so the swap found no region and the row
+  appeared to do nothing. `page_region_breadcrumbs=False` keeps the full page
+  and the fragment consistent (the template renders no breadcrumbs).
+- `partials/page_region.html` and `admin_panel.html` mark `#page-region` with
+  `hx-history-elt`. HTMX 4 restore requests carry no `HX-Request` header, so the
+  server answers with the full page; without the marker the runtime replaced the
+  whole `<body>`, dropping the head scripts (`admin_shell.js`, Alpine) and every
+  cached shell reference, which left the confirmation modal and drawer dead
+  after Back/Forward.
+- Audit report: `docs/current/ADMIN_POST_ACTIONS_2026-11-13.md` lists all 76
+  POST-capable admin routes with gate, effect and control, generated by
+  `tmp/admin_post_audit/inventory.py` and `tmp/admin_post_audit/facts.py`.
+- Verification (no database needed): `tmp/telegram_digest/smoke.py` 23/23
+  (file-id reuse, R2 re-upload, voice endpoint, document fallback, oversize and
+  provider failures, unsupported types, caption truncation);
+  `tmp/quiz_spacing/harness.py` 6/6 browser measurements (block layout 0px ->
+  8px gaps, 8px input/button gap, empty list hidden);
+  `tmp/submission_detail/smoke.py` 14/14 (render_page contract, context, and a
+  rendered `#page-region` carrying the review form and no shell);
+  `tmp/htmx_history/harness.py` 7/7 (shell script runs once with the marker, the
+  rail and modal survive, confirmations still record after Back).
+  `manage.py check`, `makemigrations --check --dry-run`, `compileall`,
+  `audit_text_encoding` (841 files), `node --check` and `git diff --check` clean;
+  `tmp/pdf_quiz_filters/smoke.py` still 25/25.
+- Known gaps: the history restore replaces only `#page-region`, so the rail's
+  active highlight can lag after browser Back until the next navigation; the
+  student shell (`student_next/base.html`) has no `hx-history-elt` because its
+  navigation targets `#display-page` inside page templates, and no runnable
+  stack was available to verify a student-side change. Nothing here was
+  verified against PostgreSQL or a live Telegram bot.
+
+## Secure lesson-PDF streaming and quiz dashboard filters (13 November 2026)
+
+Reported bug: opening a lesson PDF handed the browser a presigned R2 URL, so
+the reader fetched the document straight from object storage instead of the
+app authorizing and streaming it.
+
+- `stream_lesson` and `media_delivery.resolve_book_url` are removed. The book
+  link in `view_lesson_details` now reverses `lesson-document`
+  (`offerings/<offering>/lesson/<lesson>/<file_index>/document/`).
+- New `views.lesson_document` (GET-only) authorizes through the canonical
+  `resolve_media_link(allowed_types=("book",))`, so the published and
+  availability gates apply, then reads the object with `open_book_document`
+  (bounded Range) and streams it from the app origin with
+  `Content-Disposition: inline`, `Accept-Ranges`, `X-Content-Type-Options:
+  nosniff`, `Cache-Control: private, no-store`. Forbidden/not-found/invalid/
+  unavailable map to 403/404/400/503 and an unsatisfiable range to 416.
+- `static/js/lesson_media.js` passes `viewer.dataset.url` to pdf.js directly
+  (pdf.js sends same-origin credentials) - no JSON hop and no storage URL.
+  The PWA save path already streamed through `pwa_save_media`; it is unchanged.
+- Quizzes dashboard filters: `admin_tables.content_scope(..., view=...)`
+  normalizes the new `level` (`Level.ordering`, validated against stored rows)
+  and `quiz_type` (`QuizType.code`, validated against `QUIZ_TYPE_CODES`) for the
+  quiz view only, and `quiz_queryset` applies both predicates. Counts, sorting,
+  signed bulk selections and durable quiz jobs therefore see the same rows.
+  `views._quiz_content_filter_fields` adds the two selects to the shared
+  `aw_filter_bar`; option labels match the existing Quiz Type column
+  (`name_en`) and level labels use `Level.display_name`.
+- Verification: `manage.py check` clean, `makemigrations --check --dry-run` no
+  changes, `compileall` and `node --check` clean, `audit_text_encoding` passed
+  (840 files). `tmp/pdf_quiz_filters/smoke.py` runs 25 checks: route reversal,
+  streamed bytes/headers/range/closed body, 206 response, 403/404/400/503/416
+  mapping, no object-store URL in the response, compiled filter SQL for the
+  level/quiz-type predicates, and the rendered filter bar selects/selected
+  options. The four filter labels already exist in the Arabic catalog.
+- Not verified: no PostgreSQL or Docker engine was available (`Docker Desktop`
+  did not start its VM and local SQLite migrations are blocked by the pgcrypto
+  guard in migration 0053), so a live lesson-PDF open, filter clicks and
+  `EXPLAIN` were not run. Next safe step with the dev stack up: open a book
+  lesson and confirm the network panel shows only same-origin `document/`
+  requests (with 206 ranges) and no `r2`/presigned host, then apply both quiz
+  filters and check the row count matches the tab counts.
+
 ## Quiz edits only re-announce real scope changes (11 November 2026)
 
 Editing a published quiz used to bump `Quiz.publication_event_version` and

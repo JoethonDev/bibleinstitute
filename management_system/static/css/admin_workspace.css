@@ -2973,7 +2973,16 @@ body.aw-admin .aw-file-row .aw-file-actions { display: flex; gap: 1px; }
 
 
 
-body.aw-admin .aw-choice-row .aw-input { flex: 1; }
+/* Quiz/question editor: stacked answer rows are separate blocks, so the gap
+   must be declared on the list rather than on each row. Without it the
+   choice inputs touch and the list reads as one field. */
+body.aw-admin .mcq-choices {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+body.aw-admin .mcq-choices:empty { display: none; }
+body.aw-admin .aw-choice-row .aw-input { flex: 1; min-width: 0; }
 
 /* --------------------------------------------------------------------------
    22. Files, folders, gallery, storage stats, scanner frame

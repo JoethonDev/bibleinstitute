@@ -36,8 +36,13 @@
     supported: "مدعوم",
     notSupported: "غير مدعوم في هذا المتصفح",
     close: "إغلاق",
-    openFile: "فتح الملف",
-    openFailed: "تعذر عرض الملف. جرّب فتحه في نافذة جديدة."
+    openFailed: "تعذر عرض الملف. أعد فتح المكتبة وحاول مرة أخرى.",
+    audio: "صوت",
+    pdf: "PDF",
+    prevPage: "الصفحة السابقة",
+    nextPage: "الصفحة التالية",
+    pageOf: "صفحة {page} من {total}",
+    loading: "جارٍ التحميل..."
   } : {
     saved: "Saved for offline use.",
     unlocked: "Downloads unlocked for this session.",
@@ -50,9 +55,16 @@
     supported: "Supported",
     notSupported: "Not supported on this browser",
     close: "Close",
-    openFile: "Open file",
-    openFailed: "Could not display the file. Try opening it in a new tab."
+    openFailed: "Could not display the file. Reopen the library and try again.",
+    audio: "Audio",
+    pdf: "PDF",
+    prevPage: "Previous page",
+    nextPage: "Next page",
+    pageOf: "Page {page} of {total}",
+    loading: "Loading..."
   };
+  const PDF_DEFAULT_WORKER = "/static/vendor/pdfjs/3.11.174/pdf.worker.min.js";
+  let pdfState = null;
   let dbPromise = null;
   let unlocked = false;
 
@@ -299,43 +311,185 @@
       URL.revokeObjectURL(viewerUrl);
       viewerUrl = "";
     }
+    const state = pdfState;
+    pdfState = null;
+    if (state) {
+      try {
+        if (state.task) state.task.cancel();
+      } catch (error) {
+        // A finished render cannot be cancelled; nothing to release.
+      }
+      try {
+        if (state.loading) state.loading.destroy();
+        else if (state.doc) state.doc.destroy();
+      } catch (error) {
+        // pdf.js releases its worker on its own if destroy already ran.
+      }
+    }
     if (VIEWER_CONTENT) VIEWER_CONTENT.replaceChildren();
     if (VIEWER) VIEWER.hidden = true;
   }
 
-  function showViewer(url, type, title) {
+  function showAudio(url, title) {
     if (!VIEWER || !VIEWER_CONTENT) return;
     closeViewer();
     viewerUrl = url;
     VIEWER.hidden = false;
-    if (VIEWER_TITLE) VIEWER_TITLE.textContent = title || (type === "audio" ? "Audio" : "PDF");
-    const content = document.createElement(type === "audio" ? "audio" : "iframe");
-    content.src = url;
-    if (type === "audio") {
-      content.controls = true;
-      content.autoplay = true;
-      content.preload = "auto";
-      content.playsInline = true;
-      content.addEventListener("error", () => setStatus(T.openFailed, true));
-    } else {
-      content.title = title || "PDF";
-    }
-    VIEWER_CONTENT.replaceChildren(content);
-    if (type !== "audio") {
-      const openLink = document.createElement("a");
-      openLink.className = "pwa-btn pwa-btn--small pwa-viewer-open";
-      openLink.href = url;
-      openLink.target = "_blank";
-      openLink.rel = "noopener";
-      openLink.textContent = T.openFile;
-      VIEWER_CONTENT.appendChild(openLink);
-    }
+    if (VIEWER_TITLE) VIEWER_TITLE.textContent = title || T.audio;
+    const audio = document.createElement("audio");
+    audio.src = url;
+    audio.controls = true;
+    audio.autoplay = true;
+    audio.preload = "auto";
+    audio.playsInline = true;
+    audio.addEventListener("error", () => setStatus(T.openFailed, true));
+    VIEWER_CONTENT.replaceChildren(audio);
     VIEWER.scrollIntoView({ behavior: "smooth", block: "start" });
-    if (type === "audio") {
-      content.load();
-      const playback = content.play();
-      if (playback && typeof playback.catch === "function") playback.catch(() => {});
+    audio.load();
+    const playback = audio.play();
+    if (playback && typeof playback.catch === "function") playback.catch(() => {});
+  }
+
+  function pdfLibrary() {
+    const library = window.pdfjsLib;
+    if (!library) return null;
+    const assets = window.pdfViewerAssets || {};
+    if (library.GlobalWorkerOptions) {
+      if (assets.workerSrc) library.GlobalWorkerOptions.workerSrc = assets.workerSrc;
+      else if (!library.GlobalWorkerOptions.workerSrc) {
+        library.GlobalWorkerOptions.workerSrc = PDF_DEFAULT_WORKER;
+      }
     }
+    return library;
+  }
+
+  /* Render the decrypted PDF on a canvas inside the app. No blob URL and no new
+     tab: the bytes exist only as a decrypted buffer handed to pdf.js, so the
+     document cannot be handed to the device PDF viewer or another app. */
+  function showPdf(bytes, title) {
+    if (!VIEWER || !VIEWER_CONTENT) return;
+    const library = pdfLibrary();
+    closeViewer();
+    VIEWER.hidden = false;
+    if (VIEWER_TITLE) VIEWER_TITLE.textContent = title || T.pdf;
+    VIEWER.scrollIntoView({ behavior: "smooth", block: "start" });
+    if (!library) {
+      setStatus(T.openFailed, true);
+      return;
+    }
+    const bar = document.createElement("div");
+    bar.className = "pwa-pdf-bar";
+    const previous = document.createElement("button");
+    previous.type = "button";
+    previous.className = "pwa-btn pwa-btn--small";
+    previous.textContent = T.prevPage;
+    previous.disabled = true;
+    const counter = document.createElement("span");
+    counter.className = "pwa-pdf-page";
+    counter.setAttribute("aria-live", "polite");
+    counter.textContent = T.loading;
+    const next = document.createElement("button");
+    next.type = "button";
+    next.className = "pwa-btn pwa-btn--small";
+    next.textContent = T.nextPage;
+    next.disabled = true;
+    bar.append(previous, counter, next);
+    const stage = document.createElement("div");
+    stage.className = "pwa-pdf-stage";
+    const canvas = document.createElement("canvas");
+    canvas.className = "pwa-pdf-canvas";
+    canvas.setAttribute("role", "img");
+    canvas.setAttribute("aria-label", title || T.pdf);
+    stage.appendChild(canvas);
+    const wrapper = document.createElement("div");
+    wrapper.className = "pwa-pdf";
+    wrapper.append(bar, stage);
+    VIEWER_CONTENT.replaceChildren(wrapper);
+
+    const state = { loading: null, doc: null, page: 1, total: 0, task: null, generation: 0 };
+    pdfState = state;
+    const sync = () => {
+      if (pdfState !== state) return;
+      previous.disabled = state.page <= 1;
+      next.disabled = state.page >= state.total;
+      counter.textContent = T.pageOf
+        .replace("{page}", String(state.page))
+        .replace("{total}", String(state.total));
+    };
+    const draw = async () => {
+      if (pdfState !== state || !state.doc) return;
+      state.generation += 1;
+      const generation = state.generation;
+      try {
+        if (state.task) state.task.cancel();
+      } catch (error) {
+        // The previous page already finished rendering.
+      }
+      state.task = null;
+      try {
+        const page = await state.doc.getPage(state.page);
+        if (pdfState !== state || generation !== state.generation) return;
+        const base = page.getViewport({ scale: 1 });
+        const available = Math.max(220, (stage.clientWidth || 320) - 2);
+        const scale = Math.min(available / base.width, 2.4);
+        const viewport = page.getViewport({ scale });
+        const ratio = Math.min(window.devicePixelRatio || 1, 2);
+        canvas.width = Math.max(1, Math.floor(viewport.width * ratio));
+        canvas.height = Math.max(1, Math.floor(viewport.height * ratio));
+        canvas.style.width = `${Math.floor(viewport.width)}px`;
+        canvas.style.height = `${Math.floor(viewport.height)}px`;
+        state.task = page.render({
+          canvasContext: canvas.getContext("2d", { alpha: false }),
+          viewport,
+          transform: ratio === 1 ? null : [ratio, 0, 0, ratio, 0, 0],
+        });
+        await state.task.promise;
+        if (pdfState !== state) return;
+        setStatus("", false);
+      } catch (error) {
+        if (pdfState !== state || (error && error.name === "RenderingCancelledException")) return;
+        setStatus(T.openFailed, true);
+      }
+    };
+    previous.addEventListener("click", () => {
+      if (state.page <= 1) return;
+      state.page -= 1;
+      sync();
+      draw();
+    });
+    next.addEventListener("click", () => {
+      if (state.page >= state.total) return;
+      state.page += 1;
+      sync();
+      draw();
+    });
+    const assets = window.pdfViewerAssets || {};
+    const options = { data: bytes, isEvalSupported: false };
+    if (assets.cMapUrl) {
+      options.cMapUrl = assets.cMapUrl;
+      options.cMapPacked = true;
+    }
+    if (assets.standardFontDataUrl) options.standardFontDataUrl = assets.standardFontDataUrl;
+    state.loading = library.getDocument(options);
+    state.loading.promise.then((doc) => {
+      if (pdfState !== state) {
+        try {
+          doc.destroy();
+        } catch (error) {
+          // The viewer was closed while the document was loading.
+        }
+        return;
+      }
+      state.doc = doc;
+      state.total = Math.max(1, doc.numPages || 1);
+      state.page = 1;
+      sync();
+      draw();
+    }).catch(() => {
+      if (pdfState !== state) return;
+      counter.textContent = "";
+      setStatus(T.openFailed, true);
+    });
   }
 
   async function openItem(item) {
@@ -352,8 +506,11 @@
         cipher
       );
       const mime = item.mime || (item.type === "audio" ? "audio/mpeg" : "application/pdf");
-      const blob = new Blob([plain], { type: mime });
-      showViewer(URL.createObjectURL(blob), item.type, item.title);
+      if (item.type === "audio") {
+        showAudio(URL.createObjectURL(new Blob([plain], { type: mime })), item.title);
+      } else {
+        showPdf(new Uint8Array(plain), item.title);
+      }
     } catch (error) {
       setStatus(error.message === "missing" ? T.missing : T.cancelled, true);
     }

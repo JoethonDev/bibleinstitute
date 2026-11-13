@@ -20,7 +20,7 @@ from django.views.decorators.http import require_POST
 
 from .announcements import AnnouncementError, clean_announcement_action
 from .mobile_versioning import MAX_VERSION_CODE, is_valid_update_url, normalize_platform
-from .models import MobileAppRelease, MobileAppUpdatePolicy, MobileDownloadPolicy, StudentBanner
+from .models import MobileAppRelease, MobileAppUpdatePolicy, MobileDownloadPolicy, MobilePushSettings, StudentBanner
 from .models import StudentMode
 from .student_experience.mode import resolve_student_mode
 from .student_experience.render import render_student_page
@@ -211,6 +211,19 @@ def _save_download_policy(request):
     return redirect("app-release-manage")
 
 
+def _save_push_policy(request):
+    """Save the Expo mobile push master switch."""
+    push_settings = MobilePushSettings.load()
+    push_settings.expo_push_enabled = bool(request.POST.get("expo_push_enabled"))
+    push_settings.updated_by = request.user if getattr(request.user, "is_authenticated", False) else None
+    push_settings.save()
+    messages.success(
+        request,
+        _("Expo mobile push enabled.") if push_settings.expo_push_enabled else _("Expo mobile push disabled."),
+    )
+    return redirect("app-release-manage")
+
+
 @capability_required(can_manage_academic_setup)
 def app_release_manage(request):
     if request.method == "POST":
@@ -218,6 +231,8 @@ def app_release_manage(request):
             return _save_update_policy(request)
         if request.POST.get("download_policy"):
             return _save_download_policy(request)
+        if request.POST.get("push_policy"):
+            return _save_push_policy(request)
         version_name = (request.POST.get("version_name") or "").strip()[:50]
         release_notes = (request.POST.get("release_notes") or "").strip()[:2000]
         try:
@@ -306,6 +321,8 @@ def app_release_manage(request):
         "releases_page_obj": releases_page_obj,
         "update_policies": policies,
         "download_policy": MobileDownloadPolicy.load(),
+        "push_settings": MobilePushSettings.load(),
+        "expo_token_configured": bool(getattr(settings, "EXPO_PUSH_ACCESS_TOKEN", "").strip()),
         # The inline card is the no-JS path (?new=1); the normal path opens the
         # shared drawer instead.
         "show_form": request.GET.get("new") == "1",
