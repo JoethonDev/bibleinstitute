@@ -8,6 +8,23 @@ Earlier detailed evidence is preserved in the
 and the [5 November archive](docs/archive/2026-11-05/history/IMPLEMENTATION_MEMORY.md).
 Historical open/done statements there are superseded by the current disposition.
 
+## Self-hosted Bootstrap and Font Awesome vendor assets
+
+Reported:
+- Every external/online frontend script, stylesheet, and font request needed to be downloaded, served from the server, and cached cleanly.
+
+Changes and decisions:
+- Audited `management_system/templates/`, `management_system/static/`, `learning_platform/`, `nginx/`, and `worker.js`: the only remaining online frontend script/stylesheet/font dependencies were Bootstrap 5.3.3 (`cdn.jsdelivr.net`) and Font Awesome 6.7.2 (`cdnjs.cloudflare.com`) in `management_system/templates/base.html` and `management_system/templates/admin_panel.html` (`htmx`, `alpine`, `chartjs`, `jsqr`, `pdfjs`, and `videojs` were already vendored locally).
+- Vendored SRI-verified upstream assets under `management_system/static/vendor/`:
+  - `vendor/bootstrap/5.3.3/css/bootstrap.rtl.min.css` (232,911 bytes), `vendor/bootstrap/5.3.3/css/bootstrap.min.css` (232,803 bytes), `vendor/bootstrap/5.3.3/js/bootstrap.bundle.min.js` (80,721 bytes).
+  - `vendor/fontawesome/6.7.2/css/all.min.css` (73,890 bytes) and all 8 `webfonts/fa-*.{ttf,woff2}` files (`fa-brands-400`, `fa-regular-400`, `fa-solid-900`, `fa-v4compatibility`).
+- Replaced CDN `<link>`/`<script>` tags in `management_system/templates/base.html` and `management_system/templates/admin_panel.html` with `{% static 'vendor/...' %}?v={{ static_asset_version }}` and dropped `integrity`/`crossorigin`/`referrerpolicy`. Versioned `?v=` URLs receive `expires 7d` + `Cache-Control: public, immutable` in `nginx/default.conf`, while unversioned `../webfonts/*` font fetches from `all.min.css` receive `expires 7d` + `public, max-age=0, must-revalidate`; `service_worker.js` also caches `/static/` on demand for PWA clients.
+- Verification (local Django / staticfiles checks; no live Nginx/Docker container run here):
+  - `python manage.py findstatic ...` resolved all 12 new vendored files under `management_system/static/vendor/`.
+  - `git grep` confirmed zero remaining `cdn.jsdelivr`/`cdnjs.cloudflare`/`unpkg.com`/`fonts.googleapis`/`fonts.gstatic` references or external `<script src>` / `<link rel="stylesheet">` tags in `management_system/templates/`.
+  - Rendered `base.html` and `admin_panel.html` in both `ar` (RTL) and `en` (LTR) and served all 12 files through `django.contrib.staticfiles.views.serve` (HTTP 200, `?v=18e7acdebb9c8dd4-45`, zero external scripts/stylesheets).
+  - Ran `tmp/htmx_history/harness.py` (7/7), `tmp/quiz_spacing/harness.py` (6/6), and `tmp/submission_detail/smoke.py` (14/14).
+
 ## Scheduled notifications, announcement scheduling, Expo push toggle and offline PDF fonts
 
 Reported:
