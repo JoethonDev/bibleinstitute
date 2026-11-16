@@ -5,7 +5,7 @@ import secrets
 
 from django.core.exceptions import ValidationError
 from django.db.models import Q
-from .models import User, Role, Course, AcademicYear, AcademicYearLevel, AttendancePolicy, CourseOffering, Enrollment, Level, QuizType, PromotionRule, HistoricalAcademicSummary, QUIZ_TYPE_CODES, SignupSettings, PublicationStatus, StudentExperienceOverride, StudentExperienceSettings, assign_academic_date
+from .models import User, Role, Course, AcademicYear, AcademicYearLevel, AttendancePolicy, CourseOffering, Enrollment, Level, QuizType, PromotionRule, HistoricalAcademicSummary, QUIZ_TYPE_CODES, SignupSettings, PublicationStatus, StudentExperienceOverride, StudentExperienceSettings, MediaDeliverySettings, assign_academic_date
 from .utils.validators import normalize_username, validate_identity_by_type, validate_unique_phone
 from .utils.application_uploads import validate_application_file
 from django.utils.translation import gettext_lazy as _ # Import gettext_lazy
@@ -1688,6 +1688,42 @@ class StudentExperienceSettingsForm(AwModelForm):
             "This is the default for students who inherit the global setting. "
             "Use the force action to apply it to every student and ignore per-account overrides."
         )
+
+
+class MediaDeliverySettingsForm(AwModelForm):
+    """Admin toggle between direct R2 302 redirects and the legacy Worker proxy."""
+
+    class Meta:
+        model = MediaDeliverySettings
+        fields = ["segment_delivery_mode"]
+        widgets = {
+            "segment_delivery_mode": forms.Select(attrs={"class": "aw-select"}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if not self.is_bound and not getattr(settings, "CLOUD_WORKER", "").rstrip("/"):
+            self.initial["segment_delivery_mode"] = (
+                MediaDeliverySettings.SegmentDeliveryMode.DIRECT_R2
+            )
+        self.fields["segment_delivery_mode"].label = _("HLS segment delivery mode")
+        self.fields["segment_delivery_mode"].help_text = _(
+            "Direct R2 presigned redirect (302) routes segment checks through Django "
+            "and redirects playback to short-lived R2 URLs while recording verified "
+            "segment progress on GET. Legacy Worker keeps routing segments through "
+            "the configured Cloudflare Worker."
+        )
+
+    def clean_segment_delivery_mode(self):
+        mode = self.cleaned_data["segment_delivery_mode"]
+        if (
+            mode == MediaDeliverySettings.SegmentDeliveryMode.WORKER
+            and not getattr(settings, "CLOUD_WORKER", "").rstrip("/")
+        ):
+            raise forms.ValidationError(
+                _("Cloudflare Worker URL (CLOUD_WORKER) is not configured in the environment.")
+            )
+        return mode
 
 
 class SignupSettingsForm(AwModelForm):

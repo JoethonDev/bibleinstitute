@@ -4,6 +4,7 @@
     const form = document.getElementById("quiz-form");
     if (!form) return;
 
+    const questionWrap = form.querySelector(".sn-question-wrap");
     const questions = Array.from(form.querySelectorAll("[data-question-card]"));
     const navButtons = Array.from(form.querySelectorAll("[data-qnav]"));
     const progressNode = document.getElementById("current-question");
@@ -11,6 +12,7 @@
     const dialog = document.getElementById("unansweredQuestionsFallback");
     let current = 1;
     let confirmedSubmit = false;
+    let transitionToken = 0;
 
     function questionIsAnswered(questionCard) {
         const answerSection = questionCard.querySelector(".answers-section");
@@ -51,23 +53,90 @@
         if (answered && number === current && warningNode) warningNode.hidden = true;
     }
 
-    function showQuestion(number, checkPrevious) {
+    function getStickyOffset() {
+        const examTop = form.querySelector(".sn-exam-top");
+        if (examTop) {
+            const stickyTop = parseFloat(window.getComputedStyle(examTop).top);
+            if (Number.isFinite(stickyTop)) {
+                return stickyTop + examTop.getBoundingClientRect().height + 14;
+            }
+            return Math.max(0, examTop.getBoundingClientRect().bottom) + 14;
+        }
+        const topBar = document.querySelector(".sn-topbar");
+        return topBar ? Math.max(0, topBar.getBoundingClientRect().bottom) + 14 : 16;
+    }
+
+    function scrollQuestionIntoView() {
+        const target = questionWrap || questions[current - 1];
+        if (!target || typeof window.scrollTo !== "function") return;
+        const targetRect = target.getBoundingClientRect();
+        const targetTop = Math.max(0, window.scrollY + targetRect.top - getStickyOffset());
+        const reducedMotion = Boolean(
+            window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches
+        );
+        window.scrollTo({
+            top: targetTop,
+            behavior: reducedMotion ? "auto" : "smooth",
+        });
+    }
+
+    function animateIncomingQuestion(questionCard) {
+        if (!questionCard) return;
+        const activeToken = transitionToken;
+        questionCard.classList.remove("is-entering");
+        // Reflow restarts the entrance keyframe cleanly inside the question container.
+        void questionCard.offsetWidth;
+        questionCard.classList.add("is-entering");
+        const cleanup = () => {
+            if (activeToken === transitionToken || questionCard.hidden) {
+                questionCard.classList.remove("is-entering");
+            }
+        };
+        questionCard.addEventListener("animationend", cleanup, { once: true });
+        window.setTimeout(cleanup, 320);
+    }
+
+    function showQuestion(number, checkPrevious, options = {}) {
         if (!questions.length) return;
         const previous = questions[current - 1];
         const next = Math.max(1, Math.min(questions.length, number));
-        if (checkPrevious && previous && next !== current && !questionIsAnswered(previous)) {
+        const changed = next !== current;
+        if (checkPrevious && previous && changed && !questionIsAnswered(previous)) {
             if (warningNode) warningNode.hidden = false;
         } else if (warningNode) {
             warningNode.hidden = true;
         }
         current = next;
+        transitionToken += 1;
+        let incoming = null;
         questions.forEach((questionCard) => {
-            questionCard.hidden = Number(questionCard.dataset.question) !== current;
+            const isCurrent = Number(questionCard.dataset.question) === current;
+            questionCard.hidden = !isCurrent;
+            if (isCurrent) {
+                incoming = questionCard;
+                if (!questionCard.hasAttribute("tabindex")) questionCard.setAttribute("tabindex", "-1");
+            } else {
+                questionCard.classList.remove("is-entering");
+            }
         });
         navButtons.forEach((button) => button.classList.toggle("is-current", Number(button.dataset.qnav) === current));
         if (progressNode) progressNode.textContent = String(current);
         form.querySelectorAll("[data-quiz-prev]").forEach((button) => { button.disabled = current === 1; });
         form.querySelectorAll("[data-quiz-next]").forEach((button) => { button.disabled = current === questions.length; });
+
+        if (options.animate && changed && incoming) {
+            animateIncomingQuestion(incoming);
+        }
+        if (options.scroll) {
+            scrollQuestionIntoView();
+            if (changed && incoming && typeof incoming.focus === "function") {
+                try {
+                    incoming.focus({ preventScroll: true });
+                } catch (_) {
+                    // Older engines without preventScroll should not interrupt smooth scrolling.
+                }
+            }
+        }
     }
 
     function moveOrderItem(button, direction) {
@@ -113,9 +182,15 @@
             button.setAttribute("aria-pressed", String(flagged));
         });
     });
-    form.querySelectorAll("[data-quiz-prev]").forEach((button) => button.addEventListener("click", () => showQuestion(current - 1, true)));
-    form.querySelectorAll("[data-quiz-next]").forEach((button) => button.addEventListener("click", () => showQuestion(current + 1, true)));
-    navButtons.forEach((button) => button.addEventListener("click", () => showQuestion(Number(button.dataset.qnav), true)));
+    form.querySelectorAll("[data-quiz-prev]").forEach((button) => {
+        button.addEventListener("click", () => showQuestion(current - 1, true, { animate: true, scroll: true }));
+    });
+    form.querySelectorAll("[data-quiz-next]").forEach((button) => {
+        button.addEventListener("click", () => showQuestion(current + 1, true, { animate: true, scroll: true }));
+    });
+    navButtons.forEach((button) => {
+        button.addEventListener("click", () => showQuestion(Number(button.dataset.qnav), true, { animate: true, scroll: true }));
+    });
     form.querySelector("[data-quiz-submit]")?.addEventListener("click", (event) => {
         event.preventDefault();
         showSubmitDialog();

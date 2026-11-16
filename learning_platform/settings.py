@@ -652,6 +652,10 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 CLOUD_WORKER = os.environ.get("CLOUD_WORKER", "").rstrip("/")
 MEDIA_WORKER_HMAC_SECRET = os.environ.get("WORKER_HMAC_SECRET") or SECRET_KEY
 WORKER_RECEIPT_SECRET = os.environ.get("WORKER_RECEIPT_SECRET") or MEDIA_WORKER_HMAC_SECRET
+MEDIA_PRESIGNED_URL_SECONDS = max(
+    30,
+    min(int(os.environ.get("MEDIA_PRESIGNED_URL_SECONDS", "60") or 60), 300),
+)
 TELEGRAM_ENCRYPTION_KEY = os.environ.get("TELEGRAM_ENCRYPTION_KEY") or SECRET_KEY
 R2_ENDPOINT_URL = os.environ.get("R2_ENDPOINT_URL") or os.environ.get("endpoint")
 R2_ACCESS_KEY_ID = os.environ.get("R2_ACCESS_KEY_ID") or os.environ.get("key_id")

@@ -489,6 +489,13 @@ ADMIN_DOMAINS: tuple[AdminDomain, ...] = (
                 icon="i-settings",
                 capability=can_manage_academic_setup,
             ),
+            AdminSection(
+                key="media-delivery",
+                label=_("Media Delivery"),
+                url_name="media-delivery-settings",
+                icon="i-video",
+                capability=can_manage_academic_setup,
+            ),
         ),
     ),
 )

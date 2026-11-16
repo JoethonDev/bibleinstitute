@@ -3,6 +3,9 @@
 Canonical filter bar: search + whitelisted selects + cleared state.
 Every control posts the same normalized query parameters to the owning
 view; the table container keeps its single canonical target.
+The search input must not be hx-preserved: it swaps only #table-container so
+it never replaces itself, while hx-preserve would restore the previously
+visited dashboard's element (and its hx-get URL) after a page navigation.
 {% endcomment %}
 <div class="aw-filter-bar">
     {% if filter_tabs %}
@@ -35,7 +38,6 @@ view; the table container keeps its single canonical target.
                    aria-label="{{ search_placeholder|default:_('Search') }}"
                    hx-get="{{ url }}?{% if request.GET.sort %}sort={{ request.GET.sort }}&order={{ request.GET.order }}{% endif %}"
                    hx-include=".filters-fields"
-                   hx-preserve
                    hx-trigger="input changed delay:200ms, search"
                    hx-target="#table-container"
                    hx-swap="innerHTML"

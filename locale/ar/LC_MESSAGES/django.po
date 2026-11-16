@@ -17355,6 +17355,60 @@ msgstr "كل السنوات الدراسية"
 msgid "Total grade"
 msgstr "الدرجة الكلية"
 
+msgid "Media Delivery"
+msgstr "توصيل الوسائط"
+
+msgid "Media Delivery Settings"
+msgstr "إعدادات توصيل الوسائط"
+
+msgid "Direct R2 presigned redirect (302)"
+msgstr "تحويل مباشر إلى R2 برابط موقع (302)"
+
+msgid "Cloudflare Worker proxy (legacy)"
+msgstr "وسيط Cloudflare Worker (القديم)"
+
+msgid "HLS segment delivery mode"
+msgstr "وضع تسليم مقاطع HLS"
+
+msgid "Active segment mode"
+msgstr "وضع المقاطع النشط"
+
+msgid "Presigned URL TTL"
+msgstr "مدة صلاحية الرابط الموقع"
+
+msgid "sec"
+msgstr "ثانية"
+
+msgid "Legacy Worker URL"
+msgstr "رابط Worker القديم"
+
+msgid "Configured"
+msgstr "مهيأ"
+
+msgid "Not configured"
+msgstr "غير مهيأ"
+
+msgid "Media delivery settings saved."
+msgstr "تم حفظ إعدادات توصيل الوسائط."
+
+msgid "Cloudflare Worker URL (CLOUD_WORKER) is not configured in the environment."
+msgstr "رابط Cloudflare Worker (CLOUD_WORKER) غير مضبوط في متغيرات البيئة."
+
+msgid "Direct R2 presigned redirect (302) routes segment checks through Django and redirects playback to short-lived R2 URLs while recording verified segment progress on GET. Legacy Worker keeps routing segments through the configured Cloudflare Worker."
+msgstr "التحويل المباشر إلى R2 برابط موقع (302) يتحقق من كل مقطع عبر Django ويسجل التقدم الموثق عند GET ثم يحول المشغل لرابط R2 قصير الصلاحية. أما وضع Worker القديم فيستمر في تمرير المقاطع عبر Cloudflare Worker."
+
+msgid "Switch HLS video and audio segment delivery between Django 302 R2 redirects and the legacy Cloudflare Worker without editing environment variables."
+msgstr "التبديل في تسليم مقاطع الفيديو والصوت HLS بين تحويل Django 302 إلى R2 ووضع Cloudflare Worker القديم دون تعديل متغيرات البيئة."
+
+msgid "CLOUD_WORKER is blank in the environment, so Direct R2 presigned redirect (302) is active automatically regardless of the saved toggle."
+msgstr "متغير CLOUD_WORKER فارغ في البيئة، لذلك يعمل التحويل المباشر إلى R2 (302) تلقائيا بصرف النظر عن الإعداد المحفوظ."
+
+msgid "Direct R2 presigned redirect (302) is active. Every segment GET verifies the signed token in Django, records progress in VerifiedSegmentRequest, and redirects to a short-lived R2 URL."
+msgstr "وضع التحويل المباشر إلى R2 (302) نشط. كل طلب GET لمقطع يتحقق من التوقيع في Django ويسجل التقدم في VerifiedSegmentRequest ثم يحول إلى رابط R2 قصير الصلاحية."
+
+msgid "Legacy Cloudflare Worker mode is active. Ensure R2 bucket CORS allows GET and HEAD from this site origin before switching to Direct R2 (302)."
+msgstr "وضع Cloudflare Worker القديم نشط. تأكد من أن إعدادات CORS لحاوية R2 تسمح بطلبات GET وHEAD من نطاق الموقع قبل التحويل إلى Direct R2 (302)."
+
 #~ msgid "Cannot accept a %(status)s application."
 #~ msgstr "لا يمكن قبول طلب حالته %(status)s."
 

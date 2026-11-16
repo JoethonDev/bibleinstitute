@@ -68,15 +68,35 @@
         return media?.closest?.('.sd-live-player') || media?.parentElement || null;
     }
 
-    function showMediaReloader(media) {
+    function clearMediaReloaderTimer(media) {
+        if (media?._mediaReloaderTimeoutId) {
+            window.clearTimeout(media._mediaReloaderTimeoutId);
+            media._mediaReloaderTimeoutId = null;
+        }
+    }
+
+    function showMediaReloader(media, mode = 'reloading') {
+        clearMediaReloaderTimer(media);
         const wrapper = mediaWrapper(media);
         if (!wrapper) return;
+        wrapper.dataset.mediaReloadState = mode;
         let overlay = wrapper.querySelector('.media-reload-overlay');
         if (!overlay) {
             overlay = document.createElement('div');
             overlay.className = 'media-reload-overlay';
             overlay.setAttribute('role', 'status');
             overlay.setAttribute('aria-live', 'polite');
+            wrapper.appendChild(overlay);
+        }
+        overlay.replaceChildren();
+        if (mode === 'failed') {
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.className = 'media-reload-retry';
+            button.textContent = translate('retry', 'Retry');
+            button.addEventListener('click', () => requestMediaRefresh(media, { force: true }));
+            overlay.appendChild(button);
+        } else {
             const spinner = document.createElement('div');
             spinner.className = 'media-reload-spinner';
             spinner.setAttribute('aria-hidden', 'true');
@@ -85,39 +105,69 @@
             label.textContent = translate('reloading', 'Loading...');
             overlay.appendChild(spinner);
             overlay.appendChild(label);
-            wrapper.appendChild(overlay);
         }
         wrapper.classList.add('is-media-reloading');
     }
 
+    function showMediaRetryPrompt(media) {
+        clearMediaReloaderTimer(media);
+        showMediaReloader(media, 'failed');
+    }
+
     function hideMediaReloader(media) {
+        clearMediaReloaderTimer(media);
         const wrapper = mediaWrapper(media);
         if (!wrapper) return;
         wrapper.classList.remove('is-media-reloading');
+        delete wrapper.dataset.mediaReloadState;
         const overlay = wrapper.querySelector('.media-reload-overlay');
         if (overlay) overlay.remove();
     }
 
-    function requestMediaRefresh(media) {
+    function requestMediaRefresh(media, { force = false } = {}) {
         const source = media?.querySelector('source');
-        const url = media?._mediaSourceUrl || source?.src;
-        if (!media || !url) return;
-        // Playback can outlive the signed token. Swap in a fresh session behind
-        // a spinner instead of surfacing the player error to the student.
-        showMediaReloader(media);
+        const url = media?._mediaSourceUrl || source?.src || '';
+        if (!media) return;
+        const now = Date.now();
+        if (
+            !force
+            && media._lastRefreshRequestUrl === url
+            && now - (media._lastRefreshRequestAt || 0) < 1200
+        ) {
+            return;
+        }
+        media._lastRefreshRequestUrl = url;
+        media._lastRefreshRequestAt = now;
+        // Playback can outlive a signed segment or R2 URL. Swap in a fresh
+        // viewing session behind a spinner instead of surfacing an error.
+        showMediaReloader(media, 'reloading');
         media.dispatchEvent(new CustomEvent('media-auth-expired', {
             bubbles: true,
-            detail: {element: media, sourceUrl: url},
+            detail: {element: media, sourceUrl: url, force: Boolean(force)},
         }));
     }
 
     function handleMediaError(media, player) {
         const error = player?.error?.() || media?.error;
+        if (!error || error?.code === 1) return;
         const status = mediaErrorStatus(error);
-        // Video.js/VHS reports failed segment requests as a generic network
-        // MediaError on some browsers, without exposing the HTTP status. The
-        // Worker answers an expired/invalid signed URL with 401 or 403.
-        if (status === 401 || status === 403 || error?.code === 2 || media?.error?.code === 2) {
+        // Video.js/VHS surfaces failed 302 -> R2 segment or manifest fetches as
+        // 401/403/5xx, status 0 network errors, or MEDIA_ERR_NETWORK (2) /
+        // MEDIA_ERR_DECODE (3) / MEDIA_ERR_SRC_NOT_SUPPORTED (4).
+        if (
+            status === 401
+            || status === 403
+            || status === 404
+            || status === 408
+            || status === 410
+            || status === 429
+            || status >= 500
+            || status === 0
+            || Number.isNaN(status)
+            || error.code === 2
+            || error.code === 3
+            || error.code === 4
+        ) {
             requestMediaRefresh(media);
         }
     }
@@ -149,8 +199,11 @@
 
     function armPlaybackRestore(media, preservePosition) {
         if (!preservePosition || !media) return null;
-        const currentTime = Number.isFinite(media.currentTime) ? media.currentTime : 0;
-        const wasPlaying = !media.paused && !media.ended;
+        const rawTime = Number.isFinite(media.currentTime) && media.currentTime > 0
+            ? media.currentTime
+            : Number(media._lastKnownTime);
+        const currentTime = Number.isFinite(rawTime) && rawTime > 0 ? rawTime : 0;
+        const wasPlaying = (!media.paused && !media.ended) || Boolean(media._wasActivelyPlaying);
         let restored = false;
         const restore = () => {
             if (restored) return;
@@ -219,7 +272,7 @@
         try {
             const player = media.player || videojs(media, videoJsOptions(media));
             player.controls(true);
-            if (preservePosition && typeof player.error === 'function') player.error(null);
+            if (typeof player.error === 'function') player.error(null);
             player.src({ src: url, type: 'application/x-mpegURL' });
             if (typeof player.seekButtons === 'function') {
                 player.seekButtons({ forward: 10, back: 10 });
@@ -240,10 +293,12 @@
     }
 
     function disposeMedia(media) {
+        clearMediaReloaderTimer(media);
         media._mediaErrorCleanup?.();
         const player = media.player;
         if (player && typeof player.dispose === 'function') player.dispose();
         media._mediaSourceUrl = null;
+        media._lastRefreshRequestUrl = null;
         media._lessonMediaInitialized = false;
     }
 
@@ -251,9 +306,11 @@
         container.querySelectorAll('video, audio').forEach(disposeMedia);
     }
 
-    function attachMediaSource(media, url, preservePosition = false) {
+    function attachMediaSource(media, url, preservePosition = false, forceReload = false) {
         const source = media?.querySelector('source');
-        if (!media || !source || !url || media._mediaSourceUrl === url) return;
+        if (!media || !source || !url) return;
+        if (media._mediaSourceUrl === url && !forceReload) return;
+        media._lastRefreshRequestUrl = null;
         armPlaybackRestore(media, preservePosition);
         source.src = url;
 
@@ -272,9 +329,32 @@
         media.setAttribute('controlsList', 'nodownload');
 
         const errorHandler = () => handleMediaError(media, media.player);
+        const timeHandler = () => {
+            if (!media.seeking && Number.isFinite(media.currentTime) && media.currentTime > 0) {
+                media._lastKnownTime = media.currentTime;
+            }
+        };
+        const playHandler = () => { media._wasActivelyPlaying = true; };
+        const pauseHandler = () => {
+            const wrapper = mediaWrapper(media);
+            if (!media.error && !media.player?.error?.() && !wrapper?.classList.contains('is-media-reloading')) {
+                media._wasActivelyPlaying = false;
+            }
+        };
+        const endedHandler = () => { media._wasActivelyPlaying = false; };
         media.addEventListener('error', errorHandler);
+        media.addEventListener('timeupdate', timeHandler);
+        media.addEventListener('play', playHandler);
+        media.addEventListener('playing', playHandler);
+        media.addEventListener('pause', pauseHandler);
+        media.addEventListener('ended', endedHandler);
         media._mediaErrorCleanup = () => {
             media.removeEventListener('error', errorHandler);
+            media.removeEventListener('timeupdate', timeHandler);
+            media.removeEventListener('play', playHandler);
+            media.removeEventListener('playing', playHandler);
+            media.removeEventListener('pause', pauseHandler);
+            media.removeEventListener('ended', endedHandler);
             delete media._mediaErrorCleanup;
         };
 
@@ -548,8 +628,10 @@
             media,
             event.detail?.url,
             Boolean(event.detail?.refresh),
+            Boolean(event.detail?.forceReload),
         );
         if (media) {
+            clearMediaReloaderTimer(media);
             const settle = () => {
                 media.removeEventListener('loadeddata', settle);
                 media.removeEventListener('canplay', settle);
@@ -559,9 +641,26 @@
             media.addEventListener('loadeddata', settle);
             media.addEventListener('canplay', settle);
             media.addEventListener('playing', settle);
-            // Absolute fallback so a spinner can never outlive a stalled load.
-            window.setTimeout(() => hideMediaReloader(media), 12000);
+            // Only clear an active spinner on timeout; keep a Retry button intact.
+            media._mediaReloaderTimeoutId = window.setTimeout(() => {
+                media.removeEventListener('loadeddata', settle);
+                media.removeEventListener('canplay', settle);
+                media.removeEventListener('playing', settle);
+                if (mediaWrapper(media)?.dataset.mediaReloadState === 'reloading') {
+                    hideMediaReloader(media);
+                }
+            }, 12000);
         }
+    });
+
+    document.addEventListener('media-recovery-starting', event => {
+        const media = event.detail?.element;
+        if (media) showMediaReloader(media, 'reloading');
+    });
+
+    document.addEventListener('media-recovery-failed', event => {
+        const media = event.detail?.element;
+        if (media) showMediaRetryPrompt(media);
     });
 
     function swapTarget(event) {

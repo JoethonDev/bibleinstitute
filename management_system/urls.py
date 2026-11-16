@@ -305,6 +305,7 @@ urlpatterns = [
     path('dashboard/applications/', applications_dashboard, name="applications-dashboard"),
     path('dashboard/signup-settings/', signup_settings, name="signup-settings"),
     path('dashboard/student-experience/', student_experience_settings, name="student-experience-settings"),
+    path('dashboard/media-delivery/', portal_extra_views.media_delivery_settings, name="media-delivery-settings"),
     path('dashboard/applications/<int:user_id>/', application_review, name="application-review"),
     path('dashboard/applications/<int:user_id>/document/<str:document_type>/', application_document, name="application-document"),
     path('dashboard/applications/<int:user_id>/delete/', application_delete, name="application-delete"),

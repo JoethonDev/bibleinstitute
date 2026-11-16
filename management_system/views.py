@@ -1,6 +1,6 @@
 # Django Core Imports
 from django.shortcuts import render, redirect, get_object_or_404
-from django.http import Http404, HttpRequest, HttpResponse, FileResponse, JsonResponse, StreamingHttpResponse
+from django.http import Http404, HttpRequest, HttpResponse, HttpResponseRedirect, FileResponse, JsonResponse, StreamingHttpResponse
 from django.urls import reverse, reverse_lazy
 from django.views.generic import CreateView, UpdateView, DeleteView, FormView, DetailView
 from django.utils.translation import gettext as _, gettext_lazy
@@ -231,6 +231,7 @@ from .media_delivery import (
     MEDIA_SEGMENT_TOKEN_LIFETIME,
     MEDIA_TOKEN_VERSION,
     MediaAccessError,
+    authorize_and_presign_segment,
     build_manifest_playlist,
     create_viewing_session,
     open_book_document,
@@ -8473,7 +8474,7 @@ def lesson_manifest(request, offering_id, lesson_id, file_index):
         lesson=media.lesson,
         part_id=media.part_id,
     )
-    if timezone.now() >= session.expires_at:
+    if session.ended_at is not None or timezone.now() >= session.expires_at:
         return JsonResponse({"error": _("Viewing session expired.")}, status=401)
     audience = getattr(request, "media_audience", "web")
     expected_channel = (
@@ -8502,15 +8503,63 @@ def lesson_manifest(request, offering_id, lesson_id, file_index):
         if exc.code == "forbidden":
             return JsonResponse({"error": exc.message}, status=403)
         return HttpResponse(status=404)
-    return HttpResponse(
+    response = HttpResponse(
         playlist,
         content_type="application/vnd.apple.mpegurl",
     )
+    response["Cache-Control"] = "private, no-store"
+    return response
+
+
+@require_http_methods(["GET", "HEAD"])
+def media_segment(request, session_id, segment_key):
+    """Authorize a signed HLS segment request, record proof on GET, and 302 to R2."""
+    session = (
+        ViewingSession.objects.select_related(
+            "student",
+            "student__role",
+            "lesson",
+            "lesson__course_offering",
+            "mobile_session",
+        )
+        .filter(session_id=session_id)
+        .first()
+    )
+    try:
+        presigned_url = authorize_and_presign_segment(
+            session=session,
+            request_user=request.user,
+            segment_key=segment_key,
+            token=request.GET.get("token", ""),
+            record_verified=(request.method == "GET"),
+            cloud_client=CLOUD_CLIENT,
+            bucket_name=bucket_name,
+        )
+    except MediaAccessError as exc:
+        status_map = {
+            "not_found": 404,
+            "unauthenticated": 401,
+            "expired": 401,
+            "forbidden": 403,
+            "unavailable": 503,
+        }
+        response = JsonResponse(
+            {"error": exc.message},
+            status=status_map.get(exc.code, 403),
+        )
+        response["Cache-Control"] = "private, no-store"
+        return response
+    response = HttpResponseRedirect(presigned_url)
+    response["Cache-Control"] = "private, no-store"
+    return response
 
 
 @csrf_exempt
 @require_POST
 def worker_receipt(request):
+    """Legacy Cloudflare Worker segment-receipt receiver (active when CLOUD_WORKER is set)."""
+    if not getattr(settings, "CLOUD_WORKER", ""):
+        return JsonResponse({"error": _("Legacy worker receipts are disabled.")}, status=403)
     try:
         data = json.loads(request.body)
     except json.JSONDecodeError:
@@ -8536,7 +8585,9 @@ def worker_receipt(request):
         or token_expires_at is None
     ):
         return JsonResponse({"error": _("Missing required fields.")}, status=400)
-    if request.headers.get("X-Worker-Secret") != settings.WORKER_RECEIPT_SECRET:
+    provided_secret = request.headers.get("X-Worker-Secret", "")
+    expected_secret = settings.WORKER_RECEIPT_SECRET or ""
+    if not expected_secret or not hmac.compare_digest(provided_secret, expected_secret):
         return JsonResponse({"error": _("Invalid worker credentials.")}, status=403)
     if not validate_hls_object_key(segment_key)[0]:
         return JsonResponse({"error": _("Invalid request format.")}, status=400)
@@ -8561,7 +8612,7 @@ def worker_receipt(request):
     if audience != expected_audience:
         return JsonResponse({"error": _("Invalid request signature.")}, status=403)
 
-    if timezone.now() >= session.expires_at:
+    if session.ended_at is not None or timezone.now() >= session.expires_at:
         return JsonResponse({"error": _("Session expired.")}, status=410)
 
     if token_expires_at > int(session.expires_at.timestamp()) or token_expires_at <= 0:

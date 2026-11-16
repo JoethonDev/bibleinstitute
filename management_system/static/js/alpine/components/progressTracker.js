@@ -1,4 +1,7 @@
 const PROGRESS_HEARTBEAT_INTERVAL_MS = 10000;
+const MAX_MEDIA_RECOVERY_RETRIES = 5;
+const MEDIA_RECOVERY_BASE_DELAY_MS = 2000;
+const MEDIA_RECOVERY_MAX_DELAY_MS = 15000;
 
 function progressTracker() {
     return {
@@ -18,8 +21,11 @@ function progressTracker() {
         interval: null,
         mediaRefreshTimer: null,
         mediaRefreshInFlight: false,
+        mediaRefreshFailures: 0,
+        mediaRecoveryPending: false,
         mediaRecoverySessionId: null,
         mediaAuthErrorHandler: null,
+        onlineHandler: null,
         destroyed: false,
         segmentTokenLifetimeSeconds: 600,
         heartbeatInFlight: false,
@@ -60,16 +66,33 @@ function progressTracker() {
             window.addEventListener('lecture-position-updated', this.positionHandler);
             this.mediaAuthErrorHandler = event => {
                 const detail = event.detail || {};
+                const force = Boolean(detail.force);
                 if (
-                    detail.sourceUrl !== this.mediaUrl
-                    || !this.sessionId
-                    || this.mediaRecoverySessionId === this.sessionId
+                    !force
+                    && detail.sourceUrl
+                    && this.mediaUrl
+                    && detail.sourceUrl !== this.mediaUrl
                 ) return;
-                this.mediaRecoverySessionId = this.sessionId;
-                this.refreshMediaSession();
+                if (this.destroyed || this.finalHeartbeatSent) return;
+                this.mediaRecoveryPending = true;
+                if (force) {
+                    this.mediaRefreshFailures = 0;
+                    this.mediaRecoverySessionId = null;
+                } else if (this.sessionId && this.mediaRecoverySessionId === this.sessionId) {
+                    return;
+                }
+                if (this.mediaRefreshInFlight) return;
+                this.mediaRecoverySessionId = this.sessionId || '__pending__';
+                this.refreshMediaSession({force});
             };
             this.$el.addEventListener('media-auth-expired', this.mediaAuthErrorHandler);
-            this.startSession();
+            this.onlineHandler = () => {
+                if (this.destroyed || this.finalHeartbeatSent || !this.mediaRecoveryPending) return;
+                this.mediaRefreshFailures = 0;
+                this.refreshMediaSession({force: true});
+            };
+            window.addEventListener('online', this.onlineHandler);
+            this.refreshMediaSession({initial: true, force: true});
             this.interval = setInterval(() => this.sendHeartbeat(), PROGRESS_HEARTBEAT_INTERVAL_MS);
             this.pageExitHandler = () => {
                 this.resetPlaybackSample();
@@ -79,7 +102,12 @@ function progressTracker() {
             window.addEventListener('pagehide', this.pageExitHandler);
             this.visibilityHandler = () => {
                 this.resetPlaybackSample();
-                if (document.hidden) this.sendHeartbeat();
+                if (document.hidden) {
+                    this.sendHeartbeat();
+                } else if (this.mediaRecoveryPending && !this.mediaRefreshInFlight) {
+                    this.mediaRefreshFailures = 0;
+                    this.refreshMediaSession({force: true});
+                }
             };
             document.addEventListener('visibilitychange', this.visibilityHandler);
         },
@@ -90,6 +118,7 @@ function progressTracker() {
             this.cancelMediaRefresh();
             if (this.pageExitHandler) window.removeEventListener('pagehide', this.pageExitHandler);
             if (this.visibilityHandler) document.removeEventListener('visibilitychange', this.visibilityHandler);
+            if (this.onlineHandler) window.removeEventListener('online', this.onlineHandler);
             if (this.progressUpdateHandler) {
                 window.removeEventListener('lecture-progress-updated', this.progressUpdateHandler);
             }
@@ -219,10 +248,16 @@ function progressTracker() {
             window.setTimeout(seek, 2000);
         },
 
-        async startSession({refresh = false} = {}) {
-            const response = await fetch(this.startSessionUrl);
-            if (!response.ok) {
-                throw new Error(`Viewing session request failed: ${response.status}`);
+        async startSession({refresh = false, forceReload = false} = {}) {
+            const response = await fetch(this.startSessionUrl, {
+                credentials: 'same-origin',
+                headers: {Accept: 'application/json'},
+            });
+            const contentType = response.headers?.get('content-type') || '';
+            if (!response.ok || (contentType && !contentType.includes('application/json'))) {
+                const err = new Error(`Viewing session request failed: ${response.status}`);
+                err.status = response.status;
+                throw err;
             }
             const data = await response.json();
             if (this.destroyed || this.finalHeartbeatSent) return;
@@ -239,6 +274,9 @@ function progressTracker() {
                 this.resumeSeconds = Math.max(0, Math.floor(data.resume_seconds));
             }
             this.mediaUrl = `${data.manifest_url}?session_id=${encodeURIComponent(data.session_id)}&token=${encodeURIComponent(data.token)}`;
+            this.mediaRefreshFailures = 0;
+            this.mediaRecoveryPending = false;
+            this.mediaRecoverySessionId = null;
             const media = this.$el.querySelector('video, audio');
             const source = media?.querySelector('source');
             if (media && source) {
@@ -248,20 +286,31 @@ function progressTracker() {
                 source.src = this.mediaUrl;
                 media.dispatchEvent(new CustomEvent('media-session-ready', {
                     bubbles: true,
-                    detail: { element: media, url: this.mediaUrl, refresh: refresh || hadSession },
+                    detail: {
+                        element: media,
+                        url: this.mediaUrl,
+                        refresh: refresh || hadSession,
+                        forceReload: Boolean(forceReload || refresh || hadSession),
+                    },
                 }));
             }
             this.scheduleMediaRefresh();
         },
 
-        scheduleMediaRefresh() {
+        scheduleMediaRefresh(delayOverrideMs = null) {
             this.cancelMediaRefresh();
-            if (this.destroyed || this.finalHeartbeatSent || !this.sessionId) return;
-            const refreshDelay = Math.max(
-                30000,
-                Math.floor(this.segmentTokenLifetimeSeconds * 1000 * 0.8),
+            if (this.destroyed || this.finalHeartbeatSent) return;
+            if (delayOverrideMs === null && !this.sessionId) return;
+            const refreshDelay = delayOverrideMs !== null
+                ? Math.max(1000, delayOverrideMs)
+                : Math.max(
+                    30000,
+                    Math.floor(this.segmentTokenLifetimeSeconds * 1000 * 0.8),
+                );
+            this.mediaRefreshTimer = setTimeout(
+                () => this.refreshMediaSession({force: delayOverrideMs !== null}),
+                refreshDelay,
             );
-            this.mediaRefreshTimer = setTimeout(() => this.refreshMediaSession(), refreshDelay);
         },
 
         cancelMediaRefresh() {
@@ -269,15 +318,54 @@ function progressTracker() {
             this.mediaRefreshTimer = null;
         },
 
-        async refreshMediaSession() {
-            if (this.destroyed || this.finalHeartbeatSent || !this.sessionId || this.mediaRefreshInFlight) return;
+        async refreshMediaSession({initial = false, force = false} = {}) {
+            if (this.destroyed || this.finalHeartbeatSent || this.mediaRefreshInFlight) return;
+            if (!initial && !force && !this.sessionId) return;
+            const media = this.$el.querySelector('video, audio');
+            // Avoid flushing active playback buffers on proactive 80% renewals;
+            // wait until paused or wait for expiry/error recovery to renew cleanly.
+            if (
+                !initial
+                && !force
+                && !this.mediaRecoveryPending
+                && media
+                && !media.paused
+                && !media.ended
+                && !media.error
+            ) {
+                this.scheduleMediaRefresh(60000);
+                return;
+            }
+            if (this.mediaRecoveryPending && media) {
+                media.dispatchEvent(new CustomEvent('media-recovery-starting', {
+                    bubbles: true,
+                    detail: {element: media},
+                }));
+            }
+            this.cancelMediaRefresh();
             this.mediaRefreshInFlight = true;
+            const shouldRefreshPosition = !initial && Boolean(this.sessionId);
             try {
-                await this.startSession({refresh: true});
-                this.mediaRecoverySessionId = null;
+                await this.startSession({
+                    refresh: shouldRefreshPosition,
+                    forceReload: shouldRefreshPosition || this.mediaRecoveryPending,
+                });
             } catch (error) {
                 console.warn('progressTracker: media token refresh failed', error);
-                this.scheduleMediaRefresh();
+                this.mediaRecoverySessionId = null;
+                this.mediaRefreshFailures += 1;
+                if (this.mediaRefreshFailures <= MAX_MEDIA_RECOVERY_RETRIES) {
+                    const backoffMs = Math.min(
+                        MEDIA_RECOVERY_MAX_DELAY_MS,
+                        MEDIA_RECOVERY_BASE_DELAY_MS * Math.pow(2, this.mediaRefreshFailures - 1),
+                    );
+                    this.scheduleMediaRefresh(backoffMs);
+                } else if (media) {
+                    media.dispatchEvent(new CustomEvent('media-recovery-failed', {
+                        bubbles: true,
+                        detail: {element: media, sourceUrl: this.mediaUrl},
+                    }));
+                }
             } finally {
                 this.mediaRefreshInFlight = false;
             }

@@ -533,6 +533,24 @@ class MobilePushSettingsAdmin(AdminOnlyModelAdmin):
         return False
 
 
+@admin.register(MediaDeliverySettings)
+class MediaDeliverySettingsAdmin(AdminOnlyModelAdmin):
+    """Editable fallback for switching HLS segment delivery between R2 302 and Worker."""
+
+    list_display = [
+        "singleton",
+        "segment_delivery_mode",
+        "updated_at",
+    ]
+    readonly_fields = ["updated_at"]
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
 @admin.register(MobileAppUpdatePolicy)
 class MobileAppUpdatePolicyAdmin(AdminOnlyModelAdmin):
     """Editable fallback for the force/optional update policy per platform."""

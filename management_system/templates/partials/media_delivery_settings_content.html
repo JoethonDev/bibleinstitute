@@ -1,0 +1,90 @@
+{% load i18n %}
+{% translate "Site & Apps" as page_eyebrow %}
+{% translate "Media Delivery" as page_title %}
+{% translate "Switch HLS video and audio segment delivery between Django 302 R2 redirects and the legacy Cloudflare Worker without editing environment variables." as page_description %}
+<div id="content" class="aw-dashboard-page">
+    <div class="aw-page-head aw-flex-wrap">
+        {% include "partials/components/aw_page_head_main.html" with page_eyebrow=page_eyebrow page_title=page_title page_description=page_description %}
+    </div>
+
+    <div class="aw-kpi-grid">
+        <div class="aw-kpi">
+            <div class="aw-kpi-top">
+                <span class="aw-kpi-label">{% translate "Active segment mode" %}</span>
+                <span class="aw-kpi-icon"><svg class="aw-ico" aria-hidden="true"><use href="#i-video"></use></svg></span>
+            </div>
+            <div class="aw-kpi-value">{{ effective_mode_label }}</div>
+        </div>
+        <div class="aw-kpi aw-kpi--gold">
+            <div class="aw-kpi-top">
+                <span class="aw-kpi-label">{% translate "Presigned URL TTL" %}</span>
+                <span class="aw-kpi-icon"><svg class="aw-ico" aria-hidden="true"><use href="#i-lock"></use></svg></span>
+            </div>
+            <div class="aw-kpi-value">{{ presigned_url_seconds }} {% translate "sec" %}</div>
+        </div>
+        <div class="aw-kpi">
+            <div class="aw-kpi-top">
+                <span class="aw-kpi-label">{% translate "Legacy Worker URL" %}</span>
+                <span class="aw-kpi-icon"><svg class="aw-ico" aria-hidden="true"><use href="#i-settings"></use></svg></span>
+            </div>
+            <div class="aw-kpi-value">{% if worker_configured %}{% translate "Configured" %}{% else %}{% translate "Not configured" %}{% endif %}</div>
+        </div>
+    </div>
+
+    {% if not worker_configured %}
+    <div class="aw-alert aw-alert--warn">
+        <svg class="aw-ico" aria-hidden="true"><use href="#i-alert"></use></svg>
+        <div>
+            {% translate "CLOUD_WORKER is blank in the environment, so Direct R2 presigned redirect (302) is active automatically regardless of the saved toggle." %}
+        </div>
+    </div>
+    {% elif effective_mode == "direct_r2" %}
+    <div class="aw-alert aw-alert--info">
+        <svg class="aw-ico" aria-hidden="true"><use href="#i-video"></use></svg>
+        <div>
+            {% translate "Direct R2 presigned redirect (302) is active. Every segment GET verifies the signed token in Django, records progress in VerifiedSegmentRequest, and redirects to a short-lived R2 URL." %}
+        </div>
+    </div>
+    {% else %}
+    <div class="aw-alert aw-alert--warn">
+        <svg class="aw-ico" aria-hidden="true"><use href="#i-alert"></use></svg>
+        <div>
+            {% translate "Legacy Cloudflare Worker mode is active. Ensure R2 bucket CORS allows GET and HEAD from this site origin before switching to Direct R2 (302)." %}
+        </div>
+    </div>
+    {% endif %}
+
+    <form method="post" action="{% url 'media-delivery-settings' %}" hx-post="{% url 'media-delivery-settings' %}" hx-target="#content" hx-swap="outerHTML" hx-select="#content" hx-select-oob="#toast-stack" hx-push-url="true">
+        {% csrf_token %}
+        <section class="aw-card">
+            <div class="aw-card-head">
+                <div class="aw-card-title">
+                    <svg class="aw-ico" aria-hidden="true"><use href="#i-settings"></use></svg>
+                    <h3>{% translate "HLS segment delivery mode" %}</h3>
+                </div>
+            </div>
+            <div class="aw-card-body">
+                <div class="aw-form-grid">
+                    {% include "partials/components/aw_field.html" with field=form.segment_delivery_mode %}
+                </div>
+                {% if form.non_field_errors %}
+                <div class="aw-alert aw-alert--danger aw-mt-3" role="alert">
+                    <svg class="aw-ico" aria-hidden="true"><use href="#i-alert"></use></svg>
+                    <div>{{ form.non_field_errors }}</div>
+                </div>
+                {% endif %}
+                {% if settings_row.updated_at %}
+                <p class="aw-small aw-muted aw-mt-3">
+                    {% translate "Last changed" %} {{ settings_row.updated_at|date:"Y-m-d H:i" }} - {{ settings_row.updated_by|default:"-" }}
+                </p>
+                {% endif %}
+                <div class="aw-form-actions aw-flex-wrap">
+                    <button type="submit" class="aw-btn aw-btn--primary">
+                        <svg class="aw-ico" aria-hidden="true"><use href="#i-check"></use></svg>
+                        <span>{% translate "Save settings" %}</span>
+                    </button>
+                </div>
+            </div>
+        </section>
+    </form>
+</div>

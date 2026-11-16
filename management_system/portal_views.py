@@ -20,7 +20,9 @@ from django.views.decorators.http import require_POST
 
 from .announcements import AnnouncementError, clean_announcement_action
 from .mobile_versioning import MAX_VERSION_CODE, is_valid_update_url, normalize_platform
-from .models import MobileAppRelease, MobileAppUpdatePolicy, MobileDownloadPolicy, MobilePushSettings, StudentBanner
+from .forms import MediaDeliverySettingsForm
+from .media_delivery import effective_segment_delivery_mode, media_presigned_url_seconds
+from .models import MediaDeliverySettings, MobileAppRelease, MobileAppUpdatePolicy, MobileDownloadPolicy, MobilePushSettings, StudentBanner
 from .models import StudentMode
 from .student_experience.mode import resolve_student_mode
 from .student_experience.render import render_student_page
@@ -415,3 +417,43 @@ def banner_delete(request, banner_id: int):
     get_object_or_404(StudentBanner, pk=banner_id).delete()
     messages.success(request, _("Banner deleted."))
     return redirect("banner-manage")
+
+
+@capability_required(can_manage_academic_setup)
+def media_delivery_settings(request):
+    """Admin toggle between direct R2 302 redirects and legacy Worker delivery."""
+    settings_row = MediaDeliverySettings.load()
+    worker_configured = bool(getattr(settings, "CLOUD_WORKER", "").rstrip("/"))
+    if request.method == "POST":
+        form = MediaDeliverySettingsForm(request.POST, instance=settings_row)
+        if form.is_valid():
+            settings_row = form.save(commit=False)
+            settings_row.updated_by = request.user
+            settings_row.save()
+            messages.success(request, _("Media delivery settings saved."))
+            return redirect("media-delivery-settings")
+    else:
+        form = MediaDeliverySettingsForm(instance=settings_row)
+
+    effective_mode = effective_segment_delivery_mode()
+    effective_label = dict(MediaDeliverySettings.SegmentDeliveryMode.choices).get(
+        effective_mode,
+        effective_mode,
+    )
+    return render_page(
+        request,
+        "media_delivery_settings.html",
+        "partials/media_delivery_settings_content.html",
+        {
+            "settings_row": settings_row,
+            "form": form,
+            "worker_configured": worker_configured,
+            "effective_mode": effective_mode,
+            "effective_mode_label": effective_label,
+            "presigned_url_seconds": media_presigned_url_seconds(),
+            "breadcrumb_items": generate_breadcrumb([
+                (_("Admin"), reverse("admin-panel")),
+                (_("Media Delivery"), None),
+            ]),
+        },
+    )

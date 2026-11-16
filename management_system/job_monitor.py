@@ -81,7 +81,10 @@ def _projection(family: str, *, ids: list[str] | None = None, search: str = "", 
     processed = total = Value(0)
     succeeded = failed = skipped = Value(None, output_field=BigIntegerField())
     target = Value("")
-    next_poll = Value(None, output_field=DateTimeField())
+    # A bare NULL is unknown-typed, so PostgreSQL resolves the first all-NULL
+    # UNION pair to text and then rejects the timestamp members that follow
+    # (announcement/notification). Cast it so every member is a timestamp.
+    next_poll = Cast(Value(None), output_field=DateTimeField())
     phase = attachment = cleanup = Value("")
     updated = F("updated_at")
     error_field = "error"

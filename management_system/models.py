@@ -3582,6 +3582,47 @@ class MobilePushSettings(models.Model):
         return cls.objects.get_or_create(singleton="default")[0]
 
 
+class MediaDeliverySettings(models.Model):
+    """Admin-controlled switch between Option B (302 R2) and legacy Worker."""
+
+    class SegmentDeliveryMode(models.TextChoices):
+        DIRECT_R2 = "direct_r2", _("Direct R2 presigned redirect (302)")
+        WORKER = "worker", _("Cloudflare Worker proxy (legacy)")
+
+    singleton = models.CharField(max_length=20, unique=True, default="default", editable=False)
+    segment_delivery_mode = models.CharField(
+        max_length=16,
+        choices=SegmentDeliveryMode.choices,
+        default=SegmentDeliveryMode.WORKER,
+    )
+    updated_at = models.DateTimeField(auto_now=True)
+    updated_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="media_delivery_settings_updates",
+    )
+
+    class Meta:
+        verbose_name = _("Media Delivery Settings")
+        verbose_name_plural = _("Media Delivery Settings")
+
+    def __str__(self):
+        return str(_("Media Delivery Settings"))
+
+    @classmethod
+    def load(cls) -> "MediaDeliverySettings":
+        return cls.objects.get_or_create(singleton="default")[0]
+
+    def save(self, *args, **kwargs):
+        result = super().save(*args, **kwargs)
+        from .media_delivery import invalidate_media_delivery_mode_cache
+
+        transaction.on_commit(invalidate_media_delivery_mode_cache)
+        return result
+
+
 class QuizAnswerSnapshot(models.Model):
     quiz = models.ForeignKey(Quiz, on_delete=models.CASCADE, related_name="answer_snapshots", db_index=False)
     user = models.ForeignKey(User, on_delete=models.CASCADE)

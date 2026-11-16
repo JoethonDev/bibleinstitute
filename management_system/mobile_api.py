@@ -963,7 +963,7 @@ def media_manifest(request, offering_id, lesson_id, file_index):
         or session.student.application_status != "active"
     ):
         return _error(request, "viewing_session_required", _("Viewing session is required."), 401)
-    if timezone.now() >= session.expires_at:
+    if session.ended_at is not None or timezone.now() >= session.expires_at:
         return _error(request, "viewing_session_expired", _("Viewing session expired."), 401)
     if not valid_session_token(
         token,
@@ -993,7 +993,7 @@ def media_manifest(request, offering_id, lesson_id, file_index):
     ):
         return _error(request, "invalid_viewing_session", _("The viewing session is invalid."), 403)
     # The signed viewing session is the media credential. Native HLS requests
-    # must not carry the mobile bearer token to the media host.
+    # must not carry the mobile bearer token to the segment endpoint.
     try:
         playlist = build_manifest_playlist(
             user=session.student,
@@ -1002,6 +1002,7 @@ def media_manifest(request, offering_id, lesson_id, file_index):
             audience="mobile",
             cloud_client=CLOUD_CLIENT,
             bucket_name=bucket_name,
+            segment_base_url=request.build_absolute_uri("/").rstrip("/"),
         )
     except MediaAccessError as exc:
         if exc.code == "expired":

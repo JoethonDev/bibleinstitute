@@ -21,12 +21,22 @@ from typing import Any, Iterable
 from urllib.parse import quote
 
 from django.conf import settings
+from django.core.cache import cache
 from django.core.exceptions import PermissionDenied
+from django.db import DatabaseError
 from django.utils import timezone
 from django.utils.translation import gettext as _
 
 from .academic_access import get_accessible_offering_or_403
-from .models import CourseOffering, LectureProgressEvent, Lesson, PublicationStatus, ViewingSession
+from .models import (
+    CourseOffering,
+    LectureProgressEvent,
+    Lesson,
+    MediaDeliverySettings,
+    PublicationStatus,
+    VerifiedSegmentRequest,
+    ViewingSession,
+)
 from .storage_ownership import is_private_storage_key
 from .utils.file_validator import downloadable_audio_key, validate_downloadable_audio_key
 from .utils.lesson_access import lesson_is_available
@@ -40,6 +50,76 @@ MEDIA_AUDIENCES = frozenset({"web", "mobile"})
 MEDIA_SEGMENT_TOKEN_LIFETIME = timedelta(
     minutes=max(1, int(getattr(settings, "MEDIA_SEGMENT_TOKEN_MINUTES", 180) or 180))
 )
+DEFAULT_MEDIA_PRESIGNED_URL_SECONDS = 60
+MEDIA_DELIVERY_SETTINGS_CACHE_KEY = "media_delivery:segment_mode:v1"
+MEDIA_DELIVERY_SETTINGS_CACHE_TTL = 60
+
+
+def invalidate_media_delivery_mode_cache() -> None:
+    try:
+        cache.delete(MEDIA_DELIVERY_SETTINGS_CACHE_KEY)
+    except Exception:
+        logger.warning("Could not invalidate the media delivery mode cache.")
+
+
+def effective_segment_delivery_mode() -> str:
+    """Return active segment delivery mode (`direct_r2` or `worker`)."""
+    worker_base = getattr(settings, "CLOUD_WORKER", "").rstrip("/")
+    if not worker_base:
+        return MediaDeliverySettings.SegmentDeliveryMode.DIRECT_R2
+    valid_modes = {
+        MediaDeliverySettings.SegmentDeliveryMode.DIRECT_R2,
+        MediaDeliverySettings.SegmentDeliveryMode.WORKER,
+    }
+    try:
+        cached = cache.get(MEDIA_DELIVERY_SETTINGS_CACHE_KEY)
+    except Exception:
+        cached = None
+    if cached in valid_modes:
+        return cached
+    try:
+        mode = (
+            MediaDeliverySettings.objects.filter(singleton="default")
+            .values_list("segment_delivery_mode", flat=True)
+            .first()
+        )
+    except DatabaseError:
+        logger.warning("Could not read media delivery settings; falling back to legacy worker.")
+        return MediaDeliverySettings.SegmentDeliveryMode.WORKER
+    resolved = (
+        mode
+        if mode in valid_modes
+        else MediaDeliverySettings.SegmentDeliveryMode.WORKER
+    )
+    try:
+        cache.set(
+            MEDIA_DELIVERY_SETTINGS_CACHE_KEY,
+            resolved,
+            timeout=MEDIA_DELIVERY_SETTINGS_CACHE_TTL,
+        )
+    except Exception:
+        pass
+    return resolved
+
+
+def use_legacy_worker_segments() -> bool:
+    return bool(getattr(settings, "CLOUD_WORKER", "").rstrip("/")) and (
+        effective_segment_delivery_mode()
+        == MediaDeliverySettings.SegmentDeliveryMode.WORKER
+    )
+
+
+def media_presigned_url_seconds() -> int:
+    raw_value = getattr(
+        settings,
+        "MEDIA_PRESIGNED_URL_SECONDS",
+        DEFAULT_MEDIA_PRESIGNED_URL_SECONDS,
+    )
+    try:
+        seconds = int(raw_value or DEFAULT_MEDIA_PRESIGNED_URL_SECONDS)
+    except (TypeError, ValueError):
+        seconds = DEFAULT_MEDIA_PRESIGNED_URL_SECONDS
+    return max(30, min(seconds, 300))
 
 
 class MediaAccessError(Exception):
@@ -161,6 +241,71 @@ def sign_media_token(session_id, expires_at, segment_key, *, audience="web", tok
     expires_at_value = int(token_expiry.timestamp())
     message = f"{MEDIA_TOKEN_VERSION}|{audience}|{session_id}|{expires_at_value}|{segment_key}"
     return f"{MEDIA_TOKEN_VERSION}:{audience}:{session_id}:{expires_at_value}:{sign_media_message(message)}"
+
+
+def normalize_segment_key(segment_key: str) -> str:
+    """Validate and normalize one relative HLS segment storage key."""
+    if not isinstance(segment_key, str):
+        raise MediaAccessError("forbidden", _("Invalid viewing session token."))
+    cleaned = segment_key.lstrip("/")
+    if (
+        not cleaned
+        or "\x00" in cleaned
+        or "\\" in cleaned
+        or "?" in cleaned
+        or "#" in cleaned
+        or cleaned.startswith(("http://", "https://"))
+    ):
+        raise MediaAccessError("forbidden", _("Invalid viewing session token."))
+    parts = cleaned.split("/")
+    if any(part in {"", ".", ".."} for part in parts):
+        raise MediaAccessError("forbidden", _("Invalid viewing session token."))
+    normalized = posixpath.normpath(cleaned)
+    if (
+        normalized != cleaned
+        or not normalized.lower().endswith(".ts")
+        or is_private_storage_key(normalized)
+        or get_segment_number(normalized) is None
+    ):
+        raise MediaAccessError("forbidden", _("Invalid viewing session token."))
+    return normalized
+
+
+def verify_media_token(
+    token: str,
+    session: ViewingSession,
+    segment_key: str,
+) -> tuple[str, int, str]:
+    """Verify an HMAC-signed segment token bound to session, audience, expiry and key."""
+    if not token or not isinstance(token, str):
+        raise MediaAccessError("forbidden", _("Invalid viewing session token."))
+    parts = token.split(":")
+    if len(parts) != 5 or parts[0] != MEDIA_TOKEN_VERSION:
+        raise MediaAccessError("forbidden", _("Invalid viewing session token."))
+    _version, audience, token_session_id, raw_expires_at, signature = parts
+    expected_audience = (
+        "mobile"
+        if session.access_channel == ViewingSession.AccessChannel.MOBILE
+        else "web"
+    )
+    if audience not in MEDIA_AUDIENCES or audience != expected_audience:
+        raise MediaAccessError("forbidden", _("Invalid viewing session token."))
+    if token_session_id != session.session_id:
+        raise MediaAccessError("forbidden", _("Invalid viewing session token."))
+    try:
+        token_expires_at = int(raw_expires_at)
+    except (TypeError, ValueError):
+        raise MediaAccessError("forbidden", _("Invalid viewing session token."))
+    if token_expires_at <= 0 or token_expires_at > int(session.expires_at.timestamp()):
+        raise MediaAccessError("forbidden", _("Invalid viewing session token."))
+    expected = sign_media_message(
+        f"{MEDIA_TOKEN_VERSION}|{audience}|{session.session_id}|{token_expires_at}|{segment_key}"
+    )
+    if not signature or not hmac.compare_digest(signature, expected):
+        raise MediaAccessError("forbidden", _("Invalid viewing session token."))
+    if timezone.now().timestamp() >= token_expires_at:
+        raise MediaAccessError("expired", _("Viewing session expired."))
+    return audience, token_expires_at, signature
 
 
 def valid_session_token(token, session, *, audience="web", mobile_session_id=None):
@@ -355,13 +500,14 @@ def build_manifest_playlist(
     audience: str,
     cloud_client,
     bucket_name: str,
+    segment_base_url: str = "",
 ) -> str:
     """Return the signed playlist for one already-authenticated session."""
 
     audience = _validate_media_audience(audience)
     if session.student_id != user.pk:
         raise MediaAccessError("forbidden", _("Invalid viewing session token."))
-    if timezone.now() >= session.expires_at:
+    if session.ended_at is not None or timezone.now() >= session.expires_at:
         raise MediaAccessError("expired", _("Viewing session expired."))
     expected_channel = (
         ViewingSession.AccessChannel.MOBILE
@@ -386,6 +532,8 @@ def build_manifest_playlist(
     except Exception:  # noqa: BLE001 - provider boundary
         raise MediaAccessError("unavailable", _("The media is unavailable."))
 
+    worker_base = getattr(settings, "CLOUD_WORKER", "").rstrip("/") if use_legacy_worker_segments() else ""
+    base_url = (segment_base_url or "").rstrip("/")
     playlist_lines = []
     manifest_folder = posixpath.dirname(media.media_key).strip("/")
     for line in playlist.splitlines():
@@ -413,14 +561,133 @@ def build_manifest_playlist(
                 audience=audience,
                 token_expires_at=segment_expires_at,
             )
-            worker_base = settings.CLOUD_WORKER.rstrip("/")
-            playlist_lines.append(
-                f"{worker_base}/media/{quote(session.session_id, safe='')}/"
-                f"{quote(segment_key, safe='')}?token={quote(signed_token, safe='')}"
-            )
+            if worker_base:
+                playlist_lines.append(
+                    f"{worker_base}/media/{quote(session.session_id, safe='')}/"
+                    f"{quote(segment_key, safe='')}?token={quote(signed_token, safe='')}"
+                )
+            else:
+                playlist_lines.append(
+                    f"{base_url}/media/seg/{quote(session.session_id, safe='')}/"
+                    f"{quote(segment_key, safe='/')}?token={quote(signed_token, safe='')}"
+                )
         else:
             playlist_lines.append(line)
     return "\n".join(playlist_lines) + ("\n" if playlist.endswith("\n") else "")
+
+
+def authorize_and_presign_segment(
+    *,
+    session: ViewingSession | None,
+    request_user,
+    segment_key: str,
+    token: str,
+    record_verified: bool,
+    cloud_client,
+    bucket_name: str,
+) -> str:
+    """Authorize one segment fetch, record server-verified proof, and presign R2 GET."""
+    if session is None:
+        raise MediaAccessError("not_found", _("Viewing session was not found."))
+
+    now = timezone.now()
+    if session.access_channel == ViewingSession.AccessChannel.MOBILE:
+        mobile_session = session.mobile_session
+        if (
+            mobile_session is None
+            or mobile_session.user_id != session.student_id
+            or mobile_session.revoked_at is not None
+            or mobile_session.expires_at <= now
+            or not session.student.is_active
+            or session.student.application_status != "active"
+        ):
+            raise MediaAccessError("unauthenticated", _("Viewing session is required."))
+        allow_unpublished = False
+    elif session.access_channel == ViewingSession.AccessChannel.WEB:
+        if not request_user or not getattr(request_user, "is_authenticated", False):
+            raise MediaAccessError("unauthenticated", _("Authentication required."))
+        if not session.student.is_active or session.student_id != request_user.pk:
+            raise MediaAccessError("forbidden", _("Invalid viewing session token."))
+        allow_unpublished = True
+    else:
+        raise MediaAccessError("forbidden", _("Invalid viewing session token."))
+
+    if session.ended_at is not None or now >= session.expires_at:
+        raise MediaAccessError("expired", _("Viewing session expired."))
+
+    try:
+        get_accessible_offering_or_403(
+            session.student,
+            session.lesson.course_offering_id,
+            allow_management=allow_unpublished,
+        )
+    except PermissionDenied:
+        raise MediaAccessError("forbidden", _("You do not have access to this lesson."))
+
+    if session.lesson.status != PublicationStatus.PUBLISHED and not (
+        allow_unpublished and user_has_management_role(session.student)
+    ):
+        raise MediaAccessError("forbidden", _("You do not have access to this lesson."))
+    if not lesson_is_available(session.lesson) and not user_has_management_role(session.student):
+        raise MediaAccessError("forbidden", _("This lesson is not available yet."))
+
+    if not session.media_key or is_private_storage_key(session.media_key):
+        raise MediaAccessError("forbidden", _("The viewing session is invalid."))
+
+    clean_segment_key = normalize_segment_key(segment_key)
+    manifest_folder = posixpath.dirname(session.media_key).strip("/")
+    if manifest_folder:
+        if not clean_segment_key.startswith(f"{manifest_folder}/"):
+            raise MediaAccessError("forbidden", _("Invalid viewing session token."))
+    elif posixpath.dirname(clean_segment_key).strip("/"):
+        raise MediaAccessError("forbidden", _("Invalid viewing session token."))
+
+    _audience, _token_expires_at, signature = verify_media_token(
+        token,
+        session,
+        clean_segment_key,
+    )
+    segment_number = get_segment_number(clean_segment_key)
+    if segment_number is None:
+        raise MediaAccessError("forbidden", _("Invalid viewing session token."))
+
+    if cloud_client is None or not bucket_name:
+        raise MediaAccessError("unavailable", _("The media is unavailable."))
+
+    try:
+        presigned_url = cloud_client.generate_presigned_url(
+            "get_object",
+            Params={
+                "Bucket": bucket_name,
+                "Key": clean_segment_key,
+                "ResponseContentType": "video/mp2t",
+                "ResponseCacheControl": "private, no-store",
+            },
+            ExpiresIn=media_presigned_url_seconds(),
+        )
+    except Exception:  # noqa: BLE001 - provider boundary
+        logger.exception(
+            "Error generating presigned segment URL for session %s segment %s",
+            session.session_id,
+            segment_number,
+        )
+        raise MediaAccessError("unavailable", _("The media is unavailable."))
+
+    if not presigned_url:
+        raise MediaAccessError("unavailable", _("The media is unavailable."))
+
+    if record_verified:
+        VerifiedSegmentRequest.objects.get_or_create(
+            session=session,
+            segment_number=segment_number,
+            defaults={
+                "segment_key": clean_segment_key,
+                "signature": signature,
+                "expires_at": session.expires_at,
+            },
+        )
+
+    return presigned_url
 
 
 def open_book_document(

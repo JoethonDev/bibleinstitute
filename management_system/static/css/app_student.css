@@ -847,6 +847,22 @@ main:has(.sd-page) {
     font-weight: 600;
 }
 
+.media-reload-retry {
+    border: 1px solid rgba(255, 255, 255, .45);
+    border-radius: 999px;
+    background: var(--ps-gold, #c69a3c);
+    color: #10262e;
+    font-size: .88rem;
+    font-weight: 700;
+    padding: .45rem 1.25rem;
+    cursor: pointer;
+}
+
+.media-reload-retry:hover,
+.media-reload-retry:focus-visible {
+    filter: brightness(1.06);
+}
+
 @keyframes media-reload-spin {
     to { transform: rotate(360deg); }
 }
