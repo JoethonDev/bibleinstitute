@@ -85,7 +85,7 @@
           <div class="sn-form-section">
             <h3>{% translate "Missing documents" %}</h3>
             <p class="sn-small-copy">{% translate "Upload any signup document that is still missing. Existing documents stay protected." %}</p>
-            <form method="post" action="{% url 'profile-missing-documents' %}" hx-post="{% url 'profile-missing-documents' %}" hx-encoding="multipart/form-data" hx-target="#profile-content" hx-swap="outerHTML" hx-select="#profile-content" hx-select-oob="#toast-stack" hx-push-url="true" enctype="multipart/form-data">
+            <form method="post" action="{% url 'profile-missing-documents' %}" hx-post="{% url 'profile-missing-documents' %}" hx-encoding="multipart/form-data" hx-target="#profile-content" hx-swap="outerHTML" hx-select="#profile-content" hx-select-oob="#toast-stack" hx-push-url="true" enctype="multipart/form-data" data-direct-upload="{% url 'direct-upload-authorize' %}">
               {% csrf_token %}
               <div class="sn-form-grid">
                 {% for field in missing_documents_form %}{% include "student_next/partials/field.html" with field=field %}{% endfor %}

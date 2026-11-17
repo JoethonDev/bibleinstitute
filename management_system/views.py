@@ -6605,7 +6605,8 @@ def profile_missing_documents(request):
             request.FILES,
             instance=user,
         )
-        submitted_types = set(request.FILES)
+        document_tokens = _direct_application_document_tokens(request)
+        submitted_types = set(request.FILES) | set(document_tokens)
         allowed_types = set(form.document_types)
         if not submitted_types:
             raise ValidationError(_("Select at least one missing document."))
@@ -6622,7 +6623,23 @@ def profile_missing_documents(request):
             allowed_types = set(current_document_types)
             if not submitted_types.issubset(allowed_types):
                 raise ValidationError(_("Only missing signup documents can be uploaded."))
+            finalized_documents = finalize_application_documents(
+                actor=request.user,
+                tokens={
+                    document_type: token
+                    for document_type, token in document_tokens.items()
+                    if document_type in current_document_types
+                },
+                cloud_client=CLOUD_CLIENT,
+                bucket_name=bucket_name,
+                user_id=user.pk,
+            )
             for document_type in current_document_types:
+                uploaded = finalized_documents.get(document_type)
+                if uploaded is not None:
+                    uploaded_by_type[document_type] = uploaded
+                    uploaded_keys.extend(uploaded.keys)
+                    continue
                 uploaded_file = form.cleaned_data.get(document_type)
                 if not uploaded_file:
                     continue

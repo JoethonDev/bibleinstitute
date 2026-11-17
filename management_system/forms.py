@@ -1386,6 +1386,14 @@ class MissingApplicationDocumentsForm(forms.Form):
         for field_name in list(self.fields):
             if field_name not in self.document_types:
                 self.fields.pop(field_name)
+        for document_type in self.document_types:
+            self.fields[document_type].widget.attrs.update(
+                {
+                    "data-upload-purpose": "application_document",
+                    "data-upload-document-type": document_type,
+                    "data-upload-field": document_type,
+                }
+            )
 
     @staticmethod
     def _missing_document_types(instance):
