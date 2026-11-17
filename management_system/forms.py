@@ -268,6 +268,27 @@ class CanonicalUserAdminForm(forms.ModelForm):
         return user
 
 
+def direct_document_field(document_type: str, label, *, required: bool = False):
+    """One private application-document picker completed by a direct upload.
+
+    The picker carries the purpose and document type so the shared browser
+    uploader can authorize exactly one staging key; the form class then only
+    sees the hidden ``direct_upload_token_<field>`` value.
+    """
+
+    return forms.FileField(
+        required=required,
+        label=label,
+        widget=forms.FileInput(
+            attrs={
+                "data-upload-purpose": "application_document",
+                "data-upload-document-type": document_type,
+                "data-upload-field": document_type,
+            }
+        ),
+    )
+
+
 class UserUpdateForm(UserCreationForm):
     admin_only_fields = frozenset({
         "role", "time_zone", "application_status", "decision_notes",
@@ -378,10 +399,10 @@ class UserUpdateForm(UserCreationForm):
         required=False,
         label=_("Active"),
     )
-    identity_front = forms.FileField(required=False, label=_("Replace identity front"))
-    identity_back = forms.FileField(required=False, label=_("Replace identity back"))
-    payment = forms.FileField(required=False, label=_("Replace payment receipt (optional)"))
-    profile = forms.FileField(required=False, label=_("Replace profile photo"))
+    identity_front = direct_document_field("identity_front", _("Replace identity front"))
+    identity_back = direct_document_field("identity_back", _("Replace identity back"))
+    payment = direct_document_field("payment", _("Replace payment receipt (optional)"))
+    profile = direct_document_field("profile", _("Replace profile photo"))
     clear_identity_front = forms.BooleanField(required=False, label=_("Remove identity front"))
     clear_identity_back = forms.BooleanField(required=False, label=_("Remove identity back"))
     clear_payment = forms.BooleanField(required=False, label=_("Remove payment receipt"))
@@ -1038,10 +1059,10 @@ class ApplicationAdminForm(AwModelForm):
     )
     joined_date = _joined_date_field()
     time_zone = forms.ChoiceField(label=_("Time zone"), choices=(), required=True)
-    identity_front = forms.FileField(required=False, label=_("Replace identity front"))
-    identity_back = forms.FileField(required=False, label=_("Replace identity back"))
-    payment = forms.FileField(required=False, label=_("Replace payment receipt (optional)"))
-    profile = forms.FileField(required=False, label=_("Replace profile photo"))
+    identity_front = direct_document_field("identity_front", _("Replace identity front"))
+    identity_back = direct_document_field("identity_back", _("Replace identity back"))
+    payment = direct_document_field("payment", _("Replace payment receipt (optional)"))
+    profile = direct_document_field("profile", _("Replace profile photo"))
     clear_identity_front = forms.BooleanField(required=False, label=_("Remove identity front"))
     clear_identity_back = forms.BooleanField(required=False, label=_("Remove identity back"))
     clear_payment = forms.BooleanField(required=False, label=_("Remove payment receipt"))

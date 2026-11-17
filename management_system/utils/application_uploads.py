@@ -11,6 +11,8 @@ from PIL import Image, ImageOps, UnidentifiedImageError
 from django.core.exceptions import ValidationError
 from django.utils.translation import gettext_lazy as _
 
+from ..direct_uploads import DirectUploadError, finalize_direct_upload
+from ..models import DirectUploadAuthorization
 from ..storage_coordination import assert_storage_namespace_available, lock_storage_namespace
 from .storage_operations import delete_from_bucket, upload_to_bucket
 
@@ -230,23 +232,133 @@ def delete_application_files(cloud_client, bucket_name, keys: Iterable[str]) -> 
     return failed
 
 
+def _preview_from_finalized(
+    *,
+    cloud_client,
+    bucket_name: str,
+    user_id: int,
+    document_type: str,
+    finalized,
+) -> str | None:
+    """Build the private display derivative for one already-stored document."""
+
+    extension = os.path.splitext(finalized.original_filename)[1].lower()
+    if extension not in IMAGE_EXTENSIONS:
+        return None
+    try:
+        response = cloud_client.get_object(Bucket=bucket_name, Key=finalized.key)
+        body = response["Body"]
+        try:
+            payload = body.read(MAX_FILE_SIZE + 1)
+        finally:
+            body.close()
+    except Exception as exc:  # noqa: BLE001 - provider boundary
+        logger.exception("application preview download failed")
+        raise ValidationError(_("The uploaded document could not be read.")) from exc
+    if len(payload) > MAX_FILE_SIZE:
+        raise ValidationError(_("File size exceeds 10 MB limit."))
+    try:
+        preview = _build_image_preview(BytesIO(payload))
+    except (
+        Image.DecompressionBombError,
+        Image.DecompressionBombWarning,
+        UnidentifiedImageError,
+        OSError,
+        SyntaxError,
+        ValueError,
+    ) as exc:
+        raise ValidationError(_("Image content could not be read.")) from exc
+    preview_key = (
+        f"applications/{user_id}/{document_type}/{uuid.uuid4().hex}.webp"
+    )
+    if not upload_to_bucket(
+        cloud_client,
+        bucket_name,
+        preview,
+        preview_key,
+        content_type="image/webp",
+    ):
+        raise ValidationError(_("The profile preview could not be stored."))
+    return preview_key
+
+
+def finalize_application_documents(
+    *,
+    actor,
+    tokens: Mapping[str, str],
+    cloud_client,
+    bucket_name: str,
+    user_id: int,
+) -> dict[str, UploadedApplicationFile]:
+    """Validate already-uploaded browser documents and build their previews.
+
+    The bytes were validated and published by ``finalize_direct_upload`` using
+    the canonical ``validate_application_file`` rule; this only adds the private
+    display derivative the application screens already expect. Any failure
+    removes the objects this call produced so nothing is left unreferenced.
+    """
+
+    finalized: dict[str, UploadedApplicationFile] = {}
+    created_keys: list[str] = []
+    try:
+        for document_type in APPLICATION_DOCUMENT_FIELDS:
+            token = str(tokens.get(document_type) or "").strip()
+            if not token:
+                continue
+            try:
+                upload = finalize_direct_upload(
+                    actor=actor,
+                    token=token,
+                    validator=validate_application_file,
+                    expected_purpose=DirectUploadAuthorization.Purpose.APPLICATION_DOCUMENT,
+                    metadata={"document_type": document_type},
+                    final_folder=f"applications/{user_id}/{document_type}",
+                )
+            except DirectUploadError as exc:
+                raise ValidationError(exc.message) from exc
+            preview_key = _preview_from_finalized(
+                cloud_client=cloud_client,
+                bucket_name=bucket_name,
+                user_id=user_id,
+                document_type=document_type,
+                finalized=upload,
+            )
+            item = UploadedApplicationFile(
+                original_key=upload.key,
+                preview_key=preview_key,
+            )
+            finalized[document_type] = item
+            created_keys.extend(item.keys)
+    except Exception:
+        delete_application_files(cloud_client, bucket_name, created_keys)
+        raise
+    return finalized
+
+
 def stage_application_documents(
     *,
     cloud_client,
     bucket_name: str,
     user_id: int,
     cleaned_data: Mapping,
+    finalized: Mapping[str, UploadedApplicationFile] | None = None,
 ) -> StagedApplicationDocuments:
     """Upload every accepted document before the locked database swap.
 
-    Any upload failure deletes the files staged so far and raises one
-    translated validation error; the caller never receives a partial stage.
+    Documents already uploaded by the browser are passed in ``finalized`` and
+    are not uploaded again. Any failure deletes the files staged so far and
+    raises one translated validation error; the caller never receives a partial
+    stage.
     """
 
-    uploads: dict[str, UploadedApplicationFile] = {}
-    uploaded_keys: list[str] = []
+    uploads: dict[str, UploadedApplicationFile] = dict(finalized or {})
+    uploaded_keys: list[str] = [
+        key for item in uploads.values() for key in item.keys
+    ]
     try:
         for document_type in APPLICATION_DOCUMENT_FIELDS:
+            if document_type in uploads:
+                continue
             uploaded_file = cleaned_data.get(document_type)
             if not uploaded_file:
                 continue

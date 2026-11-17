@@ -160,6 +160,13 @@
         var labels = messages(form);
 
         form.addEventListener('submit', function (event) {
+            // The uploader re-submits once every file has a capability. That
+            // second submit must pass straight through so HTMX (when the form
+            // is an hx-post form) performs the swap instead of a full reload.
+            if (form.dataset.directUploadReady === '1') {
+                form.dataset.directUploadReady = '0';
+                return;
+            }
             var inputs = Array.prototype.slice.call(
                 form.querySelectorAll('input[type="file"][data-upload-purpose]')
             );
@@ -213,7 +220,12 @@
                 if (submitter) {
                     submitter.disabled = false;
                 }
-                form.submit();
+                form.dataset.directUploadReady = '1';
+                if (typeof form.requestSubmit === 'function') {
+                    form.requestSubmit(submitter || undefined);
+                } else {
+                    form.submit();
+                }
             }).catch(function (error) {
                 form.dataset.directUploadInFlight = '0';
                 if (submitter) {

@@ -56,7 +56,7 @@
         </span>
     </div>
 
-    <form method="post" enctype="multipart/form-data" action="{% url 'application-review' app_user.id %}" hx-post="{% url 'application-review' app_user.id %}" hx-encoding="multipart/form-data" hx-target="#content" hx-swap="outerHTML" hx-select="#content" hx-select-oob="#toast-stack" hx-push-url="true">
+    <form method="post" enctype="multipart/form-data" action="{% url 'application-review' app_user.id %}" hx-post="{% url 'application-review' app_user.id %}" hx-encoding="multipart/form-data" hx-target="#content" hx-swap="outerHTML" hx-select="#content" hx-select-oob="#toast-stack" hx-push-url="true" data-direct-upload="{% url 'direct-upload-authorize' %}">
         {% csrf_token %}
         <div class="aw-grid aw-grid--main-rail">
             <div class="aw-stack aw-stack--lg">

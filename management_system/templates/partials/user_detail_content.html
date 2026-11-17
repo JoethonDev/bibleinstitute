@@ -95,7 +95,7 @@
             </div>
         </div>
         <div class="aw-card-body aw-card-body--flush">
-            <form method="post" enctype="multipart/form-data" action="{% url 'user-profile' profile_user.pk %}" hx-post="{% url 'user-profile' profile_user.pk %}" hx-encoding="multipart/form-data" hx-target="#content" hx-swap="outerHTML" hx-select="#content" hx-select-oob="#toast-stack" hx-push-url="true">
+            <form method="post" enctype="multipart/form-data" action="{% url 'user-profile' profile_user.pk %}" hx-post="{% url 'user-profile' profile_user.pk %}" hx-encoding="multipart/form-data" hx-target="#content" hx-swap="outerHTML" hx-select="#content" hx-select-oob="#toast-stack" hx-push-url="true" data-direct-upload="{% url 'direct-upload-authorize' %}">
                 {% csrf_token %}
                 <div class="aw-form-section">
                     <div class="aw-form-grid">{% include "partials/components/aw_form_fields.html" with form=edit_form %}</div>

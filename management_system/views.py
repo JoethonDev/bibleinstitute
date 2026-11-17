@@ -131,6 +131,7 @@ from .utils.application_uploads import (
     apply_application_document_changes,
     cleanup_replaced_application_documents,
     delete_application_files,
+    finalize_application_documents,
     lock_application_document_namespace,
     rollback_staged_application_documents,
     stage_application_documents,
@@ -1700,6 +1701,17 @@ def user_dashboard(request):
     return render_dashboard(request, users, view, context)
 
 
+def _direct_application_document_tokens(request) -> dict[str, str]:
+    """Collect one capability token per replaced application document."""
+
+    tokens: dict[str, str] = {}
+    for document_type in APPLICATION_DOCUMENT_FIELDS:
+        token = (request.POST.get(f"direct_upload_token_{document_type}") or "").strip()
+        if token:
+            tokens[document_type] = token
+    return tokens
+
+
 @capability_required(can_manage_content)
 def user_profile(request, user_id):
     if request.method == "POST" and not can_manage_applications(request.user):
@@ -1726,6 +1738,13 @@ def user_profile(request, user_id):
                     bucket_name=bucket_name,
                     user_id=user.id,
                     cleaned_data=form.cleaned_data,
+                    finalized=finalize_application_documents(
+                        actor=request.user,
+                        tokens=_direct_application_document_tokens(request),
+                        cloud_client=CLOUD_CLIENT,
+                        bucket_name=bucket_name,
+                        user_id=user.id,
+                    ),
                 )
                 locked_user = lock_application_status_for_edit(user.pk, original.application_status)
                 if desired_status != original.application_status:
@@ -6359,6 +6378,13 @@ def application_review(request, user_id):
                         bucket_name=bucket_name,
                         user_id=user.id,
                         cleaned_data=form.cleaned_data,
+                        finalized=finalize_application_documents(
+                            actor=request.user,
+                            tokens=_direct_application_document_tokens(request),
+                            cloud_client=CLOUD_CLIENT,
+                            bucket_name=bucket_name,
+                            user_id=user.id,
+                        ),
                     )
                     locked_user = lock_application_status_for_edit(user.pk, original_status)
                     original_role_id = locked_user.role_id
