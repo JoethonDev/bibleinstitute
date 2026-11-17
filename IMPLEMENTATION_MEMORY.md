@@ -147,6 +147,14 @@ Implemented:
 - `phase08_signup_upload.py` gained three checks: the capability lives two
   hours, discard expires it and deletes staging, and a discarded capability
   cannot be finalized. All eight checks pass.
+- `phase08_uploader_browser.py` closes the browser gap: with Playwright and
+  Chromium it serves the real signup page from `runserver` on the disposable
+  database while stubbing authorize, the PUT and discard at the browser boundary,
+  so no real storage or network side effect happens. Seven checks pass - the page
+  exposes an annotated picker, picking a file uploads in the background, the
+  picker shows the uploaded state, a reload restores the capability, the Remove
+  control is available after reload, Remove calls the discard endpoint, and
+  Remove clears the stored capability.
 
 ### Ready to deploy (2026-11-17)
 
