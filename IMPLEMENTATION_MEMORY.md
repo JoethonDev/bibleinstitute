@@ -57,6 +57,15 @@ here, not silently dropped.
 
 ### Ready to deploy (2026-11-17)
 
+Second whole-suite pass on the tree at `1950b50` (after the payment, CSV,
+intake, Telegram-reply and quiz-limit units): `manage.py check` 0 issues,
+`makemigrations --check` no changes, all five changed JavaScript files pass
+`node --check`, the Phase 7 gate and player contracts pass, the Phase 8 queue,
+progress, heartbeat, attendance and direct-upload smokes pass, the Phase 5
+session check passes, and the three caller-level checks (payment form, CSV form
+plus read cap, application document vertical) still pass. `audit_text_encoding`
+passes over 924 files.
+
 Pre-push audit of the 24 release commits (`4b651bc..b84de53`): no `cfut_`
 token, no `CLOUDFLARE_API_TOKEN=` value, no `POSTGRES_PASSWORD` value, no R2
 secret and no private key in any added line; no `.sqlite3`, `.log`, `runtime/`
