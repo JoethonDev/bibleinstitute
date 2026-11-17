@@ -711,6 +711,33 @@ def finalize_direct_upload(
         raise
 
 
+def read_finalized_object(
+    *, client, bucket: str, key: str, max_bytes: int
+) -> bytes:
+    """Read one finalized object into memory under an explicit byte cap.
+
+    Only for purposes whose own limit is already small (CSV, intake, JSON); the
+    cap is a second guard, not the primary rule.
+    """
+
+    try:
+        response = client.get_object(Bucket=bucket, Key=key)
+    except Exception as exc:  # noqa: BLE001 - provider boundary
+        raise DirectUploadError(
+            "object_missing", _("The uploaded file was not found. Upload it again.")
+        ) from exc
+    body = response["Body"]
+    try:
+        payload = body.read(max_bytes + 1)
+    finally:
+        body.close()
+    if len(payload) > max_bytes:
+        raise DirectUploadError(
+            "file_too_large", _("This file exceeds the allowed size for this field.")
+        )
+    return payload
+
+
 def _delete_staging(client, bucket: str, key: str) -> None:
     try:
         delete_from_bucket(client, bucket, key)

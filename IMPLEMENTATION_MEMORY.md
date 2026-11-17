@@ -233,13 +233,24 @@ State at this entry:
   the stored bytes with `validate_application_file`, builds the private webp
   preview from those same bytes, and hands the keys to
   `stage_application_documents(finalized=...)` so nothing is uploaded twice.
-  **Not migrated yet**: signup, Telegram reply/broadcast, historical intake,
-  legacy user CSV and quiz JSON. Do not claim Task 5 complete. Academic payment
-  is migrated too: `AcademicPaymentForm.payment` became `required=False` with
-  the requirement enforced in `clean()` against either a file or
-  `direct_upload_token_payment`, the view finalizes the token through the same
-  helper, and a focused check confirms a receipt-less submission is rejected
-  while both the capability-only and body-file submissions pass. Next-caller
+  **Not migrated yet**: signup, Telegram reply/broadcast, historical intake
+  and quiz JSON. Do not claim Task 5 complete. Legacy user CSV is migrated:
+  `CSVUploadForm.csv_file` became `required=False` with the requirement enforced
+  in `clean()`, and the view finalizes the capability then reads the stored
+  bytes through the new bounded `read_finalized_object` helper (2 MiB cap) before
+  the existing parser and durable job run unchanged. A focused check confirms
+  the CSV-less submission is rejected while capability-only and body-file
+  submissions pass, and that the read cap refuses an oversized object.
+  Academic payment is migrated too: `AcademicPaymentForm.payment` became
+  `required=False` with the requirement enforced in `clean()` against either a
+  file or `direct_upload_token_payment`, the view finalizes the token through
+  the same helper, and a focused check confirms a receipt-less submission is
+  rejected while both the capability-only and body-file submissions pass.
+  Legacy student layout stays supported (user instruction, 2026-11-17): the
+  uploader script loads in all three shells (`base.html`, `admin_panel.html`,
+  `student_next/base.html`), and both the legacy `profile.html` missing-document
+  and payment forms carry `data-direct-upload` alongside their `student_next`
+  counterparts, so legacy students keep working unchanged. Next-caller
   constraint discovered: `SignupForm` declares `identity_front` and `profile`
   as `required=True` and makes `identity_back` conditionally required, so those
   fields must become `required=False` with a `clean()` that accepts either the

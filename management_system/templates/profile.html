@@ -143,7 +143,8 @@
         hx-select="#profile-content"
         hx-select-oob="#toast-stack"
         hx-push-url="true"
-        enctype="multipart/form-data">
+        enctype="multipart/form-data"
+        data-direct-upload="{% url 'direct-upload-authorize' %}">
                                 {% csrf_token %}
                                 {{ missing_documents_form|crispy }}
                                 <div class="d-grid mt-3">

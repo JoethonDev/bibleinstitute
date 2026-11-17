@@ -993,7 +993,27 @@ class PromotionRuleForm(AwForm):
         return cleaned
 
 class CSVUploadForm(AwForm):
-    csv_file = forms.FileField(label=_("CSV File"), help_text=_("Upload a .csv file with user data."))
+    """Legacy user CSV upload; the file may arrive as a direct-upload capability."""
+
+    csv_file = forms.FileField(
+        label=_("CSV File"),
+        help_text=_("Upload a .csv file with user data."),
+        required=False,
+        widget=forms.FileInput(
+            attrs={
+                "data-upload-purpose": "legacy_user_csv",
+                "data-upload-field": "csv_file",
+            }
+        ),
+    )
+
+    def clean(self):
+        cleaned_data = super().clean()
+        if not cleaned_data.get("csv_file") and not (
+            self.data.get("direct_upload_token_csv_file") or ""
+        ).strip():
+            self.add_error("csv_file", _("This field is required."))
+        return cleaned_data
 
 
 class QuizExceptionalOpeningForm(AwForm):

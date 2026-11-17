@@ -66,6 +66,7 @@
             hx-encoding="multipart/form-data"
             hx-target="#display-page" hx-select="#page-region" hx-select-oob="#toast-stack" hx-push-url="true"
             enctype="multipart/form-data"
+            data-direct-upload="{% url 'direct-upload-authorize' %}"
             class="needs-validation"
             novalidate
         >

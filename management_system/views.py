@@ -124,6 +124,13 @@ from .progress_activity import (
     progress_activity_for_rows,
     watch_sessions_for_day,
 )
+from .direct_uploads import (
+    PURPOSE_LIMITS,
+    DirectUploadError,
+    finalize_direct_upload,
+    read_finalized_object,
+)
+from .models import DirectUploadAuthorization
 from .utils.application_uploads import (
     APPLICATION_DOCUMENT_FIELDS,
     APPLICATION_DOCUMENT_LABELS,
@@ -2204,13 +2211,41 @@ def user_bulk_create(request):
     if request.method == 'POST':
         form = CSVUploadForm(request.POST, request.FILES)
         if form.is_valid():
-            csv_file = request.FILES['csv_file']
-            if not csv_file.name.lower().endswith('.csv'):
-                error(request, _('This is not a CSV file'), extra_tags="alert-danger")
-                return redirect('user-bulk-create')
+            csv_token = (request.POST.get("direct_upload_token_csv_file") or "").strip()
+            if csv_token:
+                try:
+                    finalized = finalize_direct_upload(
+                        actor=request.user,
+                        token=csv_token,
+                        expected_purpose=DirectUploadAuthorization.Purpose.LEGACY_USER_CSV,
+                        final_folder="legacy-imports",
+                    )
+                    content = read_finalized_object(
+                        client=CLOUD_CLIENT,
+                        bucket=bucket_name,
+                        key=finalized.key,
+                        max_bytes=int(
+                            PURPOSE_LIMITS[DirectUploadAuthorization.Purpose.LEGACY_USER_CSV]["max_bytes"]
+                        ),
+                    )
+                except DirectUploadError as exc:
+                    error(request, exc.message, extra_tags="alert-danger")
+                    return redirect('user-bulk-create')
+                csv_name = finalized.original_filename
+            else:
+                csv_file = request.FILES['csv_file']
+                csv_name = csv_file.name
+                if not csv_name.lower().endswith('.csv'):
+                    error(request, _('This is not a CSV file'), extra_tags="alert-danger")
+                    return redirect('user-bulk-create')
+                try:
+                    content = read_legacy_import_upload(csv_file)
+                except ValidationError as exc:
+                    for message in exc.messages:
+                        error(request, message, extra_tags="alert-danger")
+                    return redirect('user-bulk-create')
 
             try:
-                content = read_legacy_import_upload(csv_file)
                 # Bounded pre-check without hashing: the authoritative pass,
                 # including password hashing and the atomic apply, runs on the
                 # admin worker.
@@ -2235,7 +2270,7 @@ def user_bulk_create(request):
             job, storage_error = enqueue_legacy_user_import(
                 actor=request.user,
                 content=content,
-                filename=csv_file.name,
+                filename=csv_name,
                 language=translation.get_language() or "ar",
             )
             if storage_error:
