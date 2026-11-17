@@ -42,6 +42,98 @@
         return translations[key] || (typeof gettext === 'function' ? gettext(fallback) : fallback);
     }
 
+    // Edge-gate tokens live in memory only. Video.js VHS requests the
+    // /g/<token>/...ts paths written into the authorized manifest; after a gate
+    // rotation those paths still carry the previous token, so the request hook
+    // swaps in the token this page currently holds. Manifests (.m3u8) are never
+    // rewritten.
+    const GATE_TOKEN_RE = /^[A-Za-z0-9_-]{16}$/;
+    const GATE_SEGMENT_RE = /^(.*\/g\/)([A-Za-z0-9_-]{16})(\/[^?#]*\.ts)$/i;
+    const gateOrigins = new Set();
+    const knownGateTokens = [];
+    let heldGateToken = '';
+
+    function isKnownGateToken(token) {
+        return knownGateTokens.includes(token);
+    }
+
+    function pageOrigin() {
+        try {
+            return window.location?.href ? new URL(window.location.href).origin : null;
+        } catch (_) {
+            return null;
+        }
+    }
+
+    function gateSegmentRequest(rawUri) {
+        if (typeof rawUri !== 'string' || !rawUri) return null;
+        let parsed;
+        try {
+            parsed = new URL(rawUri, window.location?.href || undefined);
+        } catch (_) {
+            return null;
+        }
+        if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return null;
+        const match = parsed.pathname.match(GATE_SEGMENT_RE);
+        if (!match) return null;
+        return {parsed, prefix: match[1], token: match[2], suffix: match[3]};
+    }
+
+    function rewriteGateSegmentUrl(rawUri) {
+        if (!heldGateToken) return rawUri;
+        const request = gateSegmentRequest(rawUri);
+        if (!request) return rawUri;
+        const origin = request.parsed.origin;
+        if (origin !== pageOrigin() && !gateOrigins.has(origin)) {
+            // The authorized manifest is the only source of these requests. A
+            // request that carries a token this page has held teaches us the
+            // media-edge origin, which is a different host from the application
+            // by design. URLs on any other cross-origin host are left untouched.
+            if (!isKnownGateToken(request.token)) return rawUri;
+            gateOrigins.add(origin);
+        }
+        if (request.token === heldGateToken) return rawUri;
+        const path = `${request.prefix}${heldGateToken}${request.suffix}`;
+        if (/^[a-z][a-z0-9+.-]*:/i.test(rawUri)) {
+            return `${origin}${path}${request.parsed.search}${request.parsed.hash}`;
+        }
+        if (rawUri.startsWith('//')) {
+            return `${request.parsed.protocol}//${request.parsed.host}${path}${request.parsed.search}${request.parsed.hash}`;
+        }
+        if (rawUri.startsWith('/')) {
+            return `${path}${request.parsed.search}${request.parsed.hash}`;
+        }
+        return `${origin}${path}${request.parsed.search}${request.parsed.hash}`;
+    }
+
+    function gateBeforeRequest(options) {
+        if (!options || typeof options !== 'object') return options;
+        const rewritten = rewriteGateSegmentUrl(options.uri);
+        if (rewritten !== options.uri) options.uri = rewritten;
+        return options;
+    }
+    gateBeforeRequest.__lessonMediaGateHook = true;
+
+    function installGateXhrHook() {
+        const xhr = window.videojs?.Vhs?.xhr;
+        if (!xhr || xhr.beforeRequest?.__lessonMediaGateHook) return;
+        xhr.beforeRequest = gateBeforeRequest;
+    }
+
+    function rememberGateToken(value) {
+        heldGateToken = typeof value === 'string' && GATE_TOKEN_RE.test(value) ? value : '';
+        if (heldGateToken) {
+            if (!knownGateTokens.includes(heldGateToken)) {
+                knownGateTokens.push(heldGateToken);
+                // Bound the history; it only needs to cover manifests fetched
+                // before a rotation.
+                if (knownGateTokens.length > 8) knownGateTokens.shift();
+            }
+            installGateXhrHook();
+        }
+        return heldGateToken || null;
+    }
+
     function isNativeHls(media) {
         if (!media || typeof media.canPlayType !== 'function') return false;
         return Boolean(
@@ -233,6 +325,108 @@
         return restore;
     }
 
+    function withoutGateRefreshParam(rawUrl) {
+        const value = String(rawUrl || '');
+        const hashIndex = value.indexOf('#');
+        const hash = hashIndex >= 0 ? value.slice(hashIndex) : '';
+        const base = hashIndex >= 0 ? value.slice(0, hashIndex) : value;
+        const queryIndex = base.indexOf('?');
+        if (queryIndex < 0) return value;
+        const path = base.slice(0, queryIndex);
+        const query = base.slice(queryIndex + 1);
+        if (!query) return value;
+        const kept = query.split('&').filter(pair => {
+            if (!pair) return false;
+            try {
+                return decodeURIComponent(pair.split('=')[0] || '') !== '_gate_refresh';
+            } catch (_) {
+                return true;
+            }
+        });
+        return `${path}${kept.length ? `?${kept.join('&')}` : ''}${hash}`;
+    }
+
+    function refreshNativeGateSource(media, token) {
+        if (!media || !token || media._gateRefreshInProgress || media.error) return;
+        if (!isNativeHls(media)) return;
+        const source = media.querySelector('source');
+        const canonicalUrl = withoutGateRefreshParam(media._mediaSourceUrl || source?.src || '');
+        if (!canonicalUrl) return;
+        const rawPosition = Number.isFinite(media.currentTime) && media.currentTime > 0
+            ? media.currentTime
+            : Number(media._lastKnownTime);
+        const previousPosition = Number.isFinite(rawPosition) && rawPosition > 0 ? rawPosition : 0;
+        const wasPlaying = (!media.paused && !media.ended) || Boolean(media._wasActivelyPlaying);
+        const separator = canonicalUrl.includes('?') ? '&' : '?';
+        const refreshUrl = `${canonicalUrl}${separator}_gate_refresh=${encodeURIComponent(token)}`;
+
+        media._gateRefreshInProgress = true;
+        media._mediaSourceUrl = canonicalUrl;
+        let timerId = null;
+        const cleanup = () => {
+            media.removeEventListener('loadedmetadata', onLoadedMetadata);
+            media.removeEventListener('error', onRefreshError);
+            if (timerId !== null) {
+                window.clearTimeout(timerId);
+                timerId = null;
+            }
+            media._gateRefreshCleanup = null;
+        };
+        const finish = () => {
+            cleanup();
+            media._gateRefreshInProgress = false;
+        };
+        const onRefreshError = () => finish();
+        const onLoadedMetadata = () => {
+            cleanup();
+            media._mediaSourceUrl = canonicalUrl;
+            // Reassigning media.src here would start a second load and reset
+            // playback; restoring the <source> child keeps later recovery on the
+            // canonical session URL while the already-loaded stream continues.
+            if (source) source.src = canonicalUrl;
+            const seekTarget = Math.max(0, previousPosition - 2);
+            try {
+                const player = media.player;
+                if (player && typeof player.currentTime === 'function') player.currentTime(seekTarget);
+                else media.currentTime = seekTarget;
+                if (wasPlaying) {
+                    const playback = player && typeof player.play === 'function'
+                        ? player.play()
+                        : media.play();
+                    if (playback?.catch) playback.catch(() => {});
+                }
+            } catch (_) {
+                // The existing media error/recovery path handles a failed load.
+            }
+            media._gateRefreshInProgress = false;
+        };
+        media._gateRefreshCleanup = () => {
+            cleanup();
+            media._gateRefreshInProgress = false;
+        };
+        media.addEventListener('loadedmetadata', onLoadedMetadata);
+        media.addEventListener('error', onRefreshError);
+        timerId = window.setTimeout(() => {
+            if (media._gateRefreshInProgress) finish();
+        }, 15000);
+        if (source) source.src = refreshUrl;
+        media.src = refreshUrl;
+        if (typeof media.load === 'function') media.load();
+    }
+
+    function handleGateRefresh(media, event) {
+        const detail = event?.detail || {};
+        if (!media || (detail.element && detail.element !== media)) return;
+        const token = rememberGateToken(detail.token);
+        if (!token) return;
+        const previousToken = media._gateToken || '';
+        media._gateToken = token;
+        const changed = detail.tokenChanged === true
+            || (detail.tokenChanged !== false && token !== previousToken);
+        if (!changed) return;
+        refreshNativeGateSource(media, token);
+    }
+
     function videoJsOptions(media) {
         const controls = [
             'playToggle',
@@ -295,6 +489,10 @@
     function disposeMedia(media) {
         clearMediaReloaderTimer(media);
         media._mediaErrorCleanup?.();
+        media._gateRefreshCleanup?.();
+        media._gateRefreshCleanup = null;
+        media._gateToken = null;
+        media._gateRefreshInProgress = false;
         const player = media.player;
         if (player && typeof player.dispose === 'function') player.dispose();
         media._mediaSourceUrl = null;
@@ -310,6 +508,8 @@
         const source = media?.querySelector('source');
         if (!media || !source || !url) return;
         if (media._mediaSourceUrl === url && !forceReload) return;
+        // A fresh authorized session source supersedes a pending native gate reload.
+        media._gateRefreshCleanup?.();
         media._lastRefreshRequestUrl = null;
         armPlaybackRestore(media, preservePosition);
         source.src = url;
@@ -342,12 +542,14 @@
             }
         };
         const endedHandler = () => { media._wasActivelyPlaying = false; };
+        const gateHandler = event => handleGateRefresh(media, event);
         media.addEventListener('error', errorHandler);
         media.addEventListener('timeupdate', timeHandler);
         media.addEventListener('play', playHandler);
         media.addEventListener('playing', playHandler);
         media.addEventListener('pause', pauseHandler);
         media.addEventListener('ended', endedHandler);
+        media.addEventListener('media-gate-refresh', gateHandler);
         media._mediaErrorCleanup = () => {
             media.removeEventListener('error', errorHandler);
             media.removeEventListener('timeupdate', timeHandler);
@@ -355,6 +557,10 @@
             media.removeEventListener('playing', playHandler);
             media.removeEventListener('pause', pauseHandler);
             media.removeEventListener('ended', endedHandler);
+            media.removeEventListener('media-gate-refresh', gateHandler);
+            media._gateRefreshCleanup?.();
+            media._gateRefreshCleanup = null;
+            media._gateRefreshInProgress = false;
             delete media._mediaErrorCleanup;
         };
 
@@ -617,6 +823,7 @@
     }
 
     function initializeAllElements(container = document) {
+        installGateXhrHook();
         registerVideoJsLanguage();
         container.querySelectorAll('video, audio').forEach(initializeMediaElement);
         container.querySelectorAll('.pdf-viewer').forEach(initializePdfViewer);
@@ -624,6 +831,8 @@
 
     document.addEventListener('media-session-ready', event => {
         const media = event.detail?.element;
+        const gateToken = rememberGateToken(event.detail?.gateToken);
+        if (media) media._gateToken = gateToken || '';
         attachMediaSource(
             media,
             event.detail?.url,

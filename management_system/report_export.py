@@ -115,7 +115,7 @@ def build_report_workbook(
         str(_("Attendance Summary")),
         [
             _("Student ID"), _("Username"), _("First Name"), _("Last Name"),
-            _("Expected"), _("Full days"), _("Fully scanned days"), _("Partial"), _("Absent"),
+            _("Expected"), _("Full attendance"), _("Fully scanned days"), _("Partial attendance"), _("Absent"),
             _("Attendance Score"), _("Attendance %"), _("Absence %"),
         ],
         seen_titles,
@@ -150,6 +150,8 @@ def build_report_workbook(
                 row["expected"], row["valid"], row["fully_scanned"], row["invalid"], row["absent"],
                 row["attendance_score"], row["attendance_rate"], row["absence_rate"],
             ])
+            if row["study_mode"] == "online":
+                continue
             days = batch.attendance_by_student.get(row["student_id"], {})
             for day in expected_dates:
                 pair = days.get(day, {})

@@ -386,6 +386,9 @@ need a fragment endpoint that does not exist yet, so none is invented.
                         <div class="aw-kv"><dt>{{ policy_form.entrance_deadline.label }}</dt><dd>{{ policy.entrance_deadline|time:"H:i" }}</dd></div>
                         <div class="aw-kv"><dt>{{ policy_form.exit_time.label }}</dt><dd>{{ policy.exit_time|time:"H:i" }}</dd></div>
                         <div class="aw-kv"><dt>{{ policy_form.buffer_minutes.label }}</dt><dd>{{ policy.buffer_minutes }}</dd></div>
+                        <div class="aw-kv"><dt>{{ policy_form.online_full_days.label }}</dt><dd>{{ policy.online_full_days }}</dd></div>
+                        <div class="aw-kv"><dt>{{ policy_form.online_partial_days.label }}</dt><dd>{{ policy.online_partial_days }}</dd></div>
+                        <div class="aw-kv"><dt>{{ policy_form.online_partial_value.label }}</dt><dd>{{ policy.online_partial_value }}</dd></div>
                     </dl>
                     <div class="collapse aw-mt-3" id="attendance-policy-panel">
                         <form method="post" action="{% url 'attendance-policy-save' %}" hx-post="{% url 'attendance-policy-save' %}" hx-target="#content" hx-select="#content" hx-swap="outerHTML" hx-select-oob="#toast-stack" hx-push-url="true">
@@ -402,6 +405,18 @@ need a fragment endpoint that does not exist yet, so none is invented.
                                 <div class="aw-field">
                                     <label for="{{ policy_form.buffer_minutes.id_for_label }}">{{ policy_form.buffer_minutes.label }}</label>
                                     {{ policy_form.buffer_minutes }}
+                                </div>
+                                <div class="aw-field">
+                                    <label for="{{ policy_form.online_full_days.id_for_label }}">{{ policy_form.online_full_days.label }}</label>
+                                    {{ policy_form.online_full_days }}
+                                </div>
+                                <div class="aw-field">
+                                    <label for="{{ policy_form.online_partial_days.id_for_label }}">{{ policy_form.online_partial_days.label }}</label>
+                                    {{ policy_form.online_partial_days }}
+                                </div>
+                                <div class="aw-field">
+                                    <label for="{{ policy_form.online_partial_value.id_for_label }}">{{ policy_form.online_partial_value.label }}</label>
+                                    {{ policy_form.online_partial_value }}
                                 </div>
                             </div>
                             <p class="aw-small aw-muted aw-mt-3">{% blocktranslate with limit=policy.entrance_limit|time:"H:i" earliest=policy.exit_earliest|time:"H:i" buffer=policy.buffer_minutes %}Entrance scans after {{ limit }} and exit scans before {{ earliest }} count as partial attendance; the buffer is {{ buffer }} minutes. Reconciled exits always count as on-time exits.{% endblocktranslate %}</p>

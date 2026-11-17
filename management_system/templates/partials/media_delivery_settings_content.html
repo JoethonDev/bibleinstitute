@@ -54,6 +54,50 @@
     </div>
     {% endif %}
 
+    {% if effective_mode == "edge_gate" %}
+    <div class="aw-alert aw-alert--warn" role="status">
+        <svg class="aw-ico" aria-hidden="true"><use href="#i-alert"></use></svg>
+        <div>{% translate "Edge gate is active for new sessions. Verify Phase 8 progress and playback acceptance before any production enablement." %}</div>
+    </div>
+    {% endif %}
+
+    <section class="aw-card aw-mt-3" aria-labelledby="media-gate-status-title">
+        <div class="aw-card-head">
+            <div class="aw-card-title">
+                <svg class="aw-ico" aria-hidden="true"><use href="#i-lock"></use></svg>
+                <h3 id="media-gate-status-title">{% translate "Cloudflare edge gate status" %}</h3>
+            </div>
+        </div>
+        <div class="aw-card-body">
+            <p><strong>{% translate "Cloudflare configuration" %}:</strong>
+                {% if media_gate_config_complete %}{% translate "Complete" %}{% else %}{% translate "Incomplete" %}{% endif %}
+            </p>
+            {% if media_gate_missing_settings %}
+            <p><strong>{% translate "Missing environment names" %}:</strong> {{ media_gate_missing_settings|join:", " }}</p>
+            {% endif %}
+            {% if media_gate_state_error %}
+            <p role="status"><strong>{% translate "Gate state unavailable" %}:</strong> {{ media_gate_state_error }}</p>
+            {% elif media_gate_token_row %}
+            <dl class="aw-definition-list">
+                <dt>{% translate "Current edge token" %}</dt><dd><code>{{ media_gate_token_row.current_token }}</code></dd>
+                <dt>{% translate "Previous edge token" %}</dt><dd><code>{{ media_gate_token_row.previous_token|default:"-" }}</code></dd>
+                <dt>{% translate "Rotation due" %}</dt><dd>{{ media_gate_rotation_due_at|date:"Y-m-d H:i:s T" }}</dd>
+                <dt>{% translate "Last rotation attempt" %}</dt><dd>{{ media_gate_token_row.last_attempt_at|date:"Y-m-d H:i:s T"|default:"-" }}</dd>
+                <dt>{% translate "Last rotation error" %}</dt><dd>{{ media_gate_token_row.last_error|default:"-" }}</dd>
+            </dl>
+            {% else %}
+            <p>{% translate "No edge token has been published. The status check does not create a token or contact Cloudflare." %}</p>
+            {% endif %}
+            {% if media_gate_expected_expression %}
+            <details class="aw-mt-3">
+                <summary>{% translate "Expected Cloudflare WAF expression" %}</summary>
+                <pre><code>{{ media_gate_expected_expression }}</code></pre>
+            </details>
+            {% endif %}
+            <p class="aw-small aw-muted aw-mt-3">{% translate "This diagnostic reads local configuration and the committed token row only. It does not call Cloudflare." %}</p>
+        </div>
+    </section>
+
     <form method="post" action="{% url 'media-delivery-settings' %}" hx-post="{% url 'media-delivery-settings' %}" hx-target="#content" hx-swap="outerHTML" hx-select="#content" hx-select-oob="#toast-stack" hx-push-url="true">
         {% csrf_token %}
         <section class="aw-card">

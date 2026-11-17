@@ -8,6 +8,477 @@ Earlier detailed evidence is preserved in the
 and the [5 November archive](docs/archive/2026-11-05/history/IMPLEMENTATION_MEMORY.md).
 Historical open/done statements there are superseded by the current disposition.
 
+## Prior task record: curriculum dashboard search routing fix
+
+Task recorded (2026-11-16): searching a course, lesson or quiz dashboard sent the
+request to the previously visited dashboard instead of the current one.
+
+- Root cause: `partials/components/aw_filter_bar.html` marked the search input
+  `hx-preserve`. HTMX 4 restores a preserved element by id across an
+  `hx-select="#page-region"` page navigation, so after visiting Lessons the
+  Quizzes page kept the lessons input and its `hx-get`, while
+  `hx-include=".filters-fields"` still read the current page's selects. That is
+  exactly the reported `/dashboard/lessons/?name=...&academic_year=4&course=&level=&quiz_type=`
+  produced from the Quizzes page.
+- Fix: removed `hx-preserve` from the shared filter-bar search (it swaps only
+  `#table-container`, so it never replaces itself) and documented why. Scoped the
+  quiz submission search id to `submission-search-{{ quiz_id }}`, with its label
+  and clear action, because that search does replace its own region and must keep
+  `hx-preserve`; a shared id restored the previously opened quiz's `hx-get`.
+- Files: `management_system/templates/partials/components/aw_filter_bar.html`,
+  `management_system/templates/partials/submission_dashboard_content.html`.
+  No Python, model, migration, URL or JavaScript change.
+- Verification: Chromium run of the real rendered filter bar with the bundled
+  `htmx-4.0.0.min.js` and the sidebar navigation contract. With `hx-preserve`
+  restored, the search request reproduces the reported URL; with the fix it
+  requests `/dashboard/quizzez/?name=test&academic_year=4&course=&level=&quiz_type=`.
+  Rendered-template assertions pass (no `hx-preserve` in the shared bar; scoped
+  submission ids and URL). `python manage.py check` passes (0 issues) and
+  `python manage.py audit_text_encoding` passes (867 files).
+- Known gap: PostgreSQL and Docker are not running in this environment, so no
+  HTTP smoke against live dashboard data was possible; the browser proof used
+  the real template output served by a local harness.
+- Next safe step when returning to this item: confirm on a running instance by opening Lessons, using the
+  sidebar to open Quizzes and searching; the request must stay on
+  `/dashboard/quizzez/`.
+
+## Infrastructure scale and operations plan: approved review amendments
+
+Current task (2026-11-17): the user replaced the earlier phase order with one
+production release carrying Trains 1-4: Phase 5 runtime settings, Phase 7 edge
+gate shipped dormant, Phase 8 progress/attendance, and Phase 8 Task 5 direct
+R2 uploads (Train 4 provider enablement is also in scope; Cloudflare access is
+an operator gate). The user instructed: implement everything needed to reach
+those trains without waiting for infrastructure. The primary commits locally
+and the user pushes and runs `deploy/blue_green_deploy.sh`; no push, deploy or
+production migration is performed here. The plans' prerequisite gates are
+waived for this release by that explicit instruction and the waiver is recorded
+here, not silently dropped.
+
+State at this entry:
+
+- Migrations created and rehearsed on an isolated disposable PostgreSQL 18
+  (`lms_phase08_disposable` on 127.0.0.1:55433, separate project/volume):
+  `0127_phase07_media_gate_state` (MediaGateToken, edge_gate choice,
+  nonempty-token check) and `0128_phase08_progress_attendance_state`
+  (attendance policy fields, LectureProgress slack, ViewingSession window/
+  receipt/mode fields, 4 indexes, 5 checks) and
+  `0129_phase08_direct_upload_authorization` (DirectUploadAuthorization).
+  Evidence: clean-zero apply 0001-0129; forward/backward/forward rehearsal of
+  0127-0129; 0127 applied in 2.25s and 0128 in 3.41s total on a seeded
+  500,000-session, 100,000-progress fixture, so the mutually blocking window is
+  a few seconds and no concurrent index creation is required.
+  `makemigrations --check` is green.
+- Phase 5 implemented: `DJANGO_CONN_MAX_AGE` (default 60, nonnegative,
+  `ImproperlyConfigured` otherwise) and `CONN_HEALTH_CHECKS` as top-level
+  `DATABASES["default"]` alias keys, never in `OPTIONS` (an earlier
+  subagent put them in `OPTIONS`, which psycopg rejects; the primary corrected
+  it and verified a real `SELECT 1`). `SESSION_ENGINE=cached_db` with
+  `SESSION_CACHE_ALIAS=default`, 7-day cookie unchanged.
+  `NOTIFICATION_REDELIVERY_INTERVAL_SECONDS` default 45, inclusive 30..60, used
+  only by `refresh-notification-redeliveries`. Gunicorn defaults 3 workers x 4
+  threads, timeout 60, graceful 30, keepalive 5, max-requests 2000/200,
+  `/dev/shm` temp dir on both web slots. `deploy/setup_env.sh` carries the 17
+  new non-secret keys and keeps `CLOUDFLARE_API_TOKEN` in the private `.env`
+  only.
+- Phase 7 server side: `media_delivery_mode.effective_segment_delivery_mode`
+  now reads the stored row before falling back to `CLOUD_WORKER`, so
+  `edge_gate` survives Phase 10's removal of `CLOUD_WORKER`;
+  `media_gate.rule_matches_publication` compares the committed row, not the
+  cached pair; `mobile_api.media_session` pins mobile sessions to `worker`/
+  `direct_r2` and never stores `edge_gate`; new read-only
+  `media_gate_status` command. Rotation/publish/cache-on-commit and the
+  `/gate/` route were already present. Production mode remains `worker`, so
+  all of this is inert.
+- Phase 8 fixes applied by the primary: `saved_prefix_ack` now reports every
+  unconfirmed suffix after a gap and bounds itself by fragments instead of
+  dropping later ranges; `unique_seconds`/`calculate_percent` use exact
+  centisecond and decimal math so an exact 80 percent is complete;
+  `_fit_acknowledgement` trims an oversized acknowledgement inside the 16 KiB
+  bound instead of raising after the progress save (the now-unreachable
+  `ack_too_large` mappings were removed); the cleanup dry-run reports exact
+  backlog counts while the scheduled worker keeps bounded sampling; the
+  attendance report renders an em dash instead of `None` for rows without
+  online facts. `phase08_progress.py --contract-only` gained three checks
+  (all unconfirmed suffixes, exact percent boundary, bounded acknowledgement
+  fitting) and passes.
+- Phase 8 Task 5 partial: `direct_uploads.py` owns the capability, staging and
+  validate-then-publish rules with one hard-limit table; `direct_upload_views.py`
+  exposes `/api/direct-upload/authorize/` and `/api/direct-upload/limits/`;
+  `static/js/direct_upload.js` performs authorize -> PUT -> hidden
+  `direct_upload_token_<field>` inside the ordinary form POST;
+  `partials/app_release_form_fields.html` is the first migrated caller (APK,
+  500 MiB, private staging, published under `app-releases/`). The staging
+  prefix is `direct-upload-staging/`, which the Phase 7 expression already
+  denies. **Not migrated yet**: signup/admin application documents, profile
+  documents, academic payments, support chat (needs a per-purpose bucket
+  because support attachments may use `TELEGRAM_R2_BUCKET_NAME`), Telegram
+  reply/broadcast, historical intake, legacy user CSV and quiz JSON. Do not
+  claim Task 5 complete.
+- Arabic catalog: the new Phase 7 gate strings and the new upload strings are
+  NOT translated yet. A `makemessages -l ar` run rewrites 13k+ reference
+  comments, so the catalog update will be a focused manual append followed by
+  `compilemessages`; restoring the file from HEAD was used to avoid the churn.
+
+
+- Current implementation focus: Cloudflare edge-gated HLS delivery with a
+  PostgreSQL-published current/previous token pair, Redis in the user's Docker
+  stack as the short-lived cache, an authorized refresh endpoint, and bounded
+  web/iOS player refresh. No D1 or Cloudflare-hosted Redis is used. The explicit
+  Cloudflare `Bible` connection is the correct account: active zone
+  `bibleinstitute-eg.org`, R2 bucket `lecture-storage`. Read-only inspection
+  found no `cdn.bibleinstitute-eg.org` DNS record, Worker route, custom R2 domain
+  or relevant edge ruleset; `r2.dev` is disabled. No Cloudflare resource was
+  changed. The private token is never requested in chat.
+- Phase 7 local source is partial in the current dirty checkout: token model,
+  rotation module/task, manifest builder and authorized refresh route exist;
+  player refresh, status command, migration and phase smoke are incomplete.
+  `lesson_media.js` uses Video.js/VHS plus native HLS, so implementation must
+  use that installed player seam, not add hls.js. Phase 7 is offline-prep only;
+  acceptance gates remain open.
+- Migration safety preflight: `.env` names `SQLITE_SOURCE_PATH=db.sqlite3`,
+  but that file is absent at the repository root. `POSTGRES_HOST=postgres` is
+  not reachable from the host, and Docker shows only the unrelated
+  `sukun-review-c049a734` PostgreSQL container. Do not add/apply the forward
+  migration until the SQLite source/verified backup and actual migration state
+  are established. No existing container or volume was touched.
+
+- User runtime instruction (2026-11-17): run local application, database and
+  supporting service runtimes in Docker, with runtime-dependent checks in the
+  matching container environment. Use explicitly isolated disposable resources;
+  do not connect checks to existing/shared containers or real data volumes.
+  Host-specific SSH/systemd/TLS validation stays on a disposable Linux VM when
+  the phase requires it. Apply this to the next PostgreSQL validation attempt.
+
+- Phase 8 preflight: Django settings select PostgreSQL, but host-side
+  `manage.py showmigrations` fails because the configured Compose hostname
+  `postgres` is not resolvable from Windows. `docker ps` shows only the
+  unrelated `sukun-review-c049a734` PostgreSQL container; it was not touched.
+  Active/applied migration state and required baseline counts are unknown.
+  Do not run migrations until an isolated LMS PostgreSQL target and the
+  required backup/count evidence are available.
+- Superpowers execution is inline per user instruction. The installed skill
+  package has no `task-start` or `task-done` scripts; use its `task-brief`
+  extractor and maintain the plan ledger manually. Do not create a branch or
+  worktree. No subagents are used.
+- The phase dependency gates are not being waived: local code preparation may
+  proceed, but Phase 8 remains incomplete until Phases 1-7 and its own real
+  PostgreSQL/Redis/provider/browser validation pass. Existing staged cache
+  deletions and unrelated working-tree edits remain untouched.
+
+- Phase 1 status: local implementation prepared; full gate is open pending a
+  disposable Linux host and operator ACME/SSH evidence. The user-selected order
+  is recorded above. Source inventory found
+  no host bootstrap or repository-owned TLS renewal job. Existing deployment
+  scripts consume `NGINX_TLS_CERT_DIR/fullchain.pem` and `privkey.pem`; preserve
+  those mount paths and keep Phase 1 changes outside application Compose/Nginx
+  files.
+- Phase 1 unit status: bootstrap and local input/idempotency checks passed on
+  Debian 12 and Ubuntu 24.04. SSH apply/rerun, per-device login and console
+  recovery are implemented but await a disposable VM. TLS hook and isolated
+  fixture are implemented; the fixture awaits Linux `flock` and a disposable
+  Docker host. Existing ACME client, timer owner and renewal event remain
+  unknown. The user confirms an Nginx certificate is already available; no
+  certificate or private-key contents were requested. Phase 2 has not started.
+- Phase 8 Task 1 files currently changed: `management_system/models.py`,
+  `management_system/media_delivery.py`, `management_system/progress_activity.py`,
+  `management_system/utils/progress_merge.py`, and
+  `load_tests/smoke/phase08_progress.py`. Result payloads now support exact
+  persisted-ack replay; web and mobile both call the shared result serializer.
+  Model/session contracts and centisecond range behavior pass contract-only
+  assertions. No migration or database integration has run. The smoke's
+  `--contract-only` output explicitly does not claim database validation.
+- Phase 8 Task 3 files: `management_system/static/js/alpine/components/progressTracker.js`,
+  both base templates, both lesson player partials, the Arabic catalog and the
+  focused Node smoke. Queue keys bind student/lesson/part/original session;
+  pending payloads persist before fetch, old sessions reconcile across lesson
+  navigation, only confirmed ranges are removed, and uncredited active time is
+  not replayed. Both player shells expose translated pending/storage/limit/
+  terminal/account/activity status. Red/green Node checks cover partial ranges,
+  stale resync, replay activity, old-lesson dispatch and template/catalog
+  wiring. `node --check`, `manage.py check`, `audit_text_encoding`,
+  `compilemessages --locale ar` and `git diff --check` pass. Real cross-browser,
+  Web Locks, offline/reload and device behavior remain unverified.
+- Phase 8 Task 4 source files: `management_system/models.py`, `forms.py`,
+  `admin.py`, `progress_activity.py`, `utils/reports.py`, `report_export.py`,
+  both management report templates, `views.py`, `session_cleanup.py`,
+  `attendance_tasks.py`, `management/commands/cleanup_sessions.py`, settings,
+  Arabic catalog, and `load_tests/smoke/phase08_attendance_cleanup.py`.
+  Online attendance now scores distinct published media parts, requires every
+  part at 80% or more, uses the latest part completion, and reports only for
+  active online student enrollments. The report helper uses at most three
+  grouped queries per 500-student batch; offline scan scores are unchanged and
+  completed online enrollments show no score. Session cleanup uses a PostgreSQL
+  advisory lease, batches at most 5,000 child rows and 500 parents, preserves
+  events/progress, and schedules on the admin queue. Django check, Python syntax,
+  report template compilation, Arabic catalog compilation, 903-file encoding
+  audit, Task 4 contract smoke, Task 3 Node smoke, and diff check pass.
+  Disposable PostgreSQL fixtures, migration state, EXPLAIN, contention/WAL and
+  large-backlog behavior remain unverified. The full smoke refuses the current
+  database name because it lacks the `phase08` marker; `makemigrations --check
+  --dry-run` also cannot resolve host `postgres` and proposes 0127 for Phase 8
+  fields because the prerequisite Phase 7 migration 0127 is not present. Do not
+  create/run the Phase 8 migration until Phase 7 and a verified disposable
+  database baseline are available.
+- Phase 8 Task 5 direct-R2 upload implementation has not started; Phase 8 is not
+  complete.
+- Phase 1 files: `deploy/bootstrap_host.sh`, `deploy/renew_tls.sh`,
+  `load_tests/smoke/phase01_host.sh`, `load_tests/smoke/phase01_host_remote.sh`,
+  `load_tests/smoke/phase01_tls.sh`, `load_tests/compose.tls.yml`,
+  `load_tests/local_services/tls/nginx.conf`,
+  `docs/current/VPS_MIGRATION_RUNBOOK.md`,
+  `docs/current/INFRA_SCALE_PROGRESS.html`, and the Phase 1 row in
+  `docs/pending/README.md`. Existing application Compose/Nginx files, models,
+  migrations, environment files and real databases were not changed.
+- Phase 1 safety details: Docker settings merge existing JSON and do not
+  restart an active daemon; APT package installs prohibit removals, and the
+  bootstrap stops before package changes when a conflicting Docker package is
+  installed. An existing CLI also requires an active, responding local Engine;
+  remote smoke does not treat a missing Engine as a pass. SSH confirmation
+  uses the effective `sshd -T -C` result and a separate sudo-capable key
+  session. An existing differing
+  `99-lms-hardening.conf` is rejected without overwrite; identical managed
+  config is a no-op. Host test snapshots compare content, inode, mode, owner
+  and mtime on managed files. A daemon/data directory without a Docker CLI is
+  rejected before package changes, and swap/fstab staging removes the new file
+  on ordinary staging failures. Unattended-upgrades clears both origin lists
+  before enabling the security-only origin, and the host verifier requires
+  exactly one effective security `Allowed-Origins` entry with no residual
+  `Origins-Pattern` entries. The inactive `/swapfile` check also rejects a
+  dangling symlink. Certificate renewal targets an explicit Compose service,
+  validates chain/names/key/expiry, and distinguishes pre-install failure from
+  a rollback that restores the previous pair and served certificate. No renewal
+  timer was added while ownership is unknown.
+- Phase 1 local verification: all five Bash scripts pass `bash -n` in
+  read-only Debian 12 and Ubuntu 24.04 containers. Bootstrap dry-run output is
+  identical on two runs per OS; help and invalid-key rejection pass. Four
+  embedded Python blocks parse; a disposable Python 3.11 helper check passed
+  for config merge/preservation, conflicting SSH stanza rejection, malformed
+  block preservation and no-op reruns. APT parsed the security-only override
+  on both OS images; a Debian 12 `apt-config` check confirms the host smoke
+  assertion rejects added `Allowed-Origins` and `Origins-Pattern` entries.
+  Final follow-up checks: all five scripts pass Git Bash `bash -n`; an Ubuntu
+  24.04 disposable check accepted `apt-get --no-remove`, detected a dangling
+  swap link, and rejected added APT origins; Docker Compose `config --quiet`
+  passes. `python manage.py audit_text_encoding` passes (878 files), 25 local
+  Markdown links resolve, the HTML tracker has ten phase records with
+  parseable inline JavaScript, and the whitespace scan found no trailing-space
+  hits. Local TLS fixture execution is unavailable because
+  Windows Git Bash lacks `flock`; its preflight exits before creating a
+  container. `shellcheck` is unavailable and was not installed.
+- Phase 1 environment/data evidence: Docker 28.5.1 client/server; existing
+  container `sukun-review-c049a734` was only listed. Ephemeral `docker run
+  --rm` containers were used for package/config checks and exited automatically;
+  no application container or volume, database, provider or host service was
+  changed. Debian 12, Ubuntu 24.04 and Python 3.11 test images were pulled for
+  disposable syntax/config checks only. A temporary self-check script was removed from the
+  workspace after its assertions passed. The temporary synthetic Ed25519 key
+  could not be removed from TEMP: automatic command review blocked the explicit
+  cleanup command without returning a reason; the user can remove only the two
+  listed test-key files in TEMP after checking the path.
+- Before Phase 1 implementation, committed the pre-existing application-code
+  changes only as `4b651bc` (`Save pending application code changes`). No
+  documentation was included. Existing staged `__pycache__` deletions and the
+  uncommitted handoff/project-map edits remain untouched.
+- Pre-start checks: `python manage.py check` passed under local Django 5.2.17;
+  `requirements.txt` pins Django 5.1.4, so this is not target-runtime proof.
+  `makemigrations --check --dry-run` reported no changes but could not check
+  migration history because host `postgres` did not resolve. `audit_text_encoding`
+  passed for 864 files. Three changed JavaScript files passed `node --check`;
+  13 changed Python files parsed with `ast`.
+- Phase 1 operator gates still need a disposable Debian 12/Ubuntu 24.04 VM,
+  device public keys and deploy username, exact repository SSH URL, read-only
+  GitHub deploy-key registration, and the existing DNS-01 ACME client/timer
+  facts and narrowly scoped credential stored privately. Local preparation is
+  complete; ask for these through a private local path or have the operator run
+  the documented commands and return sanitized output.
+- The phase ledger and progressive tracker are `.superpowers/sdd/phase-01-host-and-tls/progress.md`
+  and `docs/current/INFRA_SCALE_PROGRESS.html` (the repo ignores `docs/**`).
+
+- Execution pack: `docs/superpowers/plans/2026-11-16-infra-scale/README.md`
+  plus ten `phase-01` through `phase-10` Markdown plans. No new user business
+  decision blocks planning. Credentials, disposable Linux/device access,
+  provider verification and live observation are explicit later operator gates.
+- Source-grounded planning corrections: first-boot proxy maintenance upstream;
+  actual overlap deadline rather than deploy-lock timeout; explicit isolated
+  named volumes/PG18 data directory; same-backup count reference; tiny local
+  fixtures before the full Phase6 harness; proper allowed Phase5infra/Phase9
+  query scope. Baseline marks later capabilities pending; final suite requires them.
+- G1 amendment A6: forward delivery-choice migration state, lock-before-provider
+  publication including bootstrap/drift, DB-failure reconciliation, guarded120s
+  test period with30s cache/tick and one300s-maximum TTL. Extend deny coverage
+  to all real staging/private roots and correct Cloudflare phase ordering.
+- Progress details: earned consumption excludes slack consumption; ended_at
+  caps accrual; only latest identical receipt is exact, older sequences resync
+  requested ranges without activity replay. Delayed first-time closed-window
+  activity is not credited to today. Upload publishes the exact validated bytes,
+  including quiz JSON picker512KiB canonical parser limit (old UI2MiB mismatched).
+- Planning validation: ten plans plus index (1591 lines) passed the inline Python
+  checker for75 local Markdown links/anchors, required headers/tasks/gates,
+  unchecked step status, fences, scope restrictions, parent order, G1 HTML and
+  superseded contracts. Focused independent source/plan reviews covered all
+  ten phases; corrected early TLS fixture dependency, combined-chain backup
+  verification and fragmented-acknowledgement bounds (200fragments/16KiB).
+  `python manage.py audit_text_encoding` passed (864files), and
+  `git diff --check -- IMPLEMENTATION_MEMORY.md` passed at the planning
+  checkpoint. Phase 1 local implementation is recorded above; no runtime
+  migration/load/restore/provider/device/48-hour acceptance is complete, and
+  Phase 1 host/TLS validation remains open.
+
+- Changed documents: `docs/pending/INFRA_SCALE_AND_OPERATIONS_PLAN.md`,
+  `docs/pending/G1_EDGE_GATE_IMPLEMENTATION_CONTRACT.md` (new amendment A5),
+  `docs/pending/G1_EDGE_GATE_FINAL_PROPOSAL.html`, `docs/pending/README.md`
+  and this handoff. No application files, migration, database, .env, provider
+  configuration, stage, commit, branch, push or deployment changed.
+- User decisions: nightly K2 backups remain; up to one day of lost changes is
+  accepted. <=5-minute PostgreSQL recovery is from an intact local chain and
+  includes combine/verification/start/data checks; remote recovery is timed
+  separately. No continuous WAL archive/PITR requirement.
+- Testing stays on the user's PC: disposable isolated PG/Redis/volumes and
+  local provider sinks, no real delivery/storage side effects during load.
+  Report actual same-PC generator limits and final capacity after every phase,
+  including legacy removal. Added correctness/worker/upload/CGNAT scenarios
+  and explicit initial per-scenario acceptance thresholds.
+- Progress rules: cumulative server-time allowance, one bounded slack per
+  student/lesson/part, nonoverlapping evidence windows and atomic progress/
+  sequence/receipt writes. Browser retries are account/session-bound with exact
+  acknowledgements, partial acceptance and original-window 7-day replay.
+  These are required future changes, not implemented runtime behavior.
+- Cleanup bounds child rows, transaction duration and task time; no unbounded
+  parent cascade. Upload unit covers browser file payloads directly to R2 with
+  shared server-owned hard limits displayed in dashboard/pickers. Current
+  source has a 500 MiB APK limit and 10 MiB application document limit; do not
+  replace them with the old assumed 250 MB proxied allowance.
+- G1 final state: direct testing and one-time off-peak edge enablement, followed
+  by legacy delivery/selector/config/schema removal after bounded pending
+  progress drain. No permanent return-to-worker fallback. Preserve academic
+  records and delayed receipts; final forward migrations must remain runnable.
+- Added fresh-host prerequisites, effective SSH validation, TLS DNS-01 renewal,
+  dual-stack firewall checks, external host availability and Docker API log
+  collection. No live replication/dual-writer migration work or new resource
+  sizing requirement: old host is down during a move, one steady web slot,
+  <=5-minute deployment overlap and off-peak heavy operations as user directed.
+- Verification: inline Python documentation checks passed (phases 1-10 in
+  order, all 8 selected review decisions, 23 local Markdown links, HTML tag/
+  anchor/document-link checks and superseded-rule scan). `git diff --check --
+  IMPLEMENTATION_MEMORY.md` passed. `python manage.py audit_text_encoding`
+  passed (853 text files). The four pending documents are Git-ignored under
+  existing rules; they were edited in place and not force-added. Runtime/load/
+  restore/provider acceptance remains unrun and required when its phase executes.
+- Next safe step: follow [VPS_MIGRATION_RUNBOOK.md](docs/current/VPS_MIGRATION_RUNBOOK.md)
+  on the explicitly disposable VM, return sanitized host/TLS evidence and the
+  ACME owner/timer details, then close the Phase 1 gate before starting Phase 2.
+
+## Infrastructure plan section 2 (G1 edge gate): APPROVED plan
+
+Documentation-only. No application code, migration, `.env` value, Cloudflare
+setting or R2 object changed.
+
+- The G1 design was approved by the user on 2026-11-16 and consolidated into one
+  canonical plan: `docs/pending/G1_EDGE_GATE_FINAL_PROPOSAL.html` (title now
+  "approved plan"; the filename stays because the sandbox cannot rename files).
+  The earlier review and draft contract are superseded.
+- Approved parameters: random 16 character token (`secrets.token_urlsafe(12)`,
+  never a timestamp); 30 minute rotation with one grace token, so a leaked link
+  lives 30-60 min; Postgres row as the only source of truth with a Redis
+  read-through copy (300 s TTL, written after commit); one authenticated
+  `/gate/` JSON endpoint returning `token` and `refresh_at`; hls.js `xhrSetup`
+  rewrite for seamless web playback; iOS native HLS fallback (manifest refetch,
+  swap `src`, seek); one Free rate-limiting rule (300 requests per 10 s per IP,
+  block 10 s); a drift check every 5 min that re-pushes and alerts on mismatch.
+  No sockets, no SSE, no push for the token; notifications stay on the existing
+  Web Push pipeline; presence comes from heartbeats.
+- PWA-only decision: no native app, so `mobile_api` and the mobile viewing-session
+  channel are out of scope and untouched. iOS still needs the native-HLS fallback
+  because WebKit has no MSE.
+- `docs/pending/G1_EDGE_GATE_IMPLEMENTATION_CONTRACT.md` was rewritten as the
+  implementation appendix: file scope (now includes `views.py`, `urls.py`,
+  `progressTracker.js`, `lesson_media.js`), shared functions, rotation state
+  machine, gate endpoint, client contract, invariants, per-file instructions,
+  operator prerequisites, verification and rollout.
+- Superseded files replaced with tombstones (the sandbox cannot delete):
+  `docs/pending/INFRA_PLAN_G1_EDGE_GATE_REVIEW.md` and
+  `docs/pending/infra_plan_g1_edge_gate_review.html`. The index rows in
+  `docs/pending/README.md` now mark the plan as approved and the two files as
+  superseded.
+- Verification: approved plan HTML parses with zero unbalanced tags (17 sections,
+  4 SVG figures), both style blocks brace-balanced, both inline scripts pass
+  `node --check`, ASCII-only byte scan clean, `audit_text_encoding` passes (851
+  files). A headless render is still impossible here (sandbox denies browser
+  launch), so the visual result is unverified.
+- Current gates: Phase 8 cumulative plausibility and durable replay replace
+  verified-segment evidence; no bitmap table. The shared-zone host is resolved
+  as `cdn.bibleinstitute-eg.org`. Phase 8 must pass before the one-time Phase 10
+  edge enablement and eventual legacy removal (A5). Old operational choices and
+  direct_r2/worker rollback promises are superseded by the parent programme.
+- Next safe step follows the sequential infrastructure programme above. The
+  later Phase 7 contract still stages at `MEDIA_GATE_PERIOD_SECONDS=120` with
+  all acceptance checks; this documentation does not implement or enable it.
+
+## Background jobs page 500 on PostgreSQL (UNION type mismatch)
+
+Reported: `/management/background-jobs/` returned 500 on PostgreSQL with
+`ProgrammingError: UNION types text and timestamp with time zone cannot be
+matched` from `Paginator(monitored_jobs(**data), PAGE_SIZE)`.
+
+- Root cause: `management_system/job_monitor.py::_projection()` set
+  `monitor_next_poll = Value(None, output_field=DateTimeField())`. Django renders
+  that as a bare `NULL`, so PostgreSQL's `select_common_type()` resolves the first
+  all-unknown UNION pair (`management` + `quiz`, with `media`/`gallery` also
+  `NULL`) to `TEXT`; the `announcement` branch's `scheduled_for` (timestamptz) then
+  cannot be matched. This was pure SQL typing, not data or permissions.
+- Fix: `next_poll = Cast(Value(None), output_field=DateTimeField())`, so every
+  non-scheduled family emits `(NULL)::timestamp with time zone` and the UNION
+  column stays timestamptz. `Cast` was already imported; no migration, caller,
+  template or API change.
+- Verification (disposable PostgreSQL 18 in Docker, `lms_probe` on
+  `127.0.0.1:55432`, migrations 0001-0125 applied):
+  - The pre-fix file reproduced the exact `ProgrammingError` through
+    `monitored_jobs().count()`; the fixed file passed 33 checks: every family's
+    count/list, default union count and page, `Paginator` page 1 and page 999,
+    cross-family `selection`, search/status filters, and a seeded queued
+    `Announcement` (`monitor_next_poll` came back tz-aware, `readable_job()`
+    produced its Arabic label/phase).
+  - HTTP with a real admin session: `background-jobs`, `notification-history`,
+    `?family=announcement`, `?page=2`, the announcement detail page and
+    `background-job-status-batch` all returned 200.
+  - `manage.py check` passed before the fix (and again immediately after) with
+    no other changes in these files. `makemigrations --check --dry-run` reported
+    no changes. `audit_text_encoding --skip-checks` passed (853 files) and
+    `compileall` is clean.
+  - A later `manage.py check` run failed on unrelated in-flight edits in
+    `management_system/{models,portal_views,urls}.py` made by another session
+    during this task; `job_monitor.py` was not involved.
+- Known limits: the production Docker stack was not reachable from this
+  machine, so the page was verified on a disposable migrated database, not the
+  live data volume. The SQL shape is unchanged apart from the typed NULL, so no
+  index or plan change is expected.
+- Next safe step: deploy/reload the app and open Background Jobs; the page and
+  its announcement rows should load.
+
+## Option B HLS segment delivery (302 to 60s R2 presigned URL) with self-healing player
+
+Requested / approved scope:
+- Implement Option B (`302` redirects to 60s default Cloudflare R2 presigned URLs via `MEDIA_PRESIGNED_URL_SECONDS=60`) while preserving `CLOUD_WORKER`, `WORKER_RECEIPT_SECRET`, `worker.js`, and `/api/worker/receipt/` (`worker_receipt`), controlled by an admin toggle in Site & Apps -> Media Delivery (`MediaDeliverySettings`) instead of clearing `CLOUD_WORKER` in `.env`.
+- Ensure every `.ts` segment fetch in Option B hits Django with a server-HMAC token bound to `(audience, session_id, token_expires_at, segment_key)` so `VerifiedSegmentRequest` is recorded exclusively server-side inside the authorized `GET` segment endpoint and cannot be forged through APIs (`worker_receipt` rejects with `403` when `CLOUD_WORKER` is blank).
+- Ensure the web player recovers automatically from segment/manifest/session failures without requiring a full page refresh, and surfaces an inline translated Retry control if retries exhaust.
+
+Changes and decisions:
+- `management_system/models.py`, `management_system/migrations/0126_media_delivery_settings.py`, `management_system/forms.py`, `management_system/portal_views.py`, `management_system/admin.py`, `management_system/admin_navigation.py`, `management_system/urls.py`, `management_system/templates/{media_delivery_settings.html,partials/media_delivery_settings_content.html}`, `locale/ar/LC_MESSAGES/django.{po,mo}`:
+  - Added `MediaDeliverySettings` (`direct_r2` vs `worker`, cached with `on_commit` invalidation), `MediaDeliverySettingsForm` (rejecting `worker` when `CLOUD_WORKER` is blank), `media_delivery_settings` view (`can_manage_academic_setup`), Site & Apps nav item `Media Delivery` (`/dashboard/media-delivery/`), Django admin registration, and compiled Arabic translations.
+- `learning_platform/settings.py`, `.env.example`, `learning_platform/urls.py`:
+  - Kept `CLOUD_WORKER` and `WORKER_RECEIPT_SECRET` for legacy Worker mode; added `MEDIA_PRESIGNED_URL_SECONDS` (default `60`, clamped `30..300`) and unprefixed `/media/seg/<str:session_id>/<path:segment_key>` (`media-segment`).
+- `management_system/media_delivery.py`, `management_system/views.py`, `management_system/mobile_api.py`:
+  - Added `effective_segment_delivery_mode()`, `use_legacy_worker_segments()`, `normalize_segment_key()`, `verify_media_token()`, and `authorize_and_presign_segment()` enforcing active web session ownership (`request.user == session.student`) or active non-revoked `mobile_session`, `session.ended_at is None`, session/token expiry, canonical offering/lesson access (`get_accessible_offering_or_403` + `lesson_is_available`), manifest folder containment, and HMAC digest validation before generating a 60s R2 `get_object` presigned URL and writing `VerifiedSegmentRequest` on `GET` only (never `HEAD`).
+  - Updated `build_manifest_playlist()` to consult `use_legacy_worker_segments()`: emits `${CLOUD_WORKER}/media/...` when `worker` mode + `CLOUD_WORKER` configured, or `/media/seg/...` (`direct_r2` mode or blank `CLOUD_WORKER`).
+  - Preserved legacy `worker_receipt()` at `/api/worker/receipt/` with constant-time `hmac.compare_digest` secret verification and `session.ended_at is None` check (disabled `403` when `CLOUD_WORKER` is blank; still processes in-flight Worker receipts when `CLOUD_WORKER` is configured). Added `Cache-Control: private, no-store` to manifest, segment `302`, and `401`/`403`/`404`/`503` JSON error responses.
+- `management_system/static/js/alpine/components/progressTracker.js`, `management_system/static/js/lesson_media.js`, `management_system/templates/course_detail.html`, `management_system/templates/student_next/partials/lesson_runtime.html`, `management_system/static/css/{app_student,student_next}.css`:
+  - Replaced single-shot refresh lockout and 80%-lifetime error sleep with bounded exponential backoff (`2s -> 4s -> 8s -> 15s`, max 5 auto-retries), automatic recovery on `'online'` / tab visibility return, JSON content-type checks on `startSession()`, live timestamp/playing-state preservation across reloads, expanded Video.js/native error recovery (`401`/`403`/`404`/`408`/`410`/`429`/`5xx`/`status 0`/`MediaError` codes `2`/`3`/`4`), and an inline translated `"Retry"` button (`media-recovery-failed`) inside `.media-reload-overlay`.
+- Verification & operations note:
+  - R2 bucket CORS must allow `GET` and `HEAD` from the LMS origin so browser Video.js/VHS XHR can follow `302` redirects directly to R2.
+  - PostgreSQL/Docker is not running locally in this environment; verify against PostgreSQL + R2 CORS before release.
+  - Verified on disposable SQLite (`tmp/option_b_verify/smoke.py`) and mocked DOM/VideoJS Node harness (`tmp/option_b_verify/verify_js_recovery.mjs`), plus `manage.py check`, `makemigrations --check --dry-run`, `audit_text_encoding`, `compileall`, and `node --check`.
+
 ## Admin and staff access to student_next views
 
 Requested / approved scope:

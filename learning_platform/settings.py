@@ -244,6 +244,20 @@ WSGI_APPLICATION = 'learning_platform.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/5.1/ref/settings/#databases
 
+
+def _database_conn_max_age() -> int:
+    """Seconds a PostgreSQL connection is reused; malformed values fail fast."""
+    raw = os.getenv("DJANGO_CONN_MAX_AGE", "60").strip()
+    if not re.fullmatch(r"[0-9]+", raw):
+        raise ImproperlyConfigured(
+            "DJANGO_CONN_MAX_AGE must be a nonnegative integer number of "
+            f"seconds; got {raw!r}. Use 60 (the default) to reuse healthy "
+            "connections, or 0 to open a new connection per request."
+        )
+    return int(raw)
+
+
+_db_conn_max_age = _database_conn_max_age()
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
@@ -252,6 +266,15 @@ DATABASES = {
         'PASSWORD': os.getenv('POSTGRES_PASSWORD', 'dev_password_change_me'),
         'HOST': os.getenv('POSTGRES_HOST', 'localhost'),
         'PORT': os.getenv('POSTGRES_PORT', '5432'),
+        # Persistent connections belong to the PostgreSQL alias only; the
+        # read-only sqlite_source import alias stays connection-option free.
+        # CONN_MAX_AGE and CONN_HEALTH_CHECKS are Django connection settings,
+        # not libpq options, so they must stay top-level alias keys: anything
+        # inside OPTIONS is forwarded to the driver and rejected there.
+        # Health checks validate a reused connection, so they are pointless
+        # when every request opens its own connection (CONN_MAX_AGE=0).
+        'CONN_MAX_AGE': _db_conn_max_age,
+        'CONN_HEALTH_CHECKS': _db_conn_max_age > 0,
     },
     'sqlite_source': {
         'ENGINE': 'django.db.backends.sqlite3',
@@ -282,6 +305,7 @@ CELERY_TASK_TRACK_STARTED = True
 CELERY_TIMEZONE = TIME_ZONE
 CELERY_IMPORTS = (
     "management_system.attendance_tasks",
+    "management_system.media_gate_tasks",
     "management_system.telegram_tasks",
     "management_system.media_tasks",
     "management_system.mobile_push_tasks",
@@ -304,11 +328,27 @@ CELERY_TASK_ROUTES = {
     # Recovery is a lightweight coordinator and must remain runnable when the
     # dedicated admin worker is busy with a population-sized operation.
     "management_system.admin_operation_tasks.recover_admin_operations": {"queue": "default"},
+    "management_system.attendance_tasks.cleanup_viewing_sessions": {"queue": "admin"},
 }
+MEDIA_GATE_PERIOD_SECONDS = os.getenv("MEDIA_GATE_PERIOD_SECONDS", "1800")
+
+
+def _notification_redelivery_interval() -> int:
+    """Beat cadence for the notification redelivery ledger; bounded 30-60s."""
+    raw = os.getenv("NOTIFICATION_REDELIVERY_INTERVAL_SECONDS", "45").strip()
+    if re.fullmatch(r"[0-9]+", raw) and 30 <= int(raw) <= 60:
+        return int(raw)
+    raise ImproperlyConfigured(
+        "NOTIFICATION_REDELIVERY_INTERVAL_SECONDS must be an integer between "
+        f"30 and 60 seconds inclusive; got {raw!r}."
+    )
+
+
+NOTIFICATION_REDELIVERY_INTERVAL_SECONDS = _notification_redelivery_interval()
 CELERY_BEAT_SCHEDULE = {
     "refresh-notification-redeliveries": {
         "task": "management_system.admin_operation_tasks.refresh_notification_redeliveries",
-        "schedule": 5.0,
+        "schedule": NOTIFICATION_REDELIVERY_INTERVAL_SECONDS,
     },
     "recover-admin-operations": {
         "task": "management_system.admin_operation_tasks.recover_admin_operations",
@@ -343,6 +383,24 @@ CELERY_BEAT_SCHEDULE = {
     "reconcile-daily-attendance": {
         "task": "management_system.attendance_tasks.reconcile_daily_attendance",
         "schedule": crontab(hour=22, minute=0),
+    },
+    "cleanup-viewing-sessions": {
+        "task": "management_system.attendance_tasks.cleanup_viewing_sessions",
+        "schedule": crontab(hour=3, minute=15),
+    },
+    "media-gate-rotation": {
+        "task": "management_system.media_gate_tasks.rotate_media_gate_token",
+        "schedule": 30.0 if (
+            MEDIA_GATE_PERIOD_SECONDS == "120"
+            and os.getenv("MEDIA_GATE_ALLOW_SHORT_PERIOD") == "1"
+        ) else 300.0,
+    },
+    "media-gate-drift": {
+        "task": "management_system.media_gate_tasks.check_media_gate_drift",
+        "schedule": 30.0 if (
+            MEDIA_GATE_PERIOD_SECONDS == "120"
+            and os.getenv("MEDIA_GATE_ALLOW_SHORT_PERIOD") == "1"
+        ) else 300.0,
     },
     "recover-pending-announcements": {
         "task": "management_system.announcement_tasks.recover_pending_announcements",
@@ -542,6 +600,12 @@ MEDIA_JOB_TIMEOUT_SECONDS = int(os.getenv("MEDIA_JOB_TIMEOUT_SECONDS", str(2 * 6
 # never interrupts playback. Default 3 hours.
 MEDIA_VIEWING_SESSION_HOURS = int(os.getenv("MEDIA_VIEWING_SESSION_HOURS", "3"))
 MEDIA_SEGMENT_TOKEN_MINUTES = int(os.getenv("MEDIA_SEGMENT_TOKEN_MINUTES", "180"))
+MEDIA_EDGE_BASE_URL = os.getenv("MEDIA_EDGE_BASE_URL", "").strip().rstrip("/")
+CLOUDFLARE_ZONE_ID = os.getenv("CLOUDFLARE_ZONE_ID", "").strip()
+CLOUDFLARE_WAF_RULESET_ID = os.getenv("CLOUDFLARE_WAF_RULESET_ID", "").strip()
+CLOUDFLARE_WAF_RULE_ID = os.getenv("CLOUDFLARE_WAF_RULE_ID", "").strip()
+CLOUDFLARE_WAF_HOST = os.getenv("CLOUDFLARE_WAF_HOST", "").strip().lower()
+CLOUDFLARE_API_TOKEN = os.getenv("CLOUDFLARE_API_TOKEN", "").strip()
 MEDIA_SEGMENT_SECONDS = int(os.getenv("MEDIA_SEGMENT_SECONDS", "6"))
 MEDIA_SOURCE_RETENTION_HOURS = int(os.getenv("MEDIA_SOURCE_RETENTION_HOURS", "24"))
 MEDIA_FAILED_SOURCE_RETENTION_HOURS = int(os.getenv("MEDIA_FAILED_SOURCE_RETENTION_HOURS", "72"))
@@ -663,7 +727,6 @@ R2_SECRET_ACCESS_KEY = os.environ.get("R2_SECRET_ACCESS_KEY") or os.environ.get(
 R2_BUCKET_NAME = os.environ.get("R2_BUCKET_NAME") or os.environ.get("bucket") or ""
 TELEGRAM_R2_BUCKET_NAME = os.environ.get("TELEGRAM_R2_BUCKET_NAME", "")
 CLOUDFLARE_ACCOUNT_ID = os.environ.get("CLOUDFLARE_ACCOUNT_ID", "")
-CLOUDFLARE_API_TOKEN = os.environ.get("CLOUDFLARE_API_TOKEN", "")
 # Graduation gallery: gallery bytes stay private in R2_BUCKET_NAME under the
 # unguessable `galleries/` prefix. Readers receive cached signed GET URLs
 # (ResponseCacheControl `public, max-age, immutable`) that are reused until
@@ -682,6 +745,13 @@ CRISPY_TEMPLATE_PACK = "bootstrap5"
 # Enable Multilangual
 USE_I18N = True
 
+
+# Sessions
+# cached_db reads a session from the cache for ordinary requests but keeps the
+# authoritative session row, so a Redis outage falls back to the database and
+# does not log users out. It uses the `default` cache configured above.
+SESSION_ENGINE = "django.contrib.sessions.backends.cached_db"
+SESSION_CACHE_ALIAS = "default"
 
 # Sessions expiry
 SESSION_COOKIE_AGE = 60 * 60 * 24 * 7 # Seconds Minutes Hours Days

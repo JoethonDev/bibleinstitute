@@ -232,8 +232,10 @@ from .media_delivery import (
     MEDIA_TOKEN_VERSION,
     MediaAccessError,
     authorize_and_presign_segment,
+    authorize_viewing_session,
     build_manifest_playlist,
     create_viewing_session,
+    effective_segment_delivery_mode,
     open_book_document,
     resolve_audio_download,
     resolve_media_link,
@@ -241,6 +243,7 @@ from .media_delivery import (
     sign_session,
     valid_session_token,
 )
+from .media_gate import MediaGateUnavailable, gate_payload
 from .course_content import course_navigation, with_offering_content_counts
 from .mobile_auth import revoke_user_mobile_access
 from .utils.hls_parser import get_segment_number
@@ -8422,10 +8425,23 @@ def start_viewing_session(request, offering_id, lesson_id, file_index):
         if exc.code == "not_found":
             raise Http404
         return JsonResponse({"error": exc.message}, status=400)
+    delivery_mode = effective_segment_delivery_mode()
+    gate_state = None
+    if delivery_mode == MediaDeliverySettings.SegmentDeliveryMode.EDGE_GATE:
+        try:
+            gate_state = gate_payload()
+        except MediaGateUnavailable:
+            response = JsonResponse({"error": _("Media delivery is temporarily unavailable.")}, status=503)
+            response["Cache-Control"] = "private, no-store"
+            return response
     # Each player/tab gets an independent authorization session and sequence.
     # Logical study sessions are shared and serialized by the progress row lock.
     session = create_viewing_session(
-        request.user, media.lesson, media.part_id, media_key=media.media_key
+        request.user,
+        media.lesson,
+        media.part_id,
+        media_key=media.media_key,
+        segment_delivery_mode=delivery_mode,
     )
     token = sign_session(session.session_id, session.expires_at, audience="web")
     progress_row = LectureProgress.objects.filter(
@@ -8435,7 +8451,7 @@ def start_viewing_session(request, offering_id, lesson_id, file_index):
     ).values("percent", "last_position_seconds").first()
     progress_percent = int(progress_row["percent"] or 0) if progress_row else 0
     resume_seconds = int(progress_row["last_position_seconds"] or 0) if progress_row else 0
-    return JsonResponse({
+    payload = {
         "session_id": session.session_id,
         "token": token,
         "expires_at": session.expires_at.isoformat(),
@@ -8446,7 +8462,16 @@ def start_viewing_session(request, offering_id, lesson_id, file_index):
         ),
         "progress_percent": progress_percent,
         "resume_seconds": resume_seconds,
-    })
+    }
+    if gate_state is not None:
+        payload["gate_token"] = gate_state["token"]
+        payload["gate_refresh_at"] = gate_state["refresh_at"]
+        payload["gate_valid_until"] = gate_state["valid_until"]
+        payload["gate_url"] = reverse(
+            "media-gate-refresh",
+            args=[media.offering.pk, media.lesson.pk, media.file_index],
+        )
+    return JsonResponse(payload)
 
 @login_required
 def lesson_manifest(request, offering_id, lesson_id, file_index):
@@ -8467,27 +8492,18 @@ def lesson_manifest(request, offering_id, lesson_id, file_index):
     token = request.GET.get("token", "")
     if not session_id or not token:
         return JsonResponse({"error": _("Viewing session is required.")}, status=401)
-    session = get_object_or_404(
-        ViewingSession,
-        session_id=session_id,
-        student=request.user,
-        lesson=media.lesson,
-        part_id=media.part_id,
-    )
-    if session.ended_at is not None or timezone.now() >= session.expires_at:
-        return JsonResponse({"error": _("Viewing session expired.")}, status=401)
     audience = getattr(request, "media_audience", "web")
-    expected_channel = (
-        ViewingSession.AccessChannel.MOBILE
-        if audience == "mobile"
-        else ViewingSession.AccessChannel.WEB
-    )
-    if session.access_channel != expected_channel:
-        return JsonResponse({"error": _("Invalid viewing session token.")}, status=403)
-    if not valid_session_token(token, session, audience=audience):
-        return JsonResponse({"error": _("Invalid viewing session token.")}, status=403)
-    if session.media_key and session.media_key != media.media_key:
-        return JsonResponse({"error": _("Invalid viewing session token.")}, status=403)
+    try:
+        session = authorize_viewing_session(
+            user=request.user,
+            media=media,
+            session_id=session_id,
+            token=token,
+            audience=audience,
+        )
+    except MediaAccessError as exc:
+        status_map = {"unauthenticated": 401, "expired": 401, "forbidden": 403, "not_found": 404}
+        return JsonResponse({"error": exc.message}, status=status_map.get(exc.code, 403))
     try:
         playlist = build_manifest_playlist(
             user=request.user,
@@ -8502,11 +8518,87 @@ def lesson_manifest(request, offering_id, lesson_id, file_index):
             return JsonResponse({"error": exc.message}, status=401)
         if exc.code == "forbidden":
             return JsonResponse({"error": exc.message}, status=403)
-        return HttpResponse(status=404)
+        return HttpResponse(status=503 if exc.code == "unavailable" else 404)
     response = HttpResponse(
         playlist,
         content_type="application/vnd.apple.mpegurl",
     )
+    response["Cache-Control"] = "private, no-store"
+    return response
+
+
+@login_required
+@require_GET
+def media_gate_refresh(request, offering_id, lesson_id, file_index):
+    """Return the current edge path token for one authorized viewing session."""
+    try:
+        media = resolve_media_link(
+            user=request.user,
+            offering_id=offering_id,
+            lesson_id=lesson_id,
+            file_index=file_index,
+            allowed_types=("video", "audio"),
+            allow_unpublished=True,
+        )
+    except MediaAccessError as exc:
+        if exc.code == "forbidden":
+            raise PermissionDenied(exc.message)
+        return HttpResponse(status=404)
+    session_id = request.GET.get("session_id", "")
+    token = request.GET.get("token", "")
+    if not session_id or not token:
+        response = JsonResponse({"error": _("Viewing session is required.")}, status=401)
+        response["Cache-Control"] = "private, no-store"
+        return response
+    audience = getattr(request, "media_audience", "web")
+    try:
+        session = authorize_viewing_session(
+            user=request.user,
+            media=media,
+            session_id=session_id,
+            token=token,
+            audience=audience,
+        )
+    except MediaAccessError as exc:
+        status_map = {"unauthenticated": 401, "expired": 401, "forbidden": 403, "not_found": 404}
+        response = JsonResponse({"error": exc.message}, status=status_map.get(exc.code, 403))
+        response["Cache-Control"] = "private, no-store"
+        return response
+
+    mode = session.segment_delivery_mode
+    if mode == ViewingSession.SegmentDeliveryMode.LEGACY:
+        mode = effective_segment_delivery_mode()
+    if mode != ViewingSession.SegmentDeliveryMode.EDGE_GATE:
+        response = JsonResponse({"error": _("Media gate is unavailable for this session.")}, status=404)
+        response["Cache-Control"] = "private, no-store"
+        return response
+
+    window = int(timezone.now().timestamp() // 60)
+    cache_key = f"media-gate-refresh:{request.user.pk}:{session.pk}:{window}"
+    try:
+        if cache.add(cache_key, 1, timeout=70):
+            request_count = 1
+        else:
+            try:
+                request_count = cache.incr(cache_key)
+            except ValueError:
+                request_count = 1 if cache.add(cache_key, 1, timeout=70) else cache.incr(cache_key)
+    except Exception:
+        response = JsonResponse({"error": _("Media delivery is temporarily unavailable.")}, status=503)
+        response["Cache-Control"] = "private, no-store"
+        return response
+    if request_count > 60:
+        response = JsonResponse({"error": _("Too many media token refresh requests.")}, status=429)
+        response["Retry-After"] = str(max(1, 60 - int(timezone.now().timestamp()) % 60))
+        response["Cache-Control"] = "private, no-store"
+        return response
+    try:
+        payload = gate_payload()
+    except MediaGateUnavailable:
+        response = JsonResponse({"error": _("Media delivery is temporarily unavailable.")}, status=503)
+        response["Cache-Control"] = "private, no-store"
+        return response
+    response = JsonResponse(payload)
     response["Cache-Control"] = "private, no-store"
     return response
 
@@ -8659,6 +8751,7 @@ def progress_heartbeat(request, *, allow_management=False):
             "unauthenticated": 401,
             "forbidden": 403,
             "expired": 403,
+            "media_unavailable": 503,
         }.get(exc.code, 400)
         return JsonResponse({"error": exc.message}, status=status)
     return JsonResponse(result.as_payload())
@@ -8867,7 +8960,7 @@ def export_report_csv(request):
         writer.writerow([
             _("Student ID"), _("Username"), _("First Name"), _("Last Name"), _("Study Mode"),
             _("Level"), _("Academic Year"), _("Grade Earned"), _("Grade Available"), _("Grade %"),
-            _("Expected"), _("Full days"), _("Fully scanned days"), _("Partial"), _("Absent"), _("Attendance Score"),
+            _("Expected"), _("Full attendance"), _("Fully scanned days"), _("Partial attendance"), _("Absent"), _("Attendance Score"),
             _("Attendance %"), _("Absence %"),
         ])
         yield output.getvalue()

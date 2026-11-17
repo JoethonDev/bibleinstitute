@@ -4,7 +4,8 @@ Android build publish form. Single definition: rendered inline when the page is
 opened with ?new=1 and fetched into the shared drawer through ?fragment=form, so
 the field ids are never duplicated in one document.
 {% endcomment %}
-<form method="post" action="{% url 'app-release-manage' %}" enctype="multipart/form-data" hx-post="{% url 'app-release-manage' %}" hx-target="#content" hx-swap="outerHTML" hx-select="#content" hx-select-oob="#toast-stack" hx-push-url="true">
+<form method="post" action="{% url 'app-release-manage' %}" enctype="multipart/form-data" hx-post="{% url 'app-release-manage' %}" hx-target="#content" hx-swap="outerHTML" hx-select="#content" hx-select-oob="#toast-stack" hx-push-url="true"
+      data-direct-upload="{% url 'direct-upload-authorize' %}" data-upload-message-failed="{% translate 'The upload failed. Please try again.' %}">
     {% csrf_token %}
     <div class="aw-form-section">
         <div class="aw-form-grid">
@@ -18,7 +19,10 @@ the field ids are never duplicated in one document.
             </div>
             <div class="aw-field">
                 <label for="id_apk">{% translate "APK file" %}</label>
-                <input id="id_apk" class="aw-input" type="file" name="apk" accept=".apk" required>
+                <input id="id_apk" class="aw-input" type="file" name="apk" accept=".apk" required
+                       data-upload-purpose="apk" data-upload-field="apk">
+                <p class="aw-hint">{% translate "Uploaded directly to storage. Maximum size: 500 MB." %}</p>
+                <p class="aw-hint" data-upload-status hidden role="status"></p>
             </div>
             <div class="aw-field">
                 <label for="id_release_notes">{% translate "Release notes" %}</label>

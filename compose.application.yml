@@ -10,15 +10,31 @@ x-app-environment: &app-environment
   POSTGRES_HOST: postgres
   POSTGRES_PORT: 5432
   SQLITE_SOURCE_PATH: /app/db.sqlite3
+  DJANGO_CONN_MAX_AGE: ${DJANGO_CONN_MAX_AGE:-60}
   REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
   REDIS_CACHE_URL: ${REDIS_CACHE_URL:-redis://redis:6379/1}
   CELERY_BROKER_URL: ${CELERY_BROKER_URL:-redis://redis:6379/0}
   CELERY_RESULT_BACKEND: ${CELERY_RESULT_BACKEND:-redis://redis:6379/0}
-  WEB_CONCURRENCY: ${WEB_CONCURRENCY:-2}
-  WEB_THREADS: ${WEB_THREADS:-8}
-  GUNICORN_TIMEOUT: ${GUNICORN_TIMEOUT:-1800}
+  NOTIFICATION_REDELIVERY_INTERVAL_SECONDS: ${NOTIFICATION_REDELIVERY_INTERVAL_SECONDS:-45}
+  WEB_CONCURRENCY: ${WEB_CONCURRENCY:-3}
+  WEB_THREADS: ${WEB_THREADS:-4}
+  GUNICORN_TIMEOUT: ${GUNICORN_TIMEOUT:-60}
+  GUNICORN_GRACEFUL_TIMEOUT: ${GUNICORN_GRACEFUL_TIMEOUT:-30}
+  GUNICORN_KEEPALIVE: ${GUNICORN_KEEPALIVE:-5}
+  GUNICORN_MAX_REQUESTS: ${GUNICORN_MAX_REQUESTS:-2000}
+  GUNICORN_MAX_REQUESTS_JITTER: ${GUNICORN_MAX_REQUESTS_JITTER:-200}
   STATIC_ASSET_VERSION: ${STATIC_ASSET_VERSION:-dev}
   FFPROBE_BINARY: ${FFPROBE_BINARY:-ffprobe}
+  # Edge-gated media (Phase 7) non-secret settings. The Cloudflare Rulesets API
+  # token is intentionally absent: it stays in .env, never in the Compose
+  # interpolation file, and the raw .env service env_file supplies it.
+  MEDIA_EDGE_BASE_URL: ${MEDIA_EDGE_BASE_URL:-}
+  MEDIA_GATE_PERIOD_SECONDS: ${MEDIA_GATE_PERIOD_SECONDS:-1800}
+  MEDIA_GATE_ALLOW_SHORT_PERIOD: ${MEDIA_GATE_ALLOW_SHORT_PERIOD:-0}
+  CLOUDFLARE_ZONE_ID: ${CLOUDFLARE_ZONE_ID:-}
+  CLOUDFLARE_WAF_RULESET_ID: ${CLOUDFLARE_WAF_RULESET_ID:-}
+  CLOUDFLARE_WAF_RULE_ID: ${CLOUDFLARE_WAF_RULE_ID:-}
+  CLOUDFLARE_WAF_HOST: ${CLOUDFLARE_WAF_HOST:-}
 
 # Only the web slots and the general Celery worker need browser push/passkey
 # configuration. The media and admin workers keep the base environment so the
@@ -65,11 +81,21 @@ services:
       - --worker-class
       - gthread
       - --workers
-      - ${WEB_CONCURRENCY:-2}
+      - ${WEB_CONCURRENCY:-3}
       - --threads
-      - ${WEB_THREADS:-8}
+      - ${WEB_THREADS:-4}
       - --timeout
-      - ${GUNICORN_TIMEOUT:-1800}
+      - ${GUNICORN_TIMEOUT:-60}
+      - --graceful-timeout
+      - ${GUNICORN_GRACEFUL_TIMEOUT:-30}
+      - --keepalive
+      - ${GUNICORN_KEEPALIVE:-5}
+      - --max-requests
+      - ${GUNICORN_MAX_REQUESTS:-2000}
+      - --max-requests-jitter
+      - ${GUNICORN_MAX_REQUESTS_JITTER:-200}
+      - --worker-tmp-dir
+      - /dev/shm
     expose:
       - 8000
     healthcheck:
@@ -93,11 +119,21 @@ services:
       - --worker-class
       - gthread
       - --workers
-      - ${WEB_CONCURRENCY:-2}
+      - ${WEB_CONCURRENCY:-3}
       - --threads
-      - ${WEB_THREADS:-8}
+      - ${WEB_THREADS:-4}
       - --timeout
-      - ${GUNICORN_TIMEOUT:-1800}
+      - ${GUNICORN_TIMEOUT:-60}
+      - --graceful-timeout
+      - ${GUNICORN_GRACEFUL_TIMEOUT:-30}
+      - --keepalive
+      - ${GUNICORN_KEEPALIVE:-5}
+      - --max-requests
+      - ${GUNICORN_MAX_REQUESTS:-2000}
+      - --max-requests-jitter
+      - ${GUNICORN_MAX_REQUESTS_JITTER:-200}
+      - --worker-tmp-dir
+      - /dev/shm
     expose:
       - 8000
     healthcheck:
@@ -164,14 +200,27 @@ services:
       POSTGRES_HOST: postgres
       POSTGRES_PORT: 5432
       SQLITE_SOURCE_PATH: /app/db.sqlite3
+      DJANGO_CONN_MAX_AGE: ${DJANGO_CONN_MAX_AGE:-60}
       REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
       CELERY_BROKER_URL: ${CELERY_BROKER_URL:-redis://redis:6379/0}
       CELERY_RESULT_BACKEND: ${CELERY_RESULT_BACKEND:-redis://redis:6379/0}
-      WEB_CONCURRENCY: ${WEB_CONCURRENCY:-2}
-      WEB_THREADS: ${WEB_THREADS:-8}
-      GUNICORN_TIMEOUT: ${GUNICORN_TIMEOUT:-1800}
+      NOTIFICATION_REDELIVERY_INTERVAL_SECONDS: ${NOTIFICATION_REDELIVERY_INTERVAL_SECONDS:-45}
+      WEB_CONCURRENCY: ${WEB_CONCURRENCY:-3}
+      WEB_THREADS: ${WEB_THREADS:-4}
+      GUNICORN_TIMEOUT: ${GUNICORN_TIMEOUT:-60}
+      GUNICORN_GRACEFUL_TIMEOUT: ${GUNICORN_GRACEFUL_TIMEOUT:-30}
+      GUNICORN_KEEPALIVE: ${GUNICORN_KEEPALIVE:-5}
+      GUNICORN_MAX_REQUESTS: ${GUNICORN_MAX_REQUESTS:-2000}
+      GUNICORN_MAX_REQUESTS_JITTER: ${GUNICORN_MAX_REQUESTS_JITTER:-200}
       STATIC_ASSET_VERSION: ${STATIC_ASSET_VERSION:-dev}
       FFPROBE_BINARY: ${FFPROBE_BINARY:-ffprobe}
+      MEDIA_EDGE_BASE_URL: ${MEDIA_EDGE_BASE_URL:-}
+      MEDIA_GATE_PERIOD_SECONDS: ${MEDIA_GATE_PERIOD_SECONDS:-1800}
+      MEDIA_GATE_ALLOW_SHORT_PERIOD: ${MEDIA_GATE_ALLOW_SHORT_PERIOD:-0}
+      CLOUDFLARE_ZONE_ID: ${CLOUDFLARE_ZONE_ID:-}
+      CLOUDFLARE_WAF_RULESET_ID: ${CLOUDFLARE_WAF_RULESET_ID:-}
+      CLOUDFLARE_WAF_RULE_ID: ${CLOUDFLARE_WAF_RULE_ID:-}
+      CLOUDFLARE_WAF_HOST: ${CLOUDFLARE_WAF_HOST:-}
       MEDIA_WORK_DIR: ${MEDIA_WORK_DIR:-/var/lib/lms-media-processing}
       MEDIA_MAX_SOURCE_SIZE: ${MEDIA_MAX_SOURCE_SIZE:-2147483648}
       MEDIA_MAX_DURATION_SECONDS: ${MEDIA_MAX_DURATION_SECONDS:-10800}

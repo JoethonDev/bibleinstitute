@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-import uuid
+from datetime import timedelta
 
 from django import forms
 from django.conf import settings
@@ -11,7 +11,7 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
 from django.core.paginator import Paginator
-from django.db import IntegrityError, transaction
+from django.db import DatabaseError, IntegrityError, transaction
 from django.http import Http404
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -19,17 +19,19 @@ from django.utils.translation import gettext as _
 from django.views.decorators.http import require_POST
 
 from .announcements import AnnouncementError, clean_announcement_action
+from .direct_uploads import DirectUploadError, finalize_direct_upload
 from .mobile_versioning import MAX_VERSION_CODE, is_valid_update_url, normalize_platform
 from .forms import MediaDeliverySettingsForm
 from .media_delivery import effective_segment_delivery_mode, media_presigned_url_seconds
-from .models import MediaDeliverySettings, MobileAppRelease, MobileAppUpdatePolicy, MobileDownloadPolicy, MobilePushSettings, StudentBanner
+from .media_gate import MediaGateError, period_seconds, waf_expression
+from .models import DirectUploadAuthorization, MediaDeliverySettings, MediaGateToken, MobileAppRelease, MobileAppUpdatePolicy, MobileDownloadPolicy, MobilePushSettings, StudentBanner
 from .models import StudentMode
 from .student_experience.mode import resolve_student_mode
 from .student_experience.render import render_student_page
 from .storage_coordination import assert_storage_namespace_available, guarded_storage_write, lock_storage_namespace
 from .utils.decorators import capability_required, can_manage_academic_setup
 from .utils.helpers import generate_breadcrumb, pagination_query_string, render_page
-from .utils.storage_operations import get_r2_client, upload_to_bucket
+from .utils.storage_operations import get_r2_client
 
 APK_MAX_BYTES = 500 * 1024 * 1024
 APK_PREFIX = "app-releases"
@@ -241,45 +243,45 @@ def app_release_manage(request):
             version_code = int(request.POST.get("version_code") or 0)
         except (TypeError, ValueError):
             version_code = 0
-        upload = request.FILES.get("apk")
+        upload_token = (request.POST.get("direct_upload_token_apk") or "").strip()
         if not version_name or version_code <= 0:
             messages.error(request, _("Version name and a positive version code are required."))
             return redirect("app-release-manage")
         if MobileAppRelease.objects.filter(version_code=version_code).exists():
             messages.error(request, _("This version code is already published."))
             return redirect("app-release-manage")
-        if upload is None:
+        if not upload_token:
             messages.error(request, _("Choose the .apk file to publish."))
-            return redirect("app-release-manage")
-        try:
-            _validate_apk(upload)
-        except ValueError as exc:
-            messages.error(request, str(exc))
             return redirect("app-release-manage")
         bucket = getattr(settings, "R2_BUCKET_NAME", "") or ""
         client = get_r2_client()
         if not bucket or client is None:
             messages.error(request, _("Storage is not configured."))
             return redirect("app-release-manage")
-        key = f"{APK_PREFIX}/bible-institute-app-{_safe_version(version_name)}-{uuid.uuid4().hex[:6]}.apk"
         try:
-            upload.seek(0)
-        except (AttributeError, OSError):
-            pass
-        uploaded_to_storage = False
+            finalized = finalize_direct_upload(
+                actor=request.user,
+                token=upload_token,
+                validator=_validate_apk,
+                expected_purpose=DirectUploadAuthorization.Purpose.APK,
+                final_folder=APK_PREFIX,
+            )
+        except DirectUploadError as exc:
+            messages.error(request, exc.message)
+            return redirect("app-release-manage")
+        except ValueError as exc:
+            messages.error(request, str(exc))
+            return redirect("app-release-manage")
+        key = finalized.key
         try:
             with transaction.atomic():
                 lock_storage_namespace(APK_PREFIX)
                 assert_storage_namespace_available(APK_PREFIX)
-                if not upload_to_bucket(client, bucket, upload, key, content_type="application/vnd.android.package-archive"):
-                    messages.error(request, _("The upload failed. Please retry."))
-                    return redirect("app-release-manage")
-                uploaded_to_storage = True
                 MobileAppRelease.objects.create(
                     version_name=version_name,
                     version_code=version_code,
                     apk_key=key,
-                    file_size=getattr(upload, "size", 0) or 0,
+                    file_size=finalized.size,
                     release_notes=release_notes,
                     uploaded_by=request.user,
                 )
@@ -290,8 +292,7 @@ def app_release_manage(request):
             messages.error(request, _("This version code is already published."))
             return redirect("app-release-manage")
         except ValidationError as exc:
-            if uploaded_to_storage:
-                _delete_orphan_apk(client, bucket, key)
+            _delete_orphan_apk(client, bucket, key)
             messages.error(request, str(exc))
             return redirect("app-release-manage")
         except Exception:
@@ -421,7 +422,7 @@ def banner_delete(request, banner_id: int):
 
 @capability_required(can_manage_academic_setup)
 def media_delivery_settings(request):
-    """Admin toggle between direct R2 302 redirects and legacy Worker delivery."""
+    """Manage transition media modes and inspect committed edge-gate state."""
     settings_row = MediaDeliverySettings.load()
     worker_configured = bool(getattr(settings, "CLOUD_WORKER", "").rstrip("/"))
     if request.method == "POST":
@@ -440,6 +441,33 @@ def media_delivery_settings(request):
         effective_mode,
         effective_mode,
     )
+    required_gate_settings = (
+        "MEDIA_EDGE_BASE_URL",
+        "CLOUDFLARE_ZONE_ID",
+        "CLOUDFLARE_WAF_RULESET_ID",
+        "CLOUDFLARE_WAF_RULE_ID",
+        "CLOUDFLARE_WAF_HOST",
+        "CLOUDFLARE_API_TOKEN",
+    )
+    missing_gate_settings = [
+        name for name in required_gate_settings if not getattr(settings, name, "")
+    ]
+    gate_row = None
+    gate_due_at = None
+    gate_expected_expression = ""
+    gate_state_error = ""
+    try:
+        gate_row = MediaGateToken.load()
+        if gate_row:
+            gate_due_at = gate_row.current_started_at + timedelta(seconds=period_seconds())
+            if not missing_gate_settings:
+                gate_expected_expression = waf_expression(
+                    settings.CLOUDFLARE_WAF_HOST,
+                    gate_row.current_token,
+                    gate_row.previous_token,
+                )
+    except (DatabaseError, MediaGateError) as exc:
+        gate_state_error = getattr(exc, "code", "media_gate_state_unavailable")
     return render_page(
         request,
         "media_delivery_settings.html",
@@ -451,6 +479,12 @@ def media_delivery_settings(request):
             "effective_mode": effective_mode,
             "effective_mode_label": effective_label,
             "presigned_url_seconds": media_presigned_url_seconds(),
+            "media_gate_config_complete": not missing_gate_settings,
+            "media_gate_missing_settings": missing_gate_settings,
+            "media_gate_token_row": gate_row,
+            "media_gate_rotation_due_at": gate_due_at,
+            "media_gate_expected_expression": gate_expected_expression,
+            "media_gate_state_error": gate_state_error,
             "breadcrumb_items": generate_breadcrumb([
                 (_("Admin"), reverse("admin-panel")),
                 (_("Media Delivery"), None),

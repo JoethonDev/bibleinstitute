@@ -161,9 +161,9 @@ already exposes through selected_year.academic_year.
               <th scope="col">{% translate "Grade" %}</th>
               <th scope="col">{% translate "Grade %" %}</th>
               <th scope="col">{% translate "Expected" %}</th>
-              <th scope="col">{% translate "Full days" %}</th>
+              <th scope="col">{% translate "Full attendance" %}</th>
               <th scope="col">{% translate "Fully scanned days" %}</th>
-              <th scope="col">{% translate "Partial" %}</th>
+              <th scope="col">{% translate "Partial attendance" %}</th>
               <th scope="col">{% translate "Absent" %}</th>
               <th scope="col">{% translate "Attendance Score" %}</th>
               <th scope="col">{% translate "Attendance %" %}</th>
@@ -187,14 +187,14 @@ already exposes through selected_year.academic_year.
                 <td>{{ row.study_mode }}</td>
                 <td class="aw-num"><span class="aw-score">{{ row.grade_earned }}/{{ row.grade_available }}</span></td>
                 <td class="aw-num"><span class="aw-score">{{ row.grade_percent }}%</span></td>
-                <td class="aw-num">{{ row.expected }}</td>
-                <td class="aw-num">{{ row.valid }}</td>
-                <td class="aw-num">{{ row.fully_scanned }}</td>
-                <td class="aw-num">{{ row.invalid }}</td>
-                <td class="aw-num">{{ row.absent }}</td>
-                <td class="aw-num"><span class="aw-score">{{ row.attendance_score }}</span></td>
-                <td class="aw-num"><span class="aw-score">{{ row.attendance_rate }}%</span></td>
-                <td class="aw-num"><span class="aw-score">{{ row.absence_rate }}%</span></td>
+                <td class="aw-num">{{ row.expected|default_if_none:"-" }}</td>
+                <td class="aw-num">{{ row.valid|default_if_none:"-" }}</td>
+                <td class="aw-num">{{ row.fully_scanned|default_if_none:"-" }}</td>
+                <td class="aw-num">{{ row.invalid|default_if_none:"-" }}</td>
+                <td class="aw-num">{{ row.absent|default_if_none:"-" }}</td>
+                <td class="aw-num"><span class="aw-score">{{ row.attendance_score|default_if_none:"-" }}</span></td>
+                <td class="aw-num"><span class="aw-score">{% if row.attendance_rate is not None %}{{ row.attendance_rate }}%{% else %}-{% endif %}</span></td>
+                <td class="aw-num"><span class="aw-score">{% if row.absence_rate is not None %}{{ row.absence_rate }}%{% else %}-{% endif %}</span></td>
               </tr>
             {% empty %}
               <tr>

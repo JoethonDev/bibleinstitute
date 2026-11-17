@@ -4,8 +4,10 @@ from django.forms.models import construct_instance
 import secrets
 
 from django.core.exceptions import ValidationError
+from django.db import DatabaseError
 from django.db.models import Q
 from .models import User, Role, Course, AcademicYear, AcademicYearLevel, AttendancePolicy, CourseOffering, Enrollment, Level, QuizType, PromotionRule, HistoricalAcademicSummary, QUIZ_TYPE_CODES, SignupSettings, PublicationStatus, StudentExperienceOverride, StudentExperienceSettings, MediaDeliverySettings, assign_academic_date
+from .media_gate import MediaGateUnavailable, published_tokens
 from .utils.validators import normalize_username, validate_identity_by_type, validate_unique_phone
 from .utils.application_uploads import validate_application_file
 from django.utils.translation import gettext_lazy as _ # Import gettext_lazy
@@ -589,11 +591,17 @@ class AcademicYearLevelWeekdayForm(AwModelForm):
 class AttendancePolicyForm(AwModelForm):
     class Meta:
         model = AttendancePolicy
-        fields = ["entrance_deadline", "exit_time", "buffer_minutes"]
+        fields = [
+            "entrance_deadline", "exit_time", "buffer_minutes",
+            "online_full_days", "online_partial_days", "online_partial_value",
+        ]
         labels = {
             "entrance_deadline": _("Entrance deadline"),
             "exit_time": _("Meeting exit time"),
             "buffer_minutes": _("Buffer (minutes)"),
+            "online_full_days": _("Full score within days"),
+            "online_partial_days": _("Partial score within days"),
+            "online_partial_value": _("Partial score value"),
         }
         widgets = {
             "entrance_deadline": forms.TimeInput(
@@ -605,6 +613,15 @@ class AttendancePolicyForm(AwModelForm):
             "buffer_minutes": forms.NumberInput(
                 attrs={"class": "form-control", "min": 0, "max": 120}
             ),
+            "online_full_days": forms.NumberInput(
+                attrs={"class": "form-control", "min": 1}
+            ),
+            "online_partial_days": forms.NumberInput(
+                attrs={"class": "form-control", "min": 1}
+            ),
+            "online_partial_value": forms.NumberInput(
+                attrs={"class": "form-control", "min": 0, "max": 1, "step": "0.01"}
+            ),
         }
 
     def clean_buffer_minutes(self):
@@ -612,7 +629,6 @@ class AttendancePolicyForm(AwModelForm):
         if minutes > 120:
             raise ValidationError(_("The buffer cannot exceed 120 minutes."))
         return minutes
-
 
 class HistoricalIntakeForm(AwForm):
     source_year_level = forms.ModelChoiceField(
@@ -1710,8 +1726,10 @@ class MediaDeliverySettingsForm(AwModelForm):
         self.fields["segment_delivery_mode"].help_text = _(
             "Direct R2 presigned redirect (302) routes segment checks through Django "
             "and redirects playback to short-lived R2 URLs while recording verified "
-            "segment progress on GET. Legacy Worker keeps routing segments through "
-            "the configured Cloudflare Worker."
+            "segment progress on GET. Edge gate serves authorized cached segments "
+            "through Cloudflare and refreshes rotating path tokens. Progress must be "
+            "deployed and verified before enabling edge gate. Legacy Worker keeps "
+            "routing segments through the configured Cloudflare Worker."
         )
 
     def clean_segment_delivery_mode(self):
@@ -1723,6 +1741,25 @@ class MediaDeliverySettingsForm(AwModelForm):
             raise forms.ValidationError(
                 _("Cloudflare Worker URL (CLOUD_WORKER) is not configured in the environment.")
             )
+        if mode == MediaDeliverySettings.SegmentDeliveryMode.EDGE_GATE:
+            required = (
+                "MEDIA_EDGE_BASE_URL",
+                "CLOUDFLARE_ZONE_ID",
+                "CLOUDFLARE_WAF_RULESET_ID",
+                "CLOUDFLARE_WAF_RULE_ID",
+                "CLOUDFLARE_WAF_HOST",
+                "CLOUDFLARE_API_TOKEN",
+            )
+            if any(not getattr(settings, name, "") for name in required):
+                raise forms.ValidationError(
+                    _("Configure the media edge URL and Cloudflare rule settings before enabling edge gate.")
+                )
+            try:
+                published_tokens()
+            except (DatabaseError, MediaGateUnavailable):
+                raise forms.ValidationError(
+                    _("A valid published media-gate token is required before enabling edge gate.")
+                )
         return mode
 
 

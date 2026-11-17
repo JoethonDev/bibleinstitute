@@ -110,9 +110,15 @@ REDIS_CACHE_URL|redis://redis:6379/1
 CELERY_BROKER_URL|redis://redis:6379/0
 CELERY_RESULT_BACKEND|redis://redis:6379/0
 CELERY_CONCURRENCY|2
-WEB_CONCURRENCY|2
-WEB_THREADS|8
-GUNICORN_TIMEOUT|1800
+DJANGO_CONN_MAX_AGE|60
+NOTIFICATION_REDELIVERY_INTERVAL_SECONDS|45
+WEB_CONCURRENCY|3
+WEB_THREADS|4
+GUNICORN_TIMEOUT|60
+GUNICORN_GRACEFUL_TIMEOUT|30
+GUNICORN_KEEPALIVE|5
+GUNICORN_MAX_REQUESTS|2000
+GUNICORN_MAX_REQUESTS_JITTER|200
 WEB_PUSH_ENABLED|false
 WEB_PUSH_VAPID_PUBLIC_KEY|
 WEB_PUSH_VAPID_SUBJECT|
@@ -124,6 +130,13 @@ WEBAUTHN_RP_NAME|Bible Institute Coptic
 WEBAUTHN_EXPECTED_ORIGIN|http://localhost:8000
 WEBAUTHN_CHALLENGE_TTL_SECONDS|300
 PWA_MEDIA_MAX_BYTES|0
+MEDIA_EDGE_BASE_URL|
+MEDIA_GATE_PERIOD_SECONDS|1800
+MEDIA_GATE_ALLOW_SHORT_PERIOD|0
+CLOUDFLARE_ZONE_ID|
+CLOUDFLARE_WAF_RULESET_ID|
+CLOUDFLARE_WAF_RULE_ID|
+CLOUDFLARE_WAF_HOST|
 SETTINGS
     chmod 600 "$COMPOSE_TMP"
     mv "$COMPOSE_TMP" .compose.env
@@ -400,13 +413,23 @@ write_value WORKER_HMAC_SECRET "$(read_secret_value WORKER_HMAC_SECRET "Worker H
 write_value WORKER_RECEIPT_SECRET "$(read_secret_value WORKER_RECEIPT_SECRET "Worker receipt secret (blank = disabled)")"
 echo ""
 
+# -- 8. Cloudflare edge gate (Phase 7) ---------------------------------
+# Non-secret edge identifiers come from .env or the write_compose_env defaults
+# below; they are never prompted here so a rerun cannot overwrite an existing
+# operator value. The zone-scoped Rulesets API token is a secret: it stays in
+# the private .env, is hidden during input, and is never copied to .compose.env
+# or printed.
+write_value CLOUDFLARE_API_TOKEN "$(read_secret_value CLOUDFLARE_API_TOKEN \
+    "Cloudflare Rulesets API token (blank = edge gate disabled)")"
+echo ""
+
 # -- Production defaults ------------------------------------------------
 write_value DJANGO_DEBUG False
 write_value NGINX_HTTP_PORT 80
 write_value NGINX_HTTPS_PORT 443
-write_value GUNICORN_TIMEOUT 1800
-write_value WEB_CONCURRENCY 2
-write_value WEB_THREADS 8
+write_value GUNICORN_TIMEOUT 60
+write_value WEB_CONCURRENCY 3
+write_value WEB_THREADS 4
 write_value DJANGO_DATA_UPLOAD_MAX_MEMORY_SIZE 2147483648
 write_value DJANGO_FILE_UPLOAD_MAX_MEMORY_SIZE 10485760
 

@@ -1,9 +1,11 @@
 from collections import defaultdict
 from dataclasses import dataclass
 from decimal import Decimal
+from datetime import datetime, time
 from typing import Iterator
 
 from django.db.models import Q
+from django.utils import timezone
 
 from ..models import AttendancePolicy, AttendanceRecord, Enrollment, Grade, Lesson, PublicationStatus
 from .attendance import (
@@ -15,6 +17,7 @@ from .attendance import (
     pair_attendance_records,
 )
 from .search import normalized_contains_q
+from ..progress_activity import online_attendance_for_students
 
 REPORT_BATCH_SIZE = 500
 
@@ -25,6 +28,9 @@ class ReportFacts:
 
     policy: AttendancePolicy
     expected_count: int
+    offering_ids: tuple[int, ...]
+    window_start: datetime
+    window_end: datetime
 
 
 @dataclass(frozen=True)
@@ -91,7 +97,7 @@ def get_grade_summary(student, academic_year_level, course_offering_id=None):
 
 
 def load_report_facts(academic_year_level, course_offering_id=None) -> ReportFacts:
-    """Load the scope-wide policy and lesson denominator once per report run."""
+    """Load scope facts once for the paginated report or bounded export."""
 
     lesson_counts = Lesson.objects.filter(
         course_offering__academic_year_level=academic_year_level,
@@ -99,9 +105,16 @@ def load_report_facts(academic_year_level, course_offering_id=None) -> ReportFac
     )
     if course_offering_id:
         lesson_counts = lesson_counts.filter(course_offering_id=course_offering_id)
+    offerings = academic_year_level.course_offerings.all()
+    if course_offering_id:
+        offerings = offerings.filter(pk=course_offering_id)
+    year = academic_year_level.academic_year
     return ReportFacts(
         policy=AttendancePolicy.load(),
         expected_count=lesson_counts.count(),
+        offering_ids=tuple(offerings.values_list("pk", flat=True)),
+        window_start=timezone.make_aware(datetime.combine(year.starts_on, time.min)),
+        window_end=timezone.now(),
     )
 
 
@@ -138,6 +151,18 @@ def _build_report_batch(enrollments, academic_year_level, course_offering_id, fa
         records = records.filter(course_offering_id=course_offering_id)
     records = records.values("student_id", "course_offering_id", "attendance_date", "action", "source", "scanned_at")
     attendance_by_student = merge_attendance_pairs(pair_attendance_records(records))
+    active_online_ids = [
+        enrollment.student_id
+        for enrollment in enrollments
+        if enrollment.status == Enrollment.Status.ACTIVE and enrollment.student.study_mode == "online"
+    ]
+    online_attendance = online_attendance_for_students(
+        student_ids=active_online_ids,
+        offering_ids=list(facts.offering_ids),
+        window_start=facts.window_start,
+        window_end=facts.window_end,
+        policy=facts.policy,
+    )
 
     rows = []
     for enrollment in enrollments:
@@ -146,9 +171,19 @@ def _build_report_batch(enrollments, academic_year_level, course_offering_id, fa
         earned = sum(detail["grade"] for detail in details)
         available = sum(detail["total"] for detail in details)
         if student.study_mode == "online":
-            expected = valid = invalid = absent = 0
-            attendance_score = Decimal("0")
-            fully_scanned = 0
+            online = online_attendance.get(student.pk)
+            if online is not None:
+                expected = online["expected"]
+                valid = online["valid"]
+                invalid = online["partial"]
+                absent = online["absent"]
+                attendance_score = online["attendance_score"]
+                fully_scanned = None
+                attendance_rate = round(float(attendance_score) / expected * 100, 1) if expected else 0
+                absence_rate = round(absent / expected * 100, 1) if expected else 0
+            else:
+                expected = valid = invalid = absent = fully_scanned = None
+                attendance_score = attendance_rate = absence_rate = None
         else:
             days = attendance_by_student.get(student.pk, {})
             full = partial = 0
@@ -166,6 +201,8 @@ def _build_report_batch(enrollments, academic_year_level, course_offering_id, fa
             valid = full
             invalid = partial
             absent = max(facts.expected_count - full - partial, 0)
+            attendance_rate = round(float(attendance_score) / expected * 100, 1) if expected else 0
+            absence_rate = round(absent / expected * 100, 1) if expected else 0
         rows.append({
             "student_id": student.pk,
             "username": student.username,
@@ -183,8 +220,8 @@ def _build_report_batch(enrollments, academic_year_level, course_offering_id, fa
             "absent": absent,
             "fully_scanned": fully_scanned,
             "attendance_score": attendance_score,
-            "attendance_rate": round(float(attendance_score) / expected * 100, 1) if expected else 0,
-            "absence_rate": round(absent / expected * 100, 1) if expected else 0,
+            "attendance_rate": attendance_rate,
+            "absence_rate": absence_rate,
             "grade_details": details,
         })
     return ReportBatch(rows=rows, attendance_by_student=attendance_by_student, facts=facts)

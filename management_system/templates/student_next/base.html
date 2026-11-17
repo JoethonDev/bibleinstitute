@@ -30,7 +30,19 @@
   <script defer src="{% static 'pwa/file-inputs.js' %}?v={{ static_asset_version }}"></script>
   {% block extra_head %}{% endblock %}
 </head>
-<body class="sn-body sn-student sn-page-{{ student_page }}" data-pwa-enabled="true" data-pwa-account="{{ request.user.pk }}">
+<body class="sn-body sn-student sn-page-{{ student_page }}"
+  data-progress-queue-pending="{% translate 'Saved progress is waiting to sync.' %}"
+  data-progress-queue-storage="{% translate 'This browser could not save progress for later. Keep this page open until it syncs.' %}"
+  data-progress-queue-limit="{% translate 'The progress queue on this device is full. Keep this page open and sync before closing it.' %}"
+  data-progress-queue-terminal="{% translate 'Some progress could not be saved because this session can no longer accept it. Contact support if progress is missing.' %}"
+  data-progress-queue-account="{% translate 'Progress syncing paused because this browser switched to another student account.' %}"
+  data-progress-queue-activity="{% translate 'Some activity time could not be confirmed and was not counted.' %}"
+  data-pwa-enabled="true" data-pwa-account="{{ request.user.pk }}">
+<script>
+  try {
+    localStorage.setItem('lms:progress:active-account', '{% if request.user.is_authenticated %}{{ request.user.pk }}{% endif %}');
+  } catch (_) {}
+</script>
   <a class="sn-skip" href="#main">{% translate "Skip to content" %}</a>
   {% include "student_next/partials/icon_sprite.html" %}
   <header class="sn-topbar">
@@ -107,6 +119,7 @@
     {% endfor %}
   </nav>
   {% include "partials/web_push_prompt.html" %}
+  <script src="{% static 'js/direct_upload.js' %}?v={{ static_asset_version }}" defer></script>
   {% block extra_scripts %}{% endblock %}
 </body>
 </html>

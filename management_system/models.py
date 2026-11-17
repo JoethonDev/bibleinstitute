@@ -7,6 +7,7 @@ from django.db.models import Case, F, Q, Value, When
 from django.utils import timezone
 from django.utils.timezone import now
 from datetime import date, datetime, time, timedelta
+from decimal import Decimal
 import hashlib
 import json
 import re
@@ -2524,6 +2525,20 @@ class AttendancePolicy(models.Model):
     entrance_deadline = models.TimeField(default=default_attendance_entrance_deadline)
     exit_time = models.TimeField(default=default_attendance_exit_time)
     buffer_minutes = models.PositiveSmallIntegerField(default=5)
+    online_full_days = models.PositiveSmallIntegerField(
+        verbose_name=_("Full score within days"),
+        default=7,
+    )
+    online_partial_days = models.PositiveSmallIntegerField(
+        verbose_name=_("Partial score within days"),
+        default=14,
+    )
+    online_partial_value = models.DecimalField(
+        verbose_name=_("Partial score value"),
+        max_digits=3,
+        decimal_places=2,
+        default=Decimal("0.50"),
+    )
     updated_at = models.DateTimeField(auto_now=True)
     updated_by = models.ForeignKey(
         "User",
@@ -2536,9 +2551,46 @@ class AttendancePolicy(models.Model):
     class Meta:
         verbose_name = _("Attendance Policy")
         verbose_name_plural = _("Attendance Policies")
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(online_full_days__gte=1),
+                name="attendance_online_full_days_positive",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(online_partial_days__gte=models.F("online_full_days")),
+                name="attendance_online_partial_days_order",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(online_partial_value__gte=0, online_partial_value__lte=1),
+                name="attendance_online_partial_value_range",
+            ),
+        ]
 
     def __str__(self):
         return str(_("Attendance Policy"))
+
+    def clean(self):
+        super().clean()
+        errors = {}
+        if self.online_full_days is not None and self.online_full_days < 1:
+            errors["online_full_days"] = _("Enter at least one day.")
+        if (
+            self.online_full_days is not None
+            and self.online_partial_days is not None
+            and self.online_partial_days < self.online_full_days
+        ):
+            errors["online_partial_days"] = _(
+                "The partial score window must not be shorter than the full score window."
+            )
+        if (
+            self.online_partial_value is not None
+            and not Decimal("0.00") <= self.online_partial_value <= Decimal("1.00")
+        ):
+            errors["online_partial_value"] = _(
+                "The partial attendance value must be between 0 and 1."
+            )
+        if errors:
+            raise ValidationError(errors)
 
     @classmethod
     def load(cls) -> "AttendancePolicy":
@@ -2711,6 +2763,12 @@ class AttendanceRecord(models.Model):
 
 
 class ViewingSession(models.Model):
+    class SegmentDeliveryMode(models.TextChoices):
+        LEGACY = "legacy", _("Legacy verified delivery")
+        DIRECT_R2 = "direct_r2", _("Direct R2 presigned redirect (302)")
+        WORKER = "worker", _("Cloudflare Worker proxy (legacy)")
+        EDGE_GATE = "edge_gate", _("Cloudflare edge gate")
+
     class AccessChannel(models.TextChoices):
         WEB = "web", _("Web")
         MOBILE = "mobile", _("Mobile")
@@ -2730,6 +2788,21 @@ class ViewingSession(models.Model):
         default=AccessChannel.WEB,
     )
     part_id = models.CharField(max_length=100)
+    segment_delivery_mode = models.CharField(
+        max_length=16,
+        choices=SegmentDeliveryMode.choices,
+        default=SegmentDeliveryMode.LEGACY,
+    )
+    started_at = models.DateTimeField(null=True, blank=True)
+    superseded_at = models.DateTimeField(null=True, blank=True)
+    edge_earned_seconds_consumed = models.DecimalField(
+        max_digits=7,
+        decimal_places=2,
+        default=Decimal("0.00"),
+    )
+    activity_cursor_at = models.DateTimeField(null=True, blank=True)
+    last_payload_digest = models.CharField(max_length=64, blank=True, default="")
+    last_acknowledgement = models.JSONField(default=dict, blank=True)
     # Exact manifest object key of the file the session was opened for. Paired
     # video/audio share a part_id but can have different segment timelines, so
     # progress verification must read the played file's own playlist.
@@ -2748,7 +2821,33 @@ class ViewingSession(models.Model):
     )
 
     class Meta:
+        indexes = [
+            models.Index(fields=["expires_at"], name="vs_expiry_idx"),
+            models.Index(
+                fields=["superseded_at"],
+                condition=models.Q(superseded_at__isnull=False),
+                name="vs_superseded_idx",
+            ),
+            models.Index(
+                fields=["ended_at"],
+                condition=models.Q(ended_at__isnull=False),
+                name="vs_ended_idx",
+            ),
+            models.Index(
+                fields=["student", "lesson", "part_id", "expires_at"],
+                condition=models.Q(
+                    started_at__isnull=False,
+                    superseded_at__isnull=True,
+                    ended_at__isnull=True,
+                ),
+                name="vs_open_progress_idx",
+            ),
+        ]
         constraints = [
+            models.CheckConstraint(
+                condition=models.Q(edge_earned_seconds_consumed__gte=0),
+                name="vs_edge_earned_nonneg",
+            ),
             models.CheckConstraint(
                 condition=(
                     models.Q(access_channel="web", mobile_session__isnull=True)
@@ -2854,9 +2953,20 @@ class LectureProgress(models.Model):
     completed_at = models.DateTimeField(null=True, blank=True)
     activity_tracking_started_at = models.DateTimeField(default=timezone.now, editable=False)
     activity_history_incomplete = models.BooleanField(default=False, editable=False)
+    edge_slack_remaining_seconds = models.DecimalField(
+        max_digits=4,
+        decimal_places=2,
+        default=Decimal("15.00"),
+    )
 
     class Meta:
         unique_together = [("student", "lesson", "part_id")]
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(edge_slack_remaining_seconds__gte=0),
+                name="lecture_edge_slack_nonneg",
+            ),
+        ]
 
     def __str__(self):
         return f"{self.student.username} - {self.lesson.name} part {self.part_id}: {self.percent}%"
@@ -3583,11 +3693,12 @@ class MobilePushSettings(models.Model):
 
 
 class MediaDeliverySettings(models.Model):
-    """Admin-controlled switch between Option B (302 R2) and legacy Worker."""
+    """Admin-controlled media delivery mode during the approved transition."""
 
     class SegmentDeliveryMode(models.TextChoices):
         DIRECT_R2 = "direct_r2", _("Direct R2 presigned redirect (302)")
         WORKER = "worker", _("Cloudflare Worker proxy (legacy)")
+        EDGE_GATE = "edge_gate", _("Cloudflare edge gate")
 
     singleton = models.CharField(max_length=20, unique=True, default="default", editable=False)
     segment_delivery_mode = models.CharField(
@@ -3621,6 +3732,36 @@ class MediaDeliverySettings(models.Model):
 
         transaction.on_commit(invalidate_media_delivery_mode_cache)
         return result
+
+
+class MediaGateToken(models.Model):
+    """The committed current/previous token pair accepted by the media edge."""
+
+    singleton = models.CharField(max_length=20, unique=True, default="default", editable=False)
+    current_token = models.CharField(max_length=64)
+    current_started_at = models.DateTimeField(default=timezone.now)
+    previous_token = models.CharField(max_length=64, null=True, blank=True)
+    last_attempt_at = models.DateTimeField(null=True, blank=True)
+    last_error = models.CharField(max_length=500, blank=True, default="")
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [
+            models.CheckConstraint(
+                condition=~Q(current_token=""),
+                name="media_gate_current_token_nonempty",
+            ),
+        ]
+        verbose_name = _("Media Gate Token")
+        verbose_name_plural = _("Media Gate Tokens")
+
+    def __str__(self):
+        return str(_("Media Gate Token"))
+
+    @classmethod
+    def load(cls):
+        """Read the published row without creating an unpushed token."""
+        return cls.objects.filter(singleton="default").first()
 
 
 class QuizAnswerSnapshot(models.Model):
@@ -3753,3 +3894,80 @@ class AdminOperationJob(models.Model):
 
     def __str__(self):
         return f"{self.kind} ({self.status}) {self.pk}"
+
+
+class DirectUploadAuthorization(models.Model):
+    """One short-lived, exact-key capability for a browser-to-R2 file transfer.
+
+    The browser sends the bytes straight to a private staging key; Django only
+    authorizes before the transfer and validates the resulting object on
+    finalize. A token or storage key is never authorization: every read
+    rechecks the actor, purpose, target and status.
+    """
+
+    class Purpose(models.TextChoices):
+        APK = "apk", _("App package")
+        APPLICATION_DOCUMENT = "application_document", _("Application document")
+        SUPPORT_ATTACHMENT = "support_attachment", _("Support attachment")
+        TELEGRAM_ATTACHMENT = "telegram_attachment", _("Telegram attachment")
+        HISTORICAL_INTAKE = "historical_intake", _("Historical intake file")
+        LEGACY_USER_CSV = "legacy_user_csv", _("Legacy user CSV")
+        QUIZ_JSON = "quiz_json", _("Quiz JSON")
+
+    class Status(models.TextChoices):
+        PENDING = "pending", _("Pending upload")
+        FINALIZED = "finalized", _("Finalized")
+        FAILED = "failed", _("Failed")
+        EXPIRED = "expired", _("Expired")
+
+    token = models.CharField(max_length=64, unique=True)
+    actor = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="direct_uploads",
+    )
+    # Server-generated target descriptor, for example "user:12" or
+    # "applicant:<signed intent>". Never taken verbatim from the browser.
+    target = models.CharField(max_length=200)
+    purpose = models.CharField(max_length=32, choices=Purpose.choices)
+    staging_key = models.CharField(max_length=500, unique=True)
+    final_key = models.CharField(max_length=500, blank=True, default="")
+    declared_filename = models.CharField(max_length=255)
+    declared_content_type = models.CharField(max_length=120)
+    declared_size = models.PositiveBigIntegerField()
+    max_bytes = models.PositiveBigIntegerField()
+    metadata = models.JSONField(default=dict, blank=True)
+    status = models.CharField(
+        max_length=16, choices=Status.choices, default=Status.PENDING
+    )
+    expires_at = models.DateTimeField()
+    created_at = models.DateTimeField(auto_now_add=True)
+    finalized_at = models.DateTimeField(null=True, blank=True)
+    failure_reason = models.CharField(max_length=200, blank=True, default="")
+
+    class Meta:
+        indexes = [
+            models.Index(
+                fields=["status", "expires_at"], name="direct_upload_expiry_idx"
+            ),
+            models.Index(
+                fields=["actor", "purpose", "status"], name="direct_upload_actor_idx"
+            ),
+        ]
+        constraints = [
+            models.CheckConstraint(
+                condition=Q(max_bytes__gt=0),
+                name="direct_upload_max_bytes_positive",
+            ),
+            models.CheckConstraint(
+                condition=Q(declared_size__gte=0),
+                name="direct_upload_declared_size_nonneg",
+            ),
+        ]
+        verbose_name = _("Direct Upload Authorization")
+        verbose_name_plural = _("Direct Upload Authorizations")
+
+    def __str__(self):
+        return f"{self.purpose} ({self.status}) {self.pk}"

@@ -1,7 +1,8 @@
 import json
-import math
-from dataclasses import dataclass
-from datetime import date, timedelta
+import hashlib
+from dataclasses import dataclass, field
+from datetime import date, datetime, time, timedelta
+from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 
 from django.conf import settings
 from django.db import transaction
@@ -11,20 +12,34 @@ from django.utils.translation import gettext as _
 
 from .academic_access import user_can_write_offering_activity
 from .models import (
+    AttendancePolicy,
+    Enrollment,
     LectureProgress,
     LectureProgressEvent,
     LectureWatchDay,
     LectureWatchSession,
     Lesson,
+    PublicationStatus,
     ViewingSession,
 )
 from .utils.hls_parser import get_lesson_segments
 from .utils.lesson_access import lesson_is_available
-from .utils.progress_merge import calculate_percent, merge_verified_progress_ranges, unique_seconds
+from .utils.progress_merge import (
+    calculate_percent,
+    intersect_ranges,
+    normalize_ranges,
+    saved_prefix_ack,
+    subtract_ranges,
+    take_ordered_prefix,
+    unique_seconds,
+)
 
 WATCH_SESSION_GAP = timedelta(minutes=10)
 MAX_HEARTBEAT_ACTIVE_SECONDS = 60
 PROGRESS_ACTIVITY_WINDOW_DAYS = 30
+# One acknowledgement must stay a small bounded JSON body. The server trims it
+# rather than failing a request whose mutations already committed.
+ACK_MAX_BYTES = 16_384
 
 
 def format_active_duration(seconds: int) -> str:
@@ -328,9 +343,39 @@ class ProgressHeartbeatResult:
     percent: int
     completed: bool
     note: str = ""
+    status: str = "ok"
+    session_id: str = ""
+    sequence: int | None = None
+    accepted_ranges: list[tuple[float, float]] = field(default_factory=list)
+    already_saved_ranges: list[tuple[float, float]] = field(default_factory=list)
+    remaining_ranges: list[tuple[float, float]] = field(default_factory=list)
+    credited_active_seconds: float = 0
+    reason: str = ""
+    terminal: bool = False
+    last_sequence: int = 0
+    next_range_index: int = 0
+    ack_truncated: bool = False
+    stored_acknowledgement: dict | None = None
 
     def as_payload(self) -> dict:
-        payload = {"status": "ok", "percent": self.percent, "completed": self.completed}
+        if self.stored_acknowledgement is not None:
+            return dict(self.stored_acknowledgement)
+        payload = {
+            "status": self.status,
+            "percent": self.percent,
+            "completed": self.completed,
+            "session_id": self.session_id,
+            "sequence": self.sequence,
+            "accepted_ranges": self.accepted_ranges,
+            "already_saved_ranges": self.already_saved_ranges,
+            "remaining_ranges": self.remaining_ranges,
+            "credited_active_seconds": self.credited_active_seconds,
+            "reason": self.reason,
+            "terminal": self.terminal,
+            "last_sequence": self.last_sequence,
+            "next_range_index": self.next_range_index,
+            "ack_truncated": self.ack_truncated,
+        }
         if self.note:
             payload["note"] = self.note
         return payload
@@ -343,6 +388,148 @@ class ProgressHeartbeatError(Exception):
         super().__init__(message)
         self.code = code
         self.message = message
+
+
+def normalize_progress_heartbeat(payload: object) -> dict:
+    """Validate one request and freeze its centisecond-level replay identity."""
+    if not isinstance(payload, dict):
+        raise ProgressHeartbeatError("invalid_payload", _("Invalid request format."))
+
+    session_id = payload.get("session_id")
+    raw_ranges = payload.get("ranges", [])
+    ended = payload.get("ended", False)
+    raw_active_seconds = payload.get("active_seconds", 0)
+    sequence = payload.get("sequence")
+    if (
+        not isinstance(session_id, str)
+        or not session_id
+        or len(session_id) > 64
+        or not isinstance(raw_ranges, list)
+        or len(raw_ranges) > 200
+        or not isinstance(ended, bool)
+        or isinstance(raw_active_seconds, bool)
+        or not isinstance(raw_active_seconds, (int, float))
+        or isinstance(sequence, bool)
+        or not isinstance(sequence, int)
+        or sequence <= 0
+        or sequence > 2_147_483_647
+    ):
+        raise ProgressHeartbeatError(
+            "invalid_payload",
+            _("Missing session identifier or invalid heartbeat data."),
+        )
+
+    try:
+        active_decimal = Decimal(str(raw_active_seconds))
+    except (InvalidOperation, ValueError, TypeError):
+        raise ProgressHeartbeatError("invalid_payload", _("Invalid active time."))
+    if not active_decimal.is_finite() or active_decimal < 0 or active_decimal > 3600:
+        raise ProgressHeartbeatError("invalid_payload", _("Invalid active time."))
+    active_centiseconds = int(
+        (active_decimal * 100).to_integral_value(rounding=ROUND_HALF_UP)
+    )
+    active_seconds = active_centiseconds / 100
+    max_duration = Decimal(str(getattr(settings, "MEDIA_MAX_DURATION_SECONDS", 3 * 60 * 60)))
+    raw_centisecond_ranges = []
+    for item in raw_ranges:
+        if (
+            not isinstance(item, (list, tuple))
+            or len(item) != 2
+            or any(isinstance(value, bool) or not isinstance(value, (int, float)) for value in item)
+        ):
+            raise ProgressHeartbeatError("invalid_payload", _("Invalid time range format."))
+        try:
+            start, end = (Decimal(str(value)) for value in item)
+        except (InvalidOperation, ValueError, TypeError):
+            raise ProgressHeartbeatError("invalid_payload", _("Invalid time range format."))
+        if (
+            not start.is_finite()
+            or not end.is_finite()
+            or start < 0
+            or end <= start
+            or end > max_duration
+        ):
+            raise ProgressHeartbeatError("invalid_payload", _("Invalid time range format."))
+        start_cs = int((start * 100).to_integral_value(rounding=ROUND_HALF_UP))
+        end_cs = int((end * 100).to_integral_value(rounding=ROUND_HALF_UP))
+        if end_cs <= start_cs:
+            raise ProgressHeartbeatError("invalid_payload", _("Time range is below centisecond precision."))
+        raw_centisecond_ranges.append((start_cs / 100, end_cs / 100))
+
+    ranges = normalize_ranges(raw_centisecond_ranges)
+    canonical_ranges = [
+        [int(Decimal(str(start)) * 100), int(Decimal(str(end)) * 100)]
+        for start, end in ranges
+    ]
+    canonical = {
+        "session_id": session_id,
+        "sequence": sequence,
+        "ranges": canonical_ranges,
+        "active_centiseconds": active_centiseconds,
+        "ended": ended,
+    }
+    digest = hashlib.sha256(
+        json.dumps(canonical, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    ).hexdigest()
+    return {
+        "session_id": session_id,
+        "sequence": sequence,
+        "ranges": ranges,
+        "active_seconds": active_seconds,
+        "active_centiseconds": active_centiseconds,
+        "ended": ended,
+        "digest": digest,
+    }
+
+
+def edge_credit_budget_centiseconds(
+    started_at,
+    window_end,
+    earned_consumed_seconds,
+    slack_remaining_seconds,
+) -> tuple[int, int]:
+    """Return total earned and currently available credit in centiseconds."""
+    if started_at is None or window_end is None:
+        earned_centiseconds = 0
+    else:
+        elapsed = max(timedelta(0), window_end - started_at)
+        elapsed_microseconds = (
+            (elapsed.days * 86_400 + elapsed.seconds) * 1_000_000
+            + elapsed.microseconds
+        )
+        earned_centiseconds = (elapsed_microseconds * 2 + 5_000) // 10_000
+    consumed_centiseconds = int(
+        (Decimal(str(earned_consumed_seconds)) * 100).to_integral_value(
+            rounding=ROUND_HALF_UP,
+        )
+    )
+    slack_centiseconds = int(
+        (Decimal(str(slack_remaining_seconds)) * 100).to_integral_value(
+            rounding=ROUND_HALF_UP,
+        )
+    )
+    available_centiseconds = max(0, earned_centiseconds - consumed_centiseconds)
+    return earned_centiseconds, available_centiseconds + max(0, slack_centiseconds)
+
+
+def _acknowledgement_size(ack: dict) -> int:
+    return len(json.dumps(ack, separators=(",", ":")).encode("utf-8"))
+
+
+def _fit_acknowledgement(ack: dict) -> dict:
+    """Keep one acknowledgement inside the transport bound without losing data.
+
+    Confirmations are advisory: a client only clears ranges it sees confirmed,
+    so trimming the response is safe and never discards accepted progress.
+    Dropping the response makes the client resubmit; confirming a range that is
+    not persisted would be the only unsafe direction.
+    """
+
+    for field in ("remaining_ranges", "accepted_ranges", "already_saved_ranges"):
+        while ack[field] and _acknowledgement_size(ack) > ACK_MAX_BYTES:
+            ack[field].pop()
+            ack["ack_truncated"] = True
+    return ack
 
 
 def _record_progress_event(
@@ -394,79 +581,30 @@ def apply_progress_heartbeat(
     allow_management: bool = False,
     session: ViewingSession | None = None,
 ) -> ProgressHeartbeatResult:
-    """Validate, authorize and persist one playback heartbeat.
-
-    The caller owns transport authentication (browser session or mobile
-    bearer/audience token); this operation owns input validation, session
-    ownership/expiry, write-access policy, verified-range merging and the
-    locked progress/event writes.
-    """
-
+    """Persist one validated playback sample under the shared progress lock."""
     if not user or not getattr(user, "is_authenticated", False):
         raise ProgressHeartbeatError("unauthenticated", _("Authentication required"))
-    if not isinstance(payload, dict):
-        raise ProgressHeartbeatError("invalid_payload", _("Invalid request format."))
 
-    session_id = payload.get("session_id")
-    ranges = payload.get("ranges", [])
-    ended = payload.get("ended", False)
-    active_seconds = payload.get("active_seconds", 0)
-    sequence = payload.get("sequence")
-
-    if (
-        not session_id
-        or not isinstance(ranges, list)
-        or not isinstance(ended, bool)
-        or isinstance(active_seconds, bool)
-        or not isinstance(active_seconds, (int, float))
-        or not math.isfinite(active_seconds)
-        or active_seconds < 0
-        or active_seconds > 3600
-    ):
-        raise ProgressHeartbeatError(
-            "invalid_payload",
-            _("Missing session identifier or time ranges."),
-        )
-    if active_seconds > 0 and (
-        isinstance(sequence, bool)
-        or not isinstance(sequence, int)
-        or sequence <= 0
-        or sequence > 2_147_483_647
-    ):
-        raise ProgressHeartbeatError("invalid_payload", _("Invalid playback sequence."))
-    if len(ranges) > 200:
-        raise ProgressHeartbeatError("invalid_payload", _("Too many time ranges."))
-    try:
-        ranges = [[float(start), float(end)] for start, end in ranges]
-    except (ValueError, TypeError):
-        raise ProgressHeartbeatError("invalid_payload", _("Invalid time range format."))
-    max_duration = float(getattr(settings, "MEDIA_MAX_DURATION_SECONDS", 3 * 60 * 60))
-    if any(
-        not math.isfinite(start)
-        or not math.isfinite(end)
-        or start < 0
-        or end <= start
-        or end > max_duration
-        for start, end in ranges
-    ):
-        raise ProgressHeartbeatError("invalid_payload", _("Invalid time range format."))
-
+    heartbeat = normalize_progress_heartbeat(payload)
+    session_id = heartbeat["session_id"]
+    sequence = heartbeat["sequence"]
+    requested_ranges = heartbeat["ranges"]
     if session is None:
-        session = (
-            ViewingSession.objects.select_related("lesson__course_offering")
-            .filter(session_id=session_id)
-            .first()
-        )
-        if session is None:
-            raise ProgressHeartbeatError("session_not_found", _("Viewing session was not found."))
-    if str(session.session_id) != str(session_id) or session.student_id != user.pk:
+        session_query = ViewingSession.objects.filter(session_id=session_id)
+    else:
+        session_query = ViewingSession.objects.filter(pk=session.pk, session_id=session_id)
+    session = session_query.select_related("lesson__course_offering").first()
+    if session is None:
+        raise ProgressHeartbeatError("session_not_found", _("Viewing session was not found."))
+    if session.student_id != user.pk:
         raise ProgressHeartbeatError("forbidden", _("Session belongs to another user."))
-    if timezone.now() >= session.expires_at:
-        raise ProgressHeartbeatError("expired", _("Session expired."))
     if not lesson_is_available(session.lesson):
         raise ProgressHeartbeatError("forbidden", _("This lesson is not available yet."))
-
-    def result(note=None) -> ProgressHeartbeatResult:
+    if not user_can_write_offering_activity(
+        user,
+        session.lesson.course_offering,
+        allow_management=allow_management,
+    ):
         current = LectureProgress.objects.filter(
             student=user,
             lesson=session.lesson,
@@ -475,82 +613,269 @@ def apply_progress_heartbeat(
         return ProgressHeartbeatResult(
             percent=int(current["percent"] or 0) if current else 0,
             completed=bool(current and current["completed_at"]),
-            note=str(note or ""),
+            note=_("Historical content is read-only"),
+            status="rejected",
+            session_id=session_id,
+            sequence=sequence,
+            reason="historical_read_only",
+            terminal=True,
+            last_sequence=int(session.heartbeat_sequence or 0),
         )
 
-    if session.ended_at is not None:
-        return result()
+    def response(
+        progress,
+        *,
+        status="ok",
+        reason="",
+        terminal=False,
+        note="",
+        ack=None,
+        credited_active_seconds=0,
+        last_sequence=None,
+    ) -> ProgressHeartbeatResult:
+        ack = ack or {}
+        return ProgressHeartbeatResult(
+            percent=int(progress.percent or 0) if progress else 0,
+            completed=bool(progress and progress.completed_at),
+            note=note,
+            status=status,
+            session_id=session_id,
+            sequence=sequence,
+            accepted_ranges=ack.get("accepted_ranges", []),
+            already_saved_ranges=ack.get("already_saved_ranges", []),
+            remaining_ranges=ack.get("remaining_ranges", []),
+            credited_active_seconds=credited_active_seconds,
+            reason=reason,
+            terminal=terminal,
+            last_sequence=(
+                int(last_sequence)
+                if last_sequence is not None
+                else int(session.heartbeat_sequence or 0)
+            ),
+            next_range_index=int(ack.get("next_range_index", 0)),
+            ack_truncated=bool(ack.get("ack_truncated", False)),
+        )
 
-    if not user_can_write_offering_activity(
-        user,
-        session.lesson.course_offering,
-        allow_management=allow_management,
+    def resync(reason, progress, last_sequence):
+        already_saved = intersect_ranges(
+            requested_ranges,
+            progress.merged_ranges if progress is not None else [],
+        )
+        ack = saved_prefix_ack(requested_ranges, already_saved, [])
+        return response(
+            progress,
+            status="resync",
+            reason=reason,
+            ack=ack,
+            last_sequence=last_sequence,
+        )
+
+    if (
+        sequence == session.heartbeat_sequence
+        and heartbeat["digest"] == session.last_payload_digest
+        and session.last_acknowledgement
     ):
-        return result(_("Historical content is read-only"))
+        return ProgressHeartbeatResult(
+            percent=0,
+            completed=False,
+            stored_acknowledgement=session.last_acknowledgement,
+        )
+    if sequence <= session.heartbeat_sequence:
+        current = LectureProgress.objects.filter(
+            student=user,
+            lesson=session.lesson,
+            part_id=session.part_id,
+        ).first()
+        return resync("stale_sequence", current, session.heartbeat_sequence)
+    if sequence != session.heartbeat_sequence + 1:
+        current = LectureProgress.objects.filter(
+            student=user,
+            lesson=session.lesson,
+            part_id=session.part_id,
+        ).first()
+        return resync("sequence_gap", current, session.heartbeat_sequence)
 
-    heartbeat_at = timezone.now()
-    session.last_heartbeat = heartbeat_at
-    update_fields = ["last_heartbeat"]
-    if ended and session.ended_at is None:
-        session.ended_at = heartbeat_at
-        update_fields.append("ended_at")
-    session.save(update_fields=update_fields)
+    checked_at = timezone.now()
+    initial_window_end = min(
+        value for value in (
+            checked_at,
+            session.expires_at,
+            session.superseded_at,
+            session.ended_at,
+        ) if value is not None
+    )
+    replay_until = initial_window_end + timedelta(days=7)
+    if checked_at > replay_until:
+        raise ProgressHeartbeatError("expired", _("Session replay window expired."))
 
-    if ended:
-        _record_progress_event(
-            session,
-            LectureProgressEvent.EventType.ENDED,
-            occurred_at=heartbeat_at,
+    try:
+        lesson_segments = get_lesson_segments(
+            session.lesson,
+            cloud_client,
+            bucket_name,
+            media_key=session.media_key or None,
+            requested_part_id=session.part_id,
+        ).get(session.part_id, [])
+    except Exception as exc:
+        raise ProgressHeartbeatError("media_unavailable", _("The media is unavailable.")) from exc
+    timeline_ranges = normalize_ranges([
+        (segment.get("start", 0), segment.get("end", 0))
+        for segment in lesson_segments
+    ])
+    if requested_ranges and not timeline_ranges:
+        return ProgressHeartbeatResult(
+            percent=0,
+            completed=False,
+            status="rejected",
+            session_id=session_id,
+            sequence=sequence,
+            remaining_ranges=requested_ranges,
+            reason="media_unavailable",
+            terminal=True,
+            last_sequence=int(session.heartbeat_sequence or 0),
         )
 
-    verified = set(session.verified_requests.values_list("segment_number", flat=True))
-    if not verified:
-        return result(_("No verified segments yet"))
+    def as_json_ranges(ranges):
+        return [[float(start), float(end)] for start, end in ranges]
 
-    lesson_segments = get_lesson_segments(
-        session.lesson,
-        cloud_client,
-        bucket_name,
-        media_key=session.media_key or None,
-        requested_part_id=session.part_id,
-    ).get(session.part_id, [])
-    all_ranges = [
-        [float(segment.get("start", 0)), float(segment.get("end", 0))]
-        for segment in lesson_segments
-        if float(segment.get("end", 0)) > float(segment.get("start", 0))
-    ]
-    verified_ranges = []
-    for segment in lesson_segments:
-        if segment.get("number") in verified:
-            verified_ranges.append({
-                "start": float(segment.get("start", 0)),
-                "end": float(segment.get("end", 0)),
-            })
-    if not verified_ranges:
-        return result(_("No verified segment ranges"))
-
-    total_secs = sum(end - start for start, end in all_ranges)
     with transaction.atomic():
-        locked_session = ViewingSession.objects.select_for_update().get(pk=session.pk)
-        if locked_session.ended_at is not None and locked_session.ended_at != heartbeat_at:
-            return result()
-        progress, _created = LectureProgress.objects.select_for_update().get_or_create(
+        if not user_can_write_offering_activity(
+            user,
+            session.lesson.course_offering,
+            allow_management=allow_management,
+        ):
+            raise ProgressHeartbeatError("forbidden", _("Progress is read-only."))
+        progress, _created = LectureProgress.objects.get_or_create(
             student=user,
             lesson=session.lesson,
             part_id=session.part_id,
             defaults={"merged_ranges": []},
         )
-        merged = merge_verified_progress_ranges(
-            progress.merged_ranges,
-            ranges,
-            verified_ranges,
+        progress = LectureProgress.objects.select_for_update().get(pk=progress.pk)
+        locked_session = ViewingSession.objects.select_for_update().select_related(
+            "lesson__course_offering__academic_year_level__academic_year"
+        ).get(pk=session.pk)
+        if (
+            locked_session.session_id != session_id
+            or locked_session.student_id != user.pk
+            or locked_session.lesson_id != session.lesson_id
+            or locked_session.part_id != session.part_id
+            or locked_session.media_key != session.media_key
+        ):
+            raise ProgressHeartbeatError("forbidden", _("Viewing session changed."))
+        if not lesson_is_available(locked_session.lesson):
+            raise ProgressHeartbeatError("forbidden", _("This lesson is not available yet."))
+        if not user_can_write_offering_activity(
+            user,
+            locked_session.lesson.course_offering,
+            allow_management=allow_management,
+        ):
+            raise ProgressHeartbeatError("forbidden", _("Progress is read-only."))
+
+        last_sequence = int(locked_session.heartbeat_sequence or 0)
+        if sequence == last_sequence:
+            if (
+                heartbeat["digest"] == locked_session.last_payload_digest
+                and locked_session.last_acknowledgement
+            ):
+                return ProgressHeartbeatResult(
+                    percent=0,
+                    completed=False,
+                    stored_acknowledgement=locked_session.last_acknowledgement,
+                )
+            return resync("sequence_conflict", progress, last_sequence)
+        if sequence < last_sequence:
+            return resync("stale_sequence", progress, last_sequence)
+        if sequence != last_sequence + 1:
+            return resync("sequence_gap", progress, last_sequence)
+
+        now = timezone.now()
+        window_end = min(
+            value for value in (
+                now,
+                locked_session.expires_at,
+                locked_session.superseded_at,
+                locked_session.ended_at,
+            ) if value is not None
         )
-        unique_secs = unique_seconds(merged)
-        percent = calculate_percent(unique_secs, total_secs) if total_secs > 0 else 0
+        if now > window_end + timedelta(days=7):
+            raise ProgressHeartbeatError("expired", _("Session replay window expired."))
+
+        timeline = timeline_ranges
+        requested_on_timeline = intersect_ranges(requested_ranges, timeline)
+        saved_before = normalize_ranges(progress.merged_ranges or [])
+        already_saved = intersect_ranges(requested_on_timeline, saved_before)
+        new_candidates = subtract_ranges(requested_on_timeline, saved_before)
+        edge_mode = (
+            locked_session.segment_delivery_mode
+            == ViewingSession.SegmentDeliveryMode.EDGE_GATE
+        )
+        verified_ranges = []
+        if not edge_mode:
+            verified = set(
+                locked_session.verified_requests.values_list("segment_number", flat=True)
+            )
+            if verified:
+                verified_ranges = [
+                    (segment.get("start", 0), segment.get("end", 0))
+                    for segment in lesson_segments
+                    if segment.get("number") in verified
+                ]
+            new_candidates = intersect_ranges(new_candidates, verified_ranges)
+
+        available_centiseconds = 30_000
+        earned_available_centiseconds = 0
+        if edge_mode:
+            _earned, available_centiseconds = edge_credit_budget_centiseconds(
+                locked_session.started_at,
+                window_end,
+                locked_session.edge_earned_seconds_consumed,
+                progress.edge_slack_remaining_seconds,
+            )
+        accepted_ranges, _remaining_by_budget = take_ordered_prefix(
+            new_candidates,
+            min(30_000, available_centiseconds) / 100,
+        )
+        accepted_centiseconds = sum(
+            int(Decimal(str(end)) * 100) - int(Decimal(str(start)) * 100)
+            for start, end in accepted_ranges
+        )
+        if edge_mode:
+            earned_total, _available = edge_credit_budget_centiseconds(
+                locked_session.started_at,
+                window_end,
+                locked_session.edge_earned_seconds_consumed,
+                progress.edge_slack_remaining_seconds,
+            )
+            consumed_before = int(
+                (Decimal(str(locked_session.edge_earned_seconds_consumed)) * 100).to_integral_value(
+                    rounding=ROUND_HALF_UP,
+                )
+            )
+            slack_before = int(
+                (Decimal(str(progress.edge_slack_remaining_seconds)) * 100).to_integral_value(
+                    rounding=ROUND_HALF_UP,
+                )
+            )
+            earned_available_centiseconds = max(0, earned_total - consumed_before)
+            earned_spent = min(accepted_centiseconds, earned_available_centiseconds)
+            slack_spent = accepted_centiseconds - earned_spent
+            locked_session.edge_earned_seconds_consumed = Decimal(
+                consumed_before + earned_spent
+            ) / 100
+            progress.edge_slack_remaining_seconds = Decimal(
+                max(0, slack_before - slack_spent)
+            ) / 100
+
+        merged = normalize_ranges(saved_before + accepted_ranges)
+        total_seconds = unique_seconds(timeline)
+        media_saved = intersect_ranges(merged, timeline)
+        unique_secs = unique_seconds(media_saved)
+        percent = calculate_percent(unique_secs, total_seconds) if total_seconds > 0 else 0
         previous_percent = progress.percent
         progress.merged_ranges = merged
         progress.percent = percent
-        progress.unique_seconds = int(round(unique_secs))
+        progress.unique_seconds = int(round(unique_seconds(merged)))
         if merged:
             furthest = max(float(end) for _start, end in merged)
             progress.last_position_seconds = max(
@@ -558,25 +883,58 @@ def apply_progress_heartbeat(
                 int(furthest),
             )
         if not progress.completed_at and percent >= 80:
-            progress.completed_at = timezone.now()
-        progress.save()
+            progress.completed_at = now
 
-        credit_watch_sample(
-            locked_session,
-            progress,
-            active_seconds=active_seconds,
-            sequence=sequence,
-            progress_before=previous_percent,
-            progress_after=percent,
-            ended=ended,
-            now=heartbeat_at,
+        window_close = min(
+            value for value in (
+                locked_session.expires_at,
+                locked_session.superseded_at,
+                locked_session.ended_at,
+            ) if value is not None
         )
+        live_window = now < window_close and locked_session.ended_at is None
+        was_ended = locked_session.ended_at
+        if live_window:
+            activity_cursor = (
+                locked_session.activity_cursor_at
+                or locked_session.started_at
+                or locked_session.last_heartbeat
+            )
+            elapsed_seconds = max(0, int((now - activity_cursor).total_seconds()))
+            requested_activity = min(
+                60,
+                int(heartbeat["active_seconds"] + 0.5),
+                elapsed_seconds,
+            )
+            if not edge_mode and not verified_ranges:
+                requested_activity = 0
+            credited_active_seconds = credit_watch_sample(
+                locked_session,
+                progress,
+                active_seconds=requested_activity,
+                sequence=sequence,
+                progress_before=previous_percent,
+                progress_after=percent,
+                ended=heartbeat["ended"],
+                now=now,
+            )
+            locked_session.activity_cursor_at = now
+        else:
+            credited_active_seconds = 0
+            locked_session.heartbeat_sequence = sequence
 
+        if heartbeat["ended"] and was_ended is None:
+            locked_session.ended_at = now
+            _record_progress_event(
+                locked_session,
+                LectureProgressEvent.EventType.ENDED,
+                occurred_at=now,
+            )
         if percent != previous_percent:
             _record_progress_event(
                 locked_session,
                 LectureProgressEvent.EventType.PROGRESS,
-                occurred_at=heartbeat_at,
+                occurred_at=now,
                 percent=percent,
                 unique_seconds=progress.unique_seconds,
             )
@@ -588,4 +946,191 @@ def apply_progress_heartbeat(
                 percent=percent,
                 unique_seconds=progress.unique_seconds,
             )
-    return ProgressHeartbeatResult(percent=percent, completed=progress.completed_at is not None)
+
+        progress.save(update_fields=[
+            "merged_ranges",
+            "percent",
+            "unique_seconds",
+            "last_position_seconds",
+            "completed_at",
+            "edge_slack_remaining_seconds",
+        ])
+
+        ack_ranges = saved_prefix_ack(
+            requested_ranges,
+            already_saved,
+            accepted_ranges,
+        )
+        reason = ""
+        if ack_ranges["remaining_ranges"]:
+            if requested_ranges and not requested_on_timeline:
+                reason = "outside_media_timeline"
+            elif not edge_mode and not verified_ranges:
+                reason = "no_verified_segments"
+            elif edge_mode and available_centiseconds <= 0:
+                reason = "credit_budget_exhausted"
+            elif not edge_mode:
+                reason = "unverified_ranges"
+            else:
+                reason = "partial_progress"
+        elif not live_window and heartbeat["active_centiseconds"]:
+            reason = "replay_activity_not_credited"
+
+        ack = {
+            "status": "ok",
+            "percent": percent,
+            "completed": progress.completed_at is not None,
+            "session_id": session_id,
+            "sequence": sequence,
+            "accepted_ranges": as_json_ranges(ack_ranges["accepted_ranges"]),
+            "already_saved_ranges": as_json_ranges(ack_ranges["already_saved_ranges"]),
+            "remaining_ranges": as_json_ranges(ack_ranges["remaining_ranges"]),
+            "credited_active_seconds": int(credited_active_seconds or 0),
+            "reason": reason,
+            "terminal": False,
+            "last_sequence": sequence,
+            "next_range_index": int(ack_ranges["next_range_index"]),
+            "ack_truncated": bool(ack_ranges["ack_truncated"]),
+        }
+        ack = _fit_acknowledgement(ack)
+        locked_session.last_payload_digest = heartbeat["digest"]
+        locked_session.last_acknowledgement = ack
+        locked_session.save(update_fields=[
+            "heartbeat_sequence",
+            "activity_cursor_at",
+            "edge_earned_seconds_consumed",
+            "last_payload_digest",
+            "last_acknowledgement",
+            "ended_at",
+        ])
+        return ProgressHeartbeatResult(
+            percent=percent,
+            completed=progress.completed_at is not None,
+            stored_acknowledgement=ack,
+        )
+
+
+def _online_attendance_outcome(
+    published_at: datetime,
+    completed_at: datetime | None,
+    policy: AttendancePolicy,
+) -> tuple[str, Decimal]:
+    if completed_at is None:
+        return "absent", Decimal("0.00")
+    if completed_at <= published_at + timedelta(days=policy.online_full_days):
+        return "full", Decimal("1.00")
+    if completed_at <= published_at + timedelta(days=policy.online_partial_days):
+        return "partial", policy.online_partial_value
+    return "absent", Decimal("0.00")
+
+
+def online_attendance_score_for_lesson(
+    published_at: datetime,
+    completed_at: datetime | None,
+    policy: AttendancePolicy,
+) -> Decimal:
+    """Return the approved online attendance score at exact day boundaries."""
+    return _online_attendance_outcome(published_at, completed_at, policy)[1]
+
+
+def online_attendance_for_students(
+    *,
+    student_ids: list[int],
+    offering_ids: list[int],
+    window_start: date | datetime,
+    window_end: date | datetime,
+    policy: AttendancePolicy,
+) -> dict[int, dict[str, int | Decimal]]:
+    """Aggregate online lesson completion for one bounded management report batch."""
+    student_ids = list(dict.fromkeys(student_ids))
+    if not student_ids or not offering_ids:
+        return {}
+    student_ids = list(Enrollment.objects.filter(
+        student_id__in=student_ids,
+        academic_year_level__course_offerings__pk__in=offering_ids,
+        enrollment_type=Enrollment.Type.NORMAL,
+        course_offering__isnull=True,
+        status=Enrollment.Status.ACTIVE,
+        student__is_active=True,
+        student__role__role="student",
+        student__study_mode="online",
+    ).values_list("student_id", flat=True).distinct())
+    if not student_ids:
+        return {}
+    start = timezone.make_aware(window_start) if isinstance(window_start, datetime) and timezone.is_naive(window_start) else window_start
+    end = timezone.make_aware(window_end) if isinstance(window_end, datetime) and timezone.is_naive(window_end) else window_end
+
+    lessons = {}
+    required_parts = {}
+    for lesson in Lesson.objects.filter(
+        course_offering_id__in=offering_ids,
+        status=PublicationStatus.PUBLISHED,
+    ).values("id", "links", "opening_date", "created_date"):
+        published_at = lesson["opening_date"] or timezone.make_aware(
+            datetime.combine(lesson["created_date"], time.min)
+        )
+        publish_day = timezone.localtime(published_at).date()
+        if (published_at < start if isinstance(start, datetime) else publish_day < start) or (
+            published_at > end if isinstance(end, datetime) else publish_day > end
+        ):
+            continue
+        try:
+            links = json.loads(lesson["links"] or "[]")
+        except (TypeError, ValueError, json.JSONDecodeError):
+            links = []
+        parts = set()
+        if isinstance(links, list):
+            for link in links:
+                if not isinstance(link, dict) or link.get("file_type") not in {"video", "audio"}:
+                    continue
+                part_id = link.get("part_id")
+                if isinstance(part_id, str) and part_id.strip():
+                    parts.add(part_id)
+        if parts:
+            lessons[lesson["id"]] = (len(parts), published_at)
+            required_parts[lesson["id"]] = parts
+
+    result = {
+        student_id: {
+            "expected": len(lessons),
+            "valid": 0,
+            "partial": 0,
+            "absent": len(lessons),
+            "attendance_score": Decimal("0.00"),
+        }
+        for student_id in student_ids
+    }
+    if not lessons:
+        return result
+
+    required_progress = Q(pk__in=[])
+    for lesson_id, part_ids in required_parts.items():
+        required_progress |= Q(lesson_id=lesson_id, part_id__in=part_ids)
+    completions = LectureProgress.objects.filter(
+        student_id__in=student_ids,
+        percent__gte=80,
+        completed_at__isnull=False,
+    ).filter(required_progress).values("student_id", "lesson_id").annotate(
+        completed_parts=Count("pk"),
+        completed_at=Max("completed_at"),
+    )
+    for completion in completions:
+        student_facts = result[completion["student_id"]]
+        lesson_id = completion["lesson_id"]
+        required_count, published_at = lessons[lesson_id]
+        if completion["completed_parts"] != required_count:
+            continue
+        outcome, score = _online_attendance_outcome(
+            published_at,
+            completion["completed_at"],
+            policy,
+        )
+        if outcome == "full":
+            student_facts["valid"] += 1
+        elif outcome == "partial":
+            student_facts["partial"] += 1
+        else:
+            continue
+        student_facts["absent"] -= 1
+        student_facts["attendance_score"] += score
+    return result

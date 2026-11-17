@@ -15,8 +15,8 @@
 
     {% if part.type == "video" %}
     <div class="sn-player">
-      <div class="lesson-video-wrapper sd-live-player sn-video-wrapper" x-data="progressTracker()" data-offering-id="{{ offering_id }}" data-lesson-id="{{ lesson_id }}" data-part-id="{{ part.part_id }}" data-file-index="{{ part.file_index }}" data-start-session-url="{% url 'start-viewing-session' offering_id lesson_id part.file_index %}" data-heartbeat-url="{% url 'progress-heartbeat' %}">
-        <video class="sn-media-element" playsinline controls crossorigin="anonymous" preload="auto" controlsList="nodownload" @play="onPlay" @pause="onPause" @seeking="resetPlaybackSample" @seeked="resetPlaybackSample" @timeupdate="onTimeUpdate" @ended="sendHeartbeat(true)">
+      <div class="lesson-video-wrapper sd-live-player sn-video-wrapper" x-data="progressTracker()" data-student-id="{% if request.user.is_authenticated and request.user.role.role == 'student' and not management_preview %}{{ request.user.pk }}{% endif %}" data-offering-id="{{ offering_id }}" data-lesson-id="{{ lesson_id }}" data-part-id="{{ part.part_id }}" data-file-index="{{ part.file_index }}" data-start-session-url="{% url 'start-viewing-session' offering_id lesson_id part.file_index %}" data-heartbeat-url="{% url 'progress-heartbeat' %}">
+        <video class="sn-media-element" playsinline controls crossorigin="anonymous" preload="auto" controlsList="nodownload" @play="onPlay" @pause="onPause" @seeking="resetPlaybackSample" @seeked="onSeek" @timeupdate="onTimeUpdate" @ended="sendHeartbeat(true)">
           <source type="application/x-mpegURL">
           <p>{% translate "Your browser does not support HTML5 video." %}</p>
         </video>
@@ -27,14 +27,15 @@
           <b x-text="progressPercent + '%'">0%</b>
         </div>
         {% endif %}
+        {% if request.user.is_authenticated and request.user.role.role == 'student' and not management_preview %}<p class="small text-muted mt-2 mb-0" role="status" aria-live="polite" x-show="queueStatusMessage" x-text="queueStatusMessage"></p>{% endif %}
       </div>
     </div>
     {% elif part.type == "audio" %}
-    <div class="sn-audio sd-live-player" x-data="progressTracker()" data-offering-id="{{ offering_id }}" data-lesson-id="{{ lesson_id }}" data-part-id="{{ part.part_id }}" data-file-index="{{ part.file_index }}" data-start-session-url="{% url 'start-viewing-session' offering_id lesson_id part.file_index %}" data-heartbeat-url="{% url 'progress-heartbeat' %}">
+    <div class="sn-audio sd-live-player" x-data="progressTracker()" data-student-id="{% if request.user.is_authenticated and request.user.role.role == 'student' and not management_preview %}{{ request.user.pk }}{% endif %}" data-offering-id="{{ offering_id }}" data-lesson-id="{{ lesson_id }}" data-part-id="{{ part.part_id }}" data-file-index="{{ part.file_index }}" data-start-session-url="{% url 'start-viewing-session' offering_id lesson_id part.file_index %}" data-heartbeat-url="{% url 'progress-heartbeat' %}">
       <div class="sn-audio-copy">
         <b>{% translate "Audio version" %}</b>
         <span dir="auto">{{ part.name }}</span>
-        <audio class="sn-media-element" controls crossorigin="anonymous" preload="auto" controlsList="nodownload" @play="onPlay" @pause="onPause" @seeking="resetPlaybackSample" @seeked="resetPlaybackSample" @timeupdate="onTimeUpdate" @ended="sendHeartbeat(true)">
+        <audio class="sn-media-element" controls crossorigin="anonymous" preload="auto" controlsList="nodownload" @play="onPlay" @pause="onPause" @seeking="resetPlaybackSample" @seeked="onSeek" @timeupdate="onTimeUpdate" @ended="sendHeartbeat(true)">
           <source type="application/x-mpegURL">
         </audio>
         {% if not management_preview %}
@@ -44,6 +45,7 @@
           <b x-text="progressPercent + '%'">0%</b>
         </div>
         {% endif %}
+        {% if request.user.is_authenticated and request.user.role.role == 'student' and not management_preview %}<p class="small text-muted mt-2 mb-0" role="status" aria-live="polite" x-show="queueStatusMessage" x-text="queueStatusMessage"></p>{% endif %}
       </div>
       {% if part.download_url %}<a class="sn-btn sn-btn--ghost sn-btn--sm" href="{{ part.download_url }}"><svg class="sn-ico" aria-hidden="true"><use href="#i-download"></use></svg>{% translate "Download audio" %}</a>{% endif %}
       {% if not management_preview %}{% include "partials/pwa_save_button.html" with offering_id=offering_id lesson_id=lesson_id file_index=part.file_index title=part.name media_type="audio" %}{% endif %}

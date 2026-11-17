@@ -187,7 +187,10 @@ class AcademicHolidayAdmin(AdminOnlyModelAdmin):
 
 @admin.register(AttendancePolicy)
 class AttendancePolicyAdmin(AdminOnlyModelAdmin):
-    list_display = ["entrance_deadline", "exit_time", "buffer_minutes", "updated_at", "updated_by"]
+    list_display = [
+        "entrance_deadline", "exit_time", "buffer_minutes", "online_full_days",
+        "online_partial_days", "online_partial_value", "updated_at", "updated_by",
+    ]
 
     def has_add_permission(self, request):
         return False
