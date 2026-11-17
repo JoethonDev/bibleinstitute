@@ -115,35 +115,38 @@ time and re-homed into `applications/<user id>/<document_type>/` at finalize;
 an end-to-end signup POST (form + token + user creation) is still unverified and
 is the next check to write.
 
-### Next unit: background upload + persistent applicant attachments
+### Next unit: background upload + persistent applicant attachments (implemented in `c0f263c`)
 
 User request (2026-11-17): upload attachments in the background while the form is
 being filled, and keep already-uploaded signup documents when the visitor leaves
-and returns, including after a rejected submission. Two parts:
+and returns, including after a rejected submission. User answers: a **two-hour**
+signup window, an explicit **Remove** button, and a cleanup for orphaned
+uploads.
 
-1. `direct_upload.js` uploads on the `change` event instead of on submit, keeps
-   one in-flight transfer per field, and only waits for pending transfers at
-   submit time.
-2. Capabilities persist in `sessionStorage` per form + field, rehydrate the
-   hidden `direct_upload_token_*` inputs on load, and render an uploaded state
-   plus a JS-injected Remove control (so no per-picker template edits). Remove
-   calls a new `POST /api/direct-upload/discard/`, which must verify the same
-   actor/applicant-session binding as finalize before expiring the row and
-   deleting the staged object; picking a replacement supersedes the old token.
+Implemented:
 
-Server defaults proposed (change them before implementation if wrong):
-signup-only capabilities live **24 hours** so a returning applicant can finish,
-while every authenticated flow keeps the current 15-minute upload URL and
-30-minute finalize grace. `expire_abandoned_direct_uploads` must respect the
-longer applicant window. The longer bearer life is acceptable only because the
-capability is session-bound, single-use and can attach one document to the
-account created from that same session.
-
-Verification to add: extend `phase08_signup_upload.py` to finalize after a
-simulated reload from the same session, and prove a discard removes the staged
-object and cannot be finalized afterwards. Plus `manage.py check`, no migration
-drift (no schema change expected), `audit_text_encoding`, and Arabic entries for
-the new uploaded/remove wording.
+- `direct_upload.js` uploads on `change` (background), keeps the capability in
+  `sessionStorage` keyed by form action + field, rehydrates the hidden
+  `direct_upload_token_*` inputs on load, and only waits for in-flight transfers
+  at submit. Each picker gets an injected status line and a Remove button that
+  calls the discard endpoint and cleans local state. Multi-file pickers still
+  emit one token per file.
+- `POST /api/direct-upload/discard/` verifies the same actor or
+  applicant-session binding as finalize before expiring the row and deleting the
+  staged object; the JS derives the discard URL from the authorize URL when a
+  template carries only the latter.
+- `APPLICANT_UPLOAD_TTL_SECONDS` is two hours for signup-only capabilities;
+  authenticated flows keep the 15-minute upload URL and 30-minute finalize
+  grace.
+- `direct_upload_tasks.expire_abandoned_uploads` runs hourly on the admin queue
+  and sweeps orphaned capabilities and their staged bytes, so an abandoned
+  signup cannot leave objects behind indefinitely.
+- `base.html`, `admin_panel.html` and `student_next/base.html` supply the
+  translated `Uploaded`/`Remove` labels; both msgids already existed in the
+  Arabic catalog.
+- `phase08_signup_upload.py` gained three checks: the capability lives two
+  hours, discard expires it and deletes staging, and a discarded capability
+  cannot be finalized. All eight checks pass.
 
 ### Ready to deploy (2026-11-17)
 
