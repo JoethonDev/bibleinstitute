@@ -130,6 +130,7 @@ from .direct_uploads import (
     finalize_direct_upload,
     read_finalized_object,
 )
+from .direct_upload_views import applicant_session_digest
 from .models import DirectUploadAuthorization
 from django.core.files.uploadedfile import SimpleUploadedFile
 from .utils.application_uploads import (
@@ -6211,16 +6212,32 @@ def signup(request):
                     required_upload_types = {"identity_front", "profile"}
                     if user.identity_type == "national_id":
                         required_upload_types.add("identity_back")
-                    for upload_type, model_field in file_type_map.items():
-                        if upload_type not in request.FILES:
-                            continue
-                        uploaded = upload_application_file(
-                            CLOUD_CLIENT,
-                            bucket_name,
-                            user.id,
-                            request.FILES[upload_type],
-                            upload_type,
+                    # Signup documents may arrive as direct-upload capabilities
+                    # minted before the account existed, so they are bound to
+                    # this anonymous session and finalized against the new id.
+                    applicant_digest = applicant_session_digest(request)
+                    finalized_documents = {}
+                    if applicant_digest:
+                        finalized_documents = finalize_application_documents(
+                            actor=None,
+                            tokens=_direct_application_document_tokens(request),
+                            cloud_client=CLOUD_CLIENT,
+                            bucket_name=bucket_name,
+                            user_id=user.pk,
+                            applicant_session=applicant_digest,
                         )
+                    for upload_type, model_field in file_type_map.items():
+                        uploaded = finalized_documents.get(upload_type)
+                        if uploaded is None:
+                            if upload_type not in request.FILES:
+                                continue
+                            uploaded = upload_application_file(
+                                CLOUD_CLIENT,
+                                bucket_name,
+                                user.id,
+                                request.FILES[upload_type],
+                                upload_type,
+                            )
                         if uploaded:
                             setattr(user, model_field, uploaded.original_key)
                             setattr(user, APPLICATION_PREVIEW_FIELDS[upload_type], uploaded.preview_key)

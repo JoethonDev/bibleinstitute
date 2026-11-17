@@ -1,4 +1,4 @@
-"""HTTP boundary for direct browser-to-R2 file transfers.
+﻿"""HTTP boundary for direct browser-to-R2 file transfers.
 
 Only authorization is exposed as an endpoint: the browser PUTs the bytes to the
 presigned private key, and the owning view finalizes the capability inside the
@@ -8,9 +8,11 @@ no second generic upload endpoint.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 
+from django.core.cache import cache
 from django.core.exceptions import ValidationError
 from django.http import JsonResponse
 from django.utils.translation import gettext as _
@@ -29,6 +31,13 @@ from .utils.decorators import can_manage_academic_setup, can_manage_content
 logger = logging.getLogger(__name__)
 
 SESSION_APPLICANT_METADATA_KEY = "applicant_session_key"
+
+# A signup visitor is not signed in yet, so the document authorization cannot be
+# bound to an account. It is bound to the browser session instead and bounded by
+# a per-session counter, because that route has no login gate.
+APPLICANT_CAPABILITY_LIMIT = 8
+APPLICANT_CAPABILITY_TTL_SECONDS = 3600
+APPLICANT_SESSION_PREFIX = "direct-upload-applicant:"
 
 ADMIN_PURPOSES = {
     DirectUploadAuthorization.Purpose.APK,
@@ -75,12 +84,99 @@ def _document_target(user, requested_target) -> str:
     return f"user:{target_id}"
 
 
+def applicant_session_digest(request) -> str:
+    """Bind a pre-account capability to this browser session."""
+
+    if not request.session.session_key:
+        request.session.create()
+    session_key = request.session.session_key or ""
+    if not session_key:
+        return ""
+    return hashlib.sha256(
+        f"{APPLICANT_SESSION_PREFIX}{session_key}".encode("utf-8")
+    ).hexdigest()[:32]
+
+
+def _applicant_capability_allowed(digest: str) -> bool:
+    """Count capabilities per session; a cache outage must not block signup."""
+
+    cache_key = f"direct_upload:applicant:{digest}"
+    try:
+        used = int(cache.get(cache_key) or 0)
+        if used >= APPLICANT_CAPABILITY_LIMIT:
+            return False
+        cache.set(cache_key, used + 1, APPLICANT_CAPABILITY_TTL_SECONDS)
+    except Exception:  # noqa: BLE001 - cache outage is not an authorization signal
+        logger.warning("applicant upload counter unavailable")
+    return True
+
+
+def _authorize_applicant_document(request):
+    """Authorize one signup document for a visitor without an account yet."""
+
+    try:
+        payload = _payload(request)
+        purpose = DirectUploadAuthorization.Purpose(payload.get("purpose"))
+    except ValueError:
+        return _error(
+            "unsupported_purpose", _("This upload purpose is not supported."), status=400
+        )
+    except DirectUploadError as exc:
+        return _error(exc.code, exc.message, status=400)
+    if purpose != DirectUploadAuthorization.Purpose.APPLICATION_DOCUMENT:
+        return _error("unauthenticated", _("Authentication required."), status=401)
+    document_type = str(payload.get("document_type") or "").strip()
+    if document_type not in APPLICATION_DOCUMENT_FIELDS:
+        return _error(
+            "invalid_document_type", _("Choose which document this file is."), status=400
+        )
+    digest = applicant_session_digest(request)
+    if not digest:
+        return _error("unauthenticated", _("Authentication required."), status=401)
+    if not _applicant_capability_allowed(digest):
+        return _error(
+            "rate_limited",
+            _("Too many uploads from this browser. Try again later."),
+            status=429,
+        )
+    try:
+        grant = authorize_direct_upload(
+            actor=None,
+            purpose=purpose,
+            target=f"applicant:{digest}",
+            filename=str(payload.get("filename") or ""),
+            size=payload.get("size"),
+            content_type=str(payload.get("content_type") or ""),
+            metadata={
+                "document_type": document_type,
+                "applicant_session": digest,
+            },
+        )
+    except DirectUploadError as exc:
+        status = 413 if exc.code == "file_too_large" else 400
+        return _error(exc.code, exc.message, status=status)
+    response = JsonResponse(
+        {
+            "token": grant.token,
+            "upload_url": grant.upload_url,
+            "key": grant.staging_key,
+            "expires_at": grant.expires_at,
+            "max_bytes": grant.max_bytes,
+            "content_types": list(grant.content_types),
+            "extensions": list(grant.extensions),
+            "audio_seconds": grant.audio_seconds,
+        }
+    )
+    response["Cache-Control"] = "private, no-store"
+    return response
+
+
 @require_POST
 def direct_upload_authorize(request):
     """Create one bounded capability for an exact private staging key."""
 
     if not request.user.is_authenticated:
-        return _error("unauthenticated", _("Authentication required."), status=401)
+        return _authorize_applicant_document(request)
     user = request.user
     try:
         payload = _payload(request)

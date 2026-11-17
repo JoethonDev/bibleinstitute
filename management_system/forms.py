@@ -1232,10 +1232,14 @@ class SignupForm(forms.ModelForm):
         widget=forms.TextInput(attrs={'placeholder': _('Full Name'), 'id': 'full_name'}),
     )
     agree_terms = forms.BooleanField(required=True, label=_("I agree to the Terms and Conditions"))
-    identity_front = forms.FileField(required=True, label=_("National ID / Passport (Front)"))
-    identity_back = forms.FileField(required=False, label=_("National ID / Passport (Back)"))
-    payment = forms.FileField(required=False, label=_("Payment Receipt (optional)"))
-    profile = forms.FileField(required=True, label=_("Profile Photo"))
+    identity_front = direct_document_field(
+        "identity_front", _("National ID / Passport (Front)")
+    )
+    identity_back = direct_document_field(
+        "identity_back", _("National ID / Passport (Back)")
+    )
+    payment = direct_document_field("payment", _("Payment Receipt (optional)"))
+    profile = direct_document_field("profile", _("Profile Photo"))
     time_zone = forms.ChoiceField(label=_("Time zone"), choices=(), required=True)
     country = forms.ChoiceField(
         label=_("Country"),
@@ -1340,13 +1344,24 @@ class SignupForm(forms.ModelForm):
                 raise forms.ValidationError(e.message if hasattr(e, 'message') else str(e))
         return identity_number
 
+    def _provided(self, field_name: str) -> bool:
+        """True when the field arrived as a file or as a direct-upload capability."""
+
+        if self.cleaned_data.get(field_name):
+            return True
+        return bool((self.data.get(f"direct_upload_token_{field_name}") or "").strip())
+
     def clean(self):
         cleaned_data = super().clean()
         if not cleaned_data.get("agree_terms"):
             raise forms.ValidationError(_("You must agree to the Terms and Conditions."))
-        if cleaned_data.get("identity_type") == "national_id" and not cleaned_data.get("identity_back"):
+        for required_field in ("identity_front", "profile"):
+            if not self._provided(required_field):
+                self.add_error(required_field, _("This field is required."))
+        identity_back = self._provided("identity_back")
+        if cleaned_data.get("identity_type") == "national_id" and not identity_back:
             self.add_error("identity_back", _("The back of the National ID is required."))
-        if cleaned_data.get("identity_type") == "passport" and cleaned_data.get("identity_back"):
+        if cleaned_data.get("identity_type") == "passport" and identity_back:
             self.add_error("identity_back", _("A passport requires only the front document."))
         return cleaned_data
 

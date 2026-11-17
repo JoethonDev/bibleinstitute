@@ -486,6 +486,7 @@ def _finalize_direct_upload(
     expected_purpose: str | None = None,
     metadata: dict | None = None,
     final_folder: str | None = None,
+    applicant_session: str | None = None,
 ) -> FinalizedUpload:
     """Validate the stored object and publish those exact bytes to a final key.
 
@@ -511,7 +512,15 @@ def _finalize_direct_upload(
             )
         # The bucket is part of the capability, never taken from the request.
         bucket = authorization.bucket or _bucket_name()
-        if authorization.actor_id != getattr(actor, "pk", None):
+        if applicant_session:
+            # A capability minted before the account existed is bound to the
+            # anonymous session that requested it, never to an account.
+            stored_session = str((authorization.metadata or {}).get("applicant_session") or "")
+            if authorization.actor_id is not None or stored_session != applicant_session:
+                raise DirectUploadError(
+                    "forbidden", _("This upload cannot be used here.")
+                )
+        elif authorization.actor_id != getattr(actor, "pk", None):
             raise DirectUploadError("forbidden", _("This upload belongs to another account."))
         if expected_purpose and authorization.purpose != expected_purpose:
             raise DirectUploadError("forbidden", _("This upload cannot be used here."))
@@ -687,6 +696,7 @@ def finalize_direct_upload(
     expected_purpose: str | None = None,
     metadata: dict | None = None,
     final_folder: str | None = None,
+    applicant_session: str | None = None,
 ) -> FinalizedUpload:
     """Finalize one capability, persisting a terminal failure outside its transaction."""
 
@@ -698,6 +708,7 @@ def finalize_direct_upload(
             expected_purpose=expected_purpose,
             metadata=metadata,
             final_folder=final_folder,
+            applicant_session=applicant_session,
         )
     except DirectUploadError as exc:
         _persist_failure(token=token, actor=actor, code=exc.code)

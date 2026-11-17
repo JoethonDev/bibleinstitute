@@ -50,7 +50,7 @@
                     </div>
 
                     <!-- ========== SIGNUP FORM ========== -->
-                    <form method="post" enctype="multipart/form-data">
+                    <form method="post" enctype="multipart/form-data" data-direct-upload="{% url 'direct-upload-authorize' %}">
                         {% csrf_token %}
                         <datalist id="egyptian-cities"
                                   data-empty-label="{% translate 'No matching cities' %}">

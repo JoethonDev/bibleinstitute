@@ -289,6 +289,7 @@ def finalize_application_documents(
     cloud_client,
     bucket_name: str,
     user_id: int,
+    applicant_session: str | None = None,
 ) -> dict[str, UploadedApplicationFile]:
     """Validate already-uploaded browser documents and build their previews.
 
@@ -313,6 +314,7 @@ def finalize_application_documents(
                     expected_purpose=DirectUploadAuthorization.Purpose.APPLICATION_DOCUMENT,
                     metadata={"document_type": document_type},
                     final_folder=f"applications/{user_id}/{document_type}",
+                    applicant_session=applicant_session,
                 )
             except DirectUploadError as exc:
                 raise ValidationError(exc.message) from exc
