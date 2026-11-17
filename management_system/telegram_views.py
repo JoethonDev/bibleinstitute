@@ -21,6 +21,15 @@ from django.utils.translation import gettext as _
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_GET, require_POST
 
+from django.core.files.uploadedfile import SimpleUploadedFile
+
+from .direct_uploads import (
+    PURPOSE_LIMITS,
+    DirectUploadError,
+    finalize_direct_upload,
+    read_finalized_payload,
+)
+from .models import DirectUploadAuthorization
 from .job_monitor import monitored_jobs, readable_job
 from .models import (
     AcademicYear,
@@ -718,12 +727,45 @@ def telegram_conversation_detail(request, conversation_id):
     return render_page(request, "telegram_conversation_detail.html", "partials/telegram_conversation_detail_content.html", context)
 
 
+def _finalized_telegram_attachment(request, field_name: str = "attachment"):
+    """Return a browser-uploaded Telegram attachment as an ordinary file object."""
+
+    purpose = DirectUploadAuthorization.Purpose.TELEGRAM_ATTACHMENT
+    finalized = finalize_direct_upload(
+        actor=request.user,
+        token=(request.POST.get(f"direct_upload_token_{field_name}") or "").strip(),
+        expected_purpose=purpose,
+        final_folder="Telegram Support/Web",
+    )
+    payload = read_finalized_payload(
+        finalized,
+        purpose=purpose,
+        max_bytes=int(PURPOSE_LIMITS[purpose]["max_bytes"]),
+    )
+    return SimpleUploadedFile(
+        finalized.original_filename,
+        payload,
+        content_type=finalized.content_type,
+    )
+
+
 @capability_required(can_manage_academic_setup)
 @require_POST
 def telegram_conversation_reply(request, conversation_id):
     conversation = get_object_or_404(_conversation_queryset(), pk=conversation_id)
-    form = TelegramSupportReplyForm(request.POST, request.FILES)
     panel_request = request.GET.get("fragment") == "panel"
+    # A browser upload is materialized before validation, because the form's
+    # own rule is "text or one attachment" and it must see the attachment.
+    files = request.FILES or None
+    attachment_error = ""
+    if (request.POST.get("direct_upload_token_attachment") or "").strip():
+        try:
+            files = {"attachment": _finalized_telegram_attachment(request)}
+        except DirectUploadError as exc:
+            attachment_error = exc.message
+    form = TelegramSupportReplyForm(request.POST, files)
+    if attachment_error:
+        form.add_error("attachment", attachment_error)
     if not form.is_valid():
         context = _conversation_detail_context(
             request,

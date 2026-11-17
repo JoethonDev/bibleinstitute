@@ -738,6 +738,22 @@ def read_finalized_object(
     return payload
 
 
+def read_finalized_payload(finalized, *, purpose: str, max_bytes: int) -> bytes:
+    """Read a finalized object's bytes from the bucket that purpose writes to."""
+
+    client = get_r2_client()
+    if client is None:
+        raise DirectUploadError(
+            "storage_unavailable", _("File storage is unavailable. Try again shortly.")
+        )
+    return read_finalized_object(
+        client=client,
+        bucket=purpose_bucket(purpose),
+        key=finalized.key,
+        max_bytes=max_bytes,
+    )
+
+
 def _delete_staging(client, bucket: str, key: str) -> None:
     try:
         delete_from_bucket(client, bucket, key)

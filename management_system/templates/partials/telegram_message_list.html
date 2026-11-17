@@ -65,6 +65,7 @@
           hx-select="#telegram-chat-panel"
           hx-swap="outerHTML"
           hx-config='{"timeout": 900000}'
+          data-direct-upload="{% url 'direct-upload-authorize' %}"
           x-on:keydown.enter.exact.prevent="$event.target.form.requestSubmit()">
         {% csrf_token %}
         {% if reply_form.non_field_errors %}

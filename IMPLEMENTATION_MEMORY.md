@@ -233,8 +233,16 @@ State at this entry:
   the stored bytes with `validate_application_file`, builds the private webp
   preview from those same bytes, and hands the keys to
   `stage_application_documents(finalized=...)` so nothing is uploaded twice.
-  **Not migrated yet**: signup, Telegram reply/broadcast and quiz JSON. Do not
-  claim Task 5 complete. Historical intake is migrated: the view accepts either
+  **Not migrated yet**: signup, Telegram broadcast and quiz JSON. Do not claim
+  Task 5 complete. Telegram admin reply is migrated: the composer carries
+  `direct_upload_token_attachment`, the view materializes the stored bytes into
+  an uploaded-file object **before** form validation (the form's own rule is
+  "text or one attachment", so injecting afterwards would have rejected a
+  token-only reply), and the existing reply service receives an ordinary file.
+  Telegram broadcast stays on the body path on purpose: its composer accepts
+  multiple attachments, and the shared uploader produces one capability per
+  file input, so a partial migration there would upload only the first file.
+  Historical intake is migrated: the view accepts either
   the browser file or `direct_upload_token_intake_file`, finalizes the
   capability, reads the stored bytes through the same bounded helper (10 MiB
   cap) and hands the existing parser, preview and durable intake job an ordinary

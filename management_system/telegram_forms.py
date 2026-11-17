@@ -92,6 +92,8 @@ class TelegramSupportReplyForm(forms.Form):
                 "class": "aw-file-input",
                 "accept": SUPPORT_ATTACHMENT_ACCEPT,
                 "aria-describedby": "telegram-support-attachment-help",
+                "data-upload-purpose": "telegram_attachment",
+                "data-upload-field": "attachment",
             }
         ),
     )
