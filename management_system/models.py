@@ -3938,6 +3938,9 @@ class DirectUploadAuthorization(models.Model):
     declared_content_type = models.CharField(max_length=120)
     declared_size = models.PositiveBigIntegerField()
     max_bytes = models.PositiveBigIntegerField()
+    # Exact provider bucket chosen server-side for this purpose. Blank means the
+    # default media bucket; support attachments may use their own bucket.
+    bucket = models.CharField(max_length=120, blank=True, default="")
     metadata = models.JSONField(default=dict, blank=True)
     status = models.CharField(
         max_length=16, choices=Status.choices, default=Status.PENDING

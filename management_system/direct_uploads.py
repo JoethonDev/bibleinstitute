@@ -296,6 +296,22 @@ def _bucket_name() -> str:
     return bucket
 
 
+def purpose_bucket(purpose: str) -> str:
+    """Return the provider bucket a purpose writes to.
+
+    Support attachments can live in their own private bucket, exactly as the
+    support chat already stores them; every other purpose uses the media
+    bucket. One rule for authorize and finalize.
+    """
+
+    if purpose == DirectUploadAuthorization.Purpose.SUPPORT_ATTACHMENT:
+        dedicated = getattr(settings, "TELEGRAM_R2_BUCKET_NAME", "") or ""
+        if dedicated:
+            return dedicated
+    return _bucket_name()
+
+
+
 def authorize_direct_upload(
     *,
     actor,
@@ -327,7 +343,7 @@ def authorize_direct_upload(
             % {"limit": round(limits.max_bytes / MEGABYTE, 2)},
         )
 
-    bucket = _bucket_name()
+    bucket = purpose_bucket(purpose)
     client = get_r2_client()
     if client is None:
         raise DirectUploadError(
@@ -349,6 +365,7 @@ def authorize_direct_upload(
             target=str(target or ""),
             purpose=purpose,
             staging_key=staging_key,
+            bucket=bucket,
             declared_filename=safe_name,
             declared_content_type=str(content_type or "").split(";")[0].strip().lower(),
             declared_size=declared_size,
@@ -476,7 +493,6 @@ def _finalize_direct_upload(
     object reference instead of publishing twice or re-validating.
     """
 
-    bucket = _bucket_name()
     client = get_r2_client()
     if client is None:
         raise DirectUploadError(
@@ -493,6 +509,8 @@ def _finalize_direct_upload(
             raise DirectUploadError(
                 "not_found", _("This upload is no longer available. Please upload the file again.")
             )
+        # The bucket is part of the capability, never taken from the request.
+        bucket = authorization.bucket or _bucket_name()
         if authorization.actor_id != getattr(actor, "pk", None):
             raise DirectUploadError("forbidden", _("This upload belongs to another account."))
         if expected_purpose and authorization.purpose != expected_purpose:
