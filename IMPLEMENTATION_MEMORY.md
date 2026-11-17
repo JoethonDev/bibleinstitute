@@ -116,11 +116,20 @@ State at this entry:
   `record_finalized_attachment` deletes the object when the row cannot be
   created. **Not migrated yet**: signup/admin application documents, profile
   documents, academic payments, Telegram reply/broadcast, historical intake,
-  legacy user CSV and quiz JSON. Do not claim Task 5 complete.
-- Arabic catalog: the new Phase 7 gate strings and the new upload strings are
-  NOT translated yet. A `makemessages -l ar` run rewrites 13k+ reference
-  comments, so the catalog update will be a focused manual append followed by
-  `compilemessages`; restoring the file from HEAD was used to avoid the churn.
+  legacy user CSV and quiz JSON. Do not claim Task 5 complete. Next-caller
+  constraint discovered: `SignupForm` declares `identity_front` and `profile`
+  as `required=True` and makes `identity_back` conditionally required, so those
+  fields must become `required=False` with a `clean()` that accepts either the
+  file or `direct_upload_token_<field>` before the view can finalize; the
+  admin/profile/payment forms are already `required=False`.
+- Arabic catalog: complete for this release (`64ab3f5`). 52 entries were
+  appended for the gate diagnostics and admin form, the bounded cleanup output,
+  the direct-upload limits/errors, the four progress-queue states and the
+  remaining untranslated labels. `msgfmt -c` is clean and reports 4151
+  translated messages with none untranslated or fuzzy; the four progress-queue
+  and upload strings were re-read in `ar` and render as Arabic. A future
+  `makemessages` run will rewrite 13k+ reference comments, so keep using the
+  focused-append workflow instead of a wholesale regenerate.
 - Evidence added after the first release commit (`51098ab`): full-mode
   `phase08_attendance_cleanup.py` passes on the disposable PostgreSQL - online
   attendance policy fields, 7/14-day score boundaries, grouped online
