@@ -234,7 +234,14 @@ State at this entry:
   preview from those same bytes, and hands the keys to
   `stage_application_documents(finalized=...)` so nothing is uploaded twice.
   **Not migrated yet**: signup, Telegram broadcast and quiz JSON. Do not claim
-  Task 5 complete. Telegram admin reply is migrated: the composer carries
+  Task 5 complete. Quiz JSON needs no R2 staging: the picker reads the file into
+  a text field that is posted with the quiz form and parsed by the canonical
+  `parse_quiz_import`, so there is no file-body path to remove. The real defect
+  the plan named - the client allowing 2 MiB while `MAX_PAYLOAD_BYTES` is
+  512 KiB - is fixed: both quiz views pass `quiz_import_max_bytes` from the
+  server constant, the import panel carries it, and the client reads it instead
+  of hardcoding a larger number. Telegram admin reply is migrated: the composer
+  carries
   `direct_upload_token_attachment`, the view materializes the stored bytes into
   an uploaded-file object **before** form validation (the form's own rule is
   "text or one attachment", so injecting afterwards would have rejected a

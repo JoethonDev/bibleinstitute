@@ -94,7 +94,12 @@ function quizJsonImport() {
             if (!file) {
                 return;
             }
-            if (file.size > 2 * 1024 * 1024) {
+            // The server owns this limit (quiz_import.MAX_PAYLOAD_BYTES); the
+            // panel carries it so the client can never advertise a larger one.
+            const panel = this.$root.querySelector('#quiz-import-panel');
+            const configuredMax = parseInt((panel && panel.dataset.maxImportBytes) || '0', 10);
+            const maxBytes = configuredMax > 0 ? configuredMax : 512 * 1024;
+            if (file.size > maxBytes) {
                 this.notify(gettext('The selected file is too large to import.'), 'danger');
                 input.value = '';
                 return;

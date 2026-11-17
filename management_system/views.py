@@ -185,7 +185,7 @@ from .admin_tables import (
 )
 from .utils.quiz_access import answers_releasable, grant_quiz_openings, quiz_window
 from .quiz_questions import MAX_QUESTIONS, build_question_instance
-from .quiz_import import parse_quiz_import
+from .quiz_import import MAX_PAYLOAD_BYTES, parse_quiz_import
 from .public_content import get_institute_copy
 from .study_mode import apply_study_mode_from_city
 from .payments import academic_payment_scopes_for_student
@@ -4394,6 +4394,7 @@ def create_quiz(request):
             "publication_statuses" : PublicationStatus.choices,
             "quiz_editable" : True,
             "quiz_mode" : "create",
+            "quiz_import_max_bytes": MAX_PAYLOAD_BYTES,
             "draft_saved": request.session.pop("saved_content_form", None) == "quiz-new",
             **_rejected_quiz_context(request, "rejected-quiz-new"),
         })
@@ -4515,6 +4516,7 @@ def update_quiz(request, quiz_id):
                     or can_manage_academic_setup(request.user)
                 ),
                 "quiz_mode" : "update",
+                "quiz_import_max_bytes": MAX_PAYLOAD_BYTES,
                 "draft_saved": request.session.pop("saved_content_form", None) == f"quiz-{quiz_id}",
                 "application_timezone": timezone_name(),
                 **_rejected_quiz_context(request, f"rejected-quiz-{quiz_id}"),

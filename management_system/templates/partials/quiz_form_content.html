@@ -98,6 +98,7 @@
     <!-- JSON Import Panel -->
     {% if quiz_editable %}
     <section id="quiz-import-panel" class="aw-card"
+             data-max-import-bytes="{{ quiz_import_max_bytes|default:524288 }}"
              x-init="initQuizImport({{ request.GET.import|yesno:'true,false' }})"
              @click="handleQuizImportClick($event)">
         <div class="aw-card-head">
