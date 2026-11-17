@@ -96,7 +96,16 @@ The user asked to stop widening scope and ship. This is the deployable set.
   non-`phase08` database name and removes its fixture. Still unmeasured: total
   PostgreSQL connections under real Gunicorn concurrency for `CONN_MAX_AGE=60`
   (3 workers x 4 threads x two slots plus workers against the default
-  `max_connections=100`), which needs the deploy or a load run.
+  `max_connections=100`), which needs the deploy or a load run. Arithmetic for
+  that decision (configured values, not a measurement): each Gunicorn thread
+  holds at most one connection, so one slot is 3 x 4 = 12; steady state is
+  12 + 2 (celery) + 2-4 (media worker, including its audio sibling thread) + 1
+  (admin worker) + 1 (beat) = 20, and the blue/green overlap is 24 + 8 = 32.
+  PostgreSQL reports the default `max_connections=100` because Compose sets no
+  override, so the peak is near 32 percent with roughly 65 connections left for
+  deploy migrations, future exporters and headroom; the D8 rule for PgBouncer
+  is above 70 percent, so none is needed. If an operator raises the concurrency
+  variables, recompute before relying on that headroom.
 - Heartbeat integration evidence (disposable PostgreSQL, real
   `apply_progress_heartbeat`, manifest timeline seeded in Redis so no provider
   call happens). The durable tool is `load_tests/smoke/phase08_heartbeat.py`
