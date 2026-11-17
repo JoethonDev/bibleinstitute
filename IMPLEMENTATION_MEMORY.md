@@ -55,35 +55,34 @@ production migration is performed here. The plans' prerequisite gates are
 waived for this release by that explicit instruction and the waiver is recorded
 here, not silently dropped.
 
-### Signup direct-upload contract (implemented)
+### Signup direct-upload contract (implemented in `bb6b778`)
 
-Signup was the last Task 5 caller and is now migrated. `signup` already created
-the user before uploading documents, so no pending namespace was needed: the
-capability is minted before the account exists and finalized against the new
+Signup was the last Task 5 caller and is now migrated. It already created the
+user before uploading documents, so no "applicant pending namespace" was needed:
+the capability is minted before the account exists and finalized against the new
 `user.pk`.
 
 - `direct_uploads.finalize_direct_upload` accepts `applicant_session`; when set
   it requires `actor_id IS NULL` and a matching `metadata["applicant_session"]`
   and refuses before any provider work otherwise.
-- `direct_upload_views` allows an anonymous authorize **only** for
-  `application_document`, binds it to a hashed session key, and bounds it with a
-  cache counter (8 capabilities per hour per session). Every other purpose still
-  returns 401 for an anonymous caller; a cache outage fails open so signup never
-  depends on Redis.
-- `SignupForm` takes `identity_front`/`profile`/`identity_back` through
+- `direct_upload_views.direct_upload_authorize` allows an anonymous request
+  **only** for `application_document`, binds it to a hashed session key and
+  bounds it with a cache counter (8 capabilities per hour per session). Every
+  other purpose still returns 401 for an anonymous caller; a cache outage fails
+  open so signup never depends on Redis.
+- `SignupForm` routes `identity_front`, `identity_back` and `profile` through
   `direct_document_field`, enforces the required ones in `clean()` against a
   file **or** a capability, and includes the capability in the national-ID and
   passport rules.
 - `signup` finalizes the token map with `applicant_session` and merges the
-  result into the existing `uploaded_by_type` loop; `signup.html` opts in to the
-  uploader.
-- Check (`tmp/signup_direct/check.py`, transient): signup rejects missing
-  required documents, accepts capability-only documents, still requires the
-  national-ID back document and accepts its capability, the anonymous authorize
-  succeeds for a signup document with an applicant-bound target, and refuses a
-  non-document purpose. Re-verified after the change: Django check, no migration
-  drift, the direct-upload smoke, the application-document vertical, the payment
-  and CSV form checks, and the encoding audit.
+  result into the existing upload loop; `signup.html` opts in to the uploader.
+- Check (`tmp/signup_direct/check.py`, transient): missing required documents
+  are rejected, capability-only documents are accepted, a national ID still
+  requires the back document and accepts its capability, the anonymous authorize
+  succeeds for a signup document with an applicant-bound target, and a
+  non-document purpose is refused. Re-verified after the change: Django check,
+  no migration drift, the direct-upload smoke, the application-document
+  vertical, the payment and CSV form checks, and the encoding audit.
 
 Note the JavaScript dependency the migrated callers introduced: publishing an APK
 and sending a support-chat attachment now require the uploader script (a plain
@@ -738,7 +737,7 @@ Changes and decisions:
 - `management_system/templates/student_next/partials/course_workspace.html`, `partials/ring.html`: split the single course-content section into two `<section class="sn-card sn-content-card">` containers (Lectures & lessons, Quizzes) with `.sn-section-head` and `.sn-card-body > .sn-content-list`, replaced `.sn-content-label` + `.sn-content-go` with `.sn-pill` status badges, added media summary / question counts, removed inline `#display-page`, changed lesson links to standard full-page `<a href="...">` navigation without `hx-get`/`hx-target="#display-page"`, hid `.sn-course-hero-progress` under `management_preview`, and handled `value=None` in `ring.html` without rendering a bare `%`.
 - `management_system/templates/student_next/course.html`, `lesson.html`, `partials/lesson_body.html`, `views.py`: removed `lesson_runtime.html` from `course.html`, rendered `lesson.description` in `lesson.html`, removed the unused `show_nav` / `HX-Target == "display-page"` -> `lesson_content.html` branch in `views.py::view_lesson_details`, and deleted obsolete `student_next/partials/lesson_content.html`. Legacy `course_detail.html` and `lesson_stream.html` remain untouched.
 - `management_system/static/css/student_next.css`: styled `.sn-content-card`, `.sn-content-row` rounded cards, `.sn-content-state` icon boxes, mobile pill layout, and `.sn-reading + .sn-lesson-parts` spacing; removed obsolete `.sn-content-group*`, `.sn-content-label`, `.sn-content-go`, `.sn-content-empty-hint`, `.sn-lesson-content`, `.sn-lesson-navigation`, and `.sn-course-page .sn-content-panel` rules.
-- `locale/ar/LC_MESSAGES/django.po`, `django.mo`: added `"Lectures and lessons"` -> `"Ø§Ù„Ù…Ø­Ø§Ø¶Ø±Ø§Øª ÙˆØ§Ù„Ø¯Ø±ÙˆØ³"` and compiled with `compilemessages -l ar`.
+- `locale/ar/LC_MESSAGES/django.po`, `django.mo`: added `"Lectures and lessons"` -> `"المحاضرات والدروس"` and compiled with `compilemessages -l ar`.
 - Verification (PostgreSQL unavailable on `localhost:5432`, so ORM execution against live PostgreSQL was not run):
   - `python manage.py compilemessages -l ar`, `python manage.py audit_text_encoding` (843 text files), `python manage.py check` (0 issues), `python manage.py makemigrations --check --dry-run` (No changes detected), and `python -m compileall management_system/student_experience management_system/views.py` all passed.
   - Focused verification script (`_lesson_media_summary`, EN/AR template rendering of `student_next/course.html` and `student_next/lesson.html`, `TemplateDoesNotExist` check on `lesson_content.html`, legacy template loading, and mocked `view_lesson_details` dispatch under `HX-Target=body#display-page`) exited 0 (`VERIFICATION_ALL_PASSED`).
@@ -3064,7 +3063,7 @@ Follow-ups found by the detail-page worker and closed in the same pass:
   mirrors the percentage onto `.aw-progress`, so the note no longer claims it
   only writes the native element.
 - Arabic entry added for the new content-detail description msgid
-  `%(kind)s in %(course)s` -> `%(kind)s ÙÙŠ %(course)s`.
+  `%(kind)s in %(course)s` -> `%(kind)s في %(course)s`.
 
 Tracked, not changed: a precise scan
 (`tmp/ui-audit/scan_bootstrap_classes.py`) still finds Bootstrap tokens in 25
@@ -3191,7 +3190,7 @@ Two defects found and fixed while verifying against real data:
 
 - The first label used `{% translate "Audience" %}` while the metrics row used
   `{% translate "Recipients" %}`; both map to the same Arabic word, so the drawer
-  showed "Ø§Ù„Ù…Ø³ØªÙ„Ù…ÙˆÙ†" twice. The first row is now "Target".
+  showed "المستلمون" twice. The first row is now "Target".
 - `{{ broadcast.academic_year }}` rendered empty for a year whose `name` is blank.
   The row now uses `{% firstof ...name ...starts_on|date:"Y" %}`, so it falls back
   to the starting year.
