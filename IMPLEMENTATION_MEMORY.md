@@ -110,11 +110,13 @@ State at this entry:
   `partials/app_release_form_fields.html` is the first migrated caller (APK,
   500 MiB, private staging, published under `app-releases/`). The staging
   prefix is `direct-upload-staging/`, which the Phase 7 expression already
-  denies. **Not migrated yet**: signup/admin application documents, profile
-  documents, academic payments, support chat (needs a per-purpose bucket
-  because support attachments may use `TELEGRAM_R2_BUCKET_NAME`), Telegram
-  reply/broadcast, historical intake, legacy user CSV and quiz JSON. Do not
-  claim Task 5 complete.
+  denies. Support chat is migrated too (`82c0c63`): the composer authorizes,
+  PUTs and posts only the token; `send_student_message` accepts a finalized key
+  plus its validated spec and rejects a body file combined with a capability;
+  `record_finalized_attachment` deletes the object when the row cannot be
+  created. **Not migrated yet**: signup/admin application documents, profile
+  documents, academic payments, Telegram reply/broadcast, historical intake,
+  legacy user CSV and quiz JSON. Do not claim Task 5 complete.
 - Arabic catalog: the new Phase 7 gate strings and the new upload strings are
   NOT translated yet. A `makemessages -l ar` run rewrites 13k+ reference
   comments, so the catalog update will be a focused manual append followed by
