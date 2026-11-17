@@ -231,6 +231,12 @@
     </footer>
 
     <script src="{% static 'vendor/bootstrap/5.3.3/js/bootstrap.bundle.min.js' %}?v={{ static_asset_version }}"></script>
+    <script>
+      window.DIRECT_UPLOAD_I18N = {
+        uploaded: "{% translate 'Uploaded' %}",
+        remove: "{% translate 'Remove' %}"
+      };
+    </script>
     <script src="{% static 'js/direct_upload.js' %}?v={{ static_asset_version }}" defer></script>
 
 </body>

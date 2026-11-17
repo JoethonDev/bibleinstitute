@@ -36,6 +36,10 @@ logger = logging.getLogger(__name__)
 STAGING_PREFIX = "direct-upload-staging"
 FINAL_PREFIX = "direct-uploads"
 UPLOAD_URL_TTL_SECONDS = 900
+# Signup documents are minted before an account exists, so a visitor can leave
+# the form and come back. Two hours is enough for one sitting while keeping the
+# bearer capability short-lived; the scheduled sweeper removes whatever is left.
+APPLICANT_UPLOAD_TTL_SECONDS = 2 * 60 * 60
 FINALIZE_GRACE = timedelta(minutes=30)
 DOWNLOAD_CHUNK_BYTES = 1024 * 1024
 MAX_SWEEP_ROWS = 500
@@ -321,6 +325,7 @@ def authorize_direct_upload(
     size: int,
     content_type: str,
     metadata: dict | None = None,
+    ttl_seconds: int | None = None,
 ) -> DirectUploadGrant:
     """Create one short-lived capability for an exact private staging key.
 
@@ -354,7 +359,11 @@ def authorize_direct_upload(
     safe_name = _safe_filename(filename, limits.extensions)
     folder = _storage_target(purpose, target)
     staging_key = f"{folder}/{token[:12]}-{safe_name}"
-    expires_at = timezone.now() + timedelta(seconds=UPLOAD_URL_TTL_SECONDS)
+    lifetime = max(
+        UPLOAD_URL_TTL_SECONDS,
+        int(ttl_seconds or UPLOAD_URL_TTL_SECONDS),
+    )
+    expires_at = timezone.now() + timedelta(seconds=lifetime)
 
     with transaction.atomic():
         lock_storage_namespace(staging_key)
@@ -776,20 +785,32 @@ def _delete_staging_safely(client, bucket: str, key: str) -> None:
     _delete_staging(client, bucket, key)
 
 
-def discard_direct_upload(*, actor, token: str) -> None:
+def discard_direct_upload(
+    *,
+    actor,
+    token: str,
+    applicant_session: str | None = None,
+) -> None:
     """Drop one pending capability and its staged object after a cancelled form."""
 
-    authorization = DirectUploadAuthorization.objects.filter(
+    pending = DirectUploadAuthorization.objects.filter(
         token=str(token or ""),
-        actor_id=getattr(actor, "pk", None),
         status=DirectUploadAuthorization.Status.PENDING,
-    ).first()
+    )
+    if applicant_session:
+        authorization = pending.filter(actor__isnull=True).first()
+        if authorization is not None and str(
+            (authorization.metadata or {}).get("applicant_session") or ""
+        ) != applicant_session:
+            return
+    else:
+        authorization = pending.filter(actor_id=getattr(actor, "pk", None)).first()
     if authorization is None:
         return
     authorization.status = DirectUploadAuthorization.Status.EXPIRED
     authorization.failure_reason = "cancelled"
     authorization.save(update_fields=["status", "failure_reason"])
-    bucket = getattr(settings, "R2_BUCKET_NAME", "") or ""
+    bucket = authorization.bucket or getattr(settings, "R2_BUCKET_NAME", "") or ""
     if bucket:
         _delete_staging(get_r2_client(), bucket, authorization.staging_key)
 

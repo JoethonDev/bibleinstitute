@@ -19,9 +19,11 @@ from django.utils.translation import gettext as _
 from django.views.decorators.http import require_GET, require_POST
 
 from .direct_uploads import (
+    APPLICANT_UPLOAD_TTL_SECONDS,
     PURPOSE_LIMITS,
     DirectUploadError,
     authorize_direct_upload,
+    discard_direct_upload,
     upload_limits_by_purpose,
 )
 from .models import DirectUploadAuthorization, User
@@ -151,6 +153,7 @@ def _authorize_applicant_document(request):
                 "document_type": document_type,
                 "applicant_session": digest,
             },
+            ttl_seconds=APPLICANT_UPLOAD_TTL_SECONDS,
         )
     except DirectUploadError as exc:
         status = 413 if exc.code == "file_too_large" else 400
@@ -249,6 +252,32 @@ def direct_upload_authorize(request):
             "audio_seconds": grant.audio_seconds,
         }
     )
+    response["Cache-Control"] = "private, no-store"
+    return response
+
+
+@require_POST
+def direct_upload_discard(request):
+    """Remove one pending capability and its staged object."""
+
+    try:
+        payload = _payload(request)
+    except DirectUploadError as exc:
+        return _error(exc.code, exc.message, status=400)
+    token = str(payload.get("token") or "").strip()
+    if not token:
+        return _error("invalid_payload", _("Invalid request format."), status=400)
+    try:
+        if request.user.is_authenticated:
+            discard_direct_upload(actor=request.user, token=token)
+        else:
+            digest = applicant_session_digest(request)
+            if not digest:
+                return _error("unauthenticated", _("Authentication required."), status=401)
+            discard_direct_upload(actor=None, token=token, applicant_session=digest)
+    except DirectUploadError as exc:
+        return _error(exc.code, exc.message, status=400)
+    response = JsonResponse({"ok": True})
     response["Cache-Control"] = "private, no-store"
     return response
 

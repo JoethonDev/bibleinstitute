@@ -187,6 +187,49 @@ def main() -> int:
             else:
                 checks.append("account document columns populated")
 
+            # Removing an attachment: discard expires the capability, deletes
+            # the staged bytes, and the token can no longer be finalized.
+            removed = direct_uploads.authorize_direct_upload(
+                actor=None,
+                purpose="application_document",
+                target=f"applicant:{digest}",
+                filename="profile.png",
+                size=len(payload),
+                content_type="image/png",
+                metadata={"document_type": "profile", "applicant_session": digest},
+                ttl_seconds=direct_uploads.APPLICANT_UPLOAD_TTL_SECONDS,
+            )
+            fake.objects[removed.staging_key] = {"body": payload, "content_type": "image/png"}
+            row = direct_uploads.DirectUploadAuthorization.objects.get(token=removed.token)
+            lifetime = (row.expires_at - row.created_at).total_seconds()
+            if abs(lifetime - direct_uploads.APPLICANT_UPLOAD_TTL_SECONDS) > 5:
+                failures.append(f"applicant capability lifetime was {lifetime:.0f}s")
+            else:
+                checks.append("applicant capability lives two hours")
+            direct_uploads.discard_direct_upload(
+                actor=None, token=removed.token, applicant_session=digest
+            )
+            row.refresh_from_db()
+            if row.status != direct_uploads.DirectUploadAuthorization.Status.EXPIRED:
+                failures.append("discard did not expire the capability")
+            elif removed.staging_key in fake.objects:
+                failures.append("discard did not delete the staged object")
+            else:
+                checks.append("discard expires the capability and deletes staging")
+            try:
+                finalize_application_documents(
+                    actor=None,
+                    tokens={"profile": removed.token},
+                    cloud_client=fake,
+                    bucket_name=BUCKET,
+                    user_id=user.pk,
+                    applicant_session=digest,
+                )
+            except Exception:
+                checks.append("a discarded capability cannot be finalized")
+            else:
+                failures.append("a discarded capability was finalized")
+
         transaction.set_rollback(True)
 
     if User.objects.filter(username__startswith="p8signup").exists():

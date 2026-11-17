@@ -305,6 +305,7 @@ CELERY_TASK_TRACK_STARTED = True
 CELERY_TIMEZONE = TIME_ZONE
 CELERY_IMPORTS = (
     "management_system.attendance_tasks",
+    "management_system.direct_upload_tasks",
     "management_system.media_gate_tasks",
     "management_system.telegram_tasks",
     "management_system.media_tasks",
@@ -329,6 +330,7 @@ CELERY_TASK_ROUTES = {
     # dedicated admin worker is busy with a population-sized operation.
     "management_system.admin_operation_tasks.recover_admin_operations": {"queue": "default"},
     "management_system.attendance_tasks.cleanup_viewing_sessions": {"queue": "admin"},
+    "management_system.direct_upload_tasks.expire_abandoned_uploads": {"queue": "admin"},
 }
 MEDIA_GATE_PERIOD_SECONDS = os.getenv("MEDIA_GATE_PERIOD_SECONDS", "1800")
 
@@ -387,6 +389,11 @@ CELERY_BEAT_SCHEDULE = {
     "cleanup-viewing-sessions": {
         "task": "management_system.attendance_tasks.cleanup_viewing_sessions",
         "schedule": crontab(hour=3, minute=15),
+    },
+    "expire-abandoned-direct-uploads": {
+        "task": "management_system.direct_upload_tasks.expire_abandoned_uploads",
+        "schedule": 3600.0,
+        "kwargs": {"limit": 500},
     },
     "media-gate-rotation": {
         "task": "management_system.media_gate_tasks.rotate_media_gate_token",

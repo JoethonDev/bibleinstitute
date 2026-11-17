@@ -119,6 +119,12 @@
     {% endfor %}
   </nav>
   {% include "partials/web_push_prompt.html" %}
+  <script>
+    window.DIRECT_UPLOAD_I18N = {
+      uploaded: "{% translate 'Uploaded' %}",
+      remove: "{% translate 'Remove' %}"
+    };
+  </script>
   <script src="{% static 'js/direct_upload.js' %}?v={{ static_asset_version }}" defer></script>
   {% block extra_scripts %}{% endblock %}
 </body>

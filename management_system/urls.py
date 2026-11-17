@@ -2,7 +2,11 @@ from django.contrib.auth import views as auth_views
 from django.urls import include, path
 from management_system import password_reset as password_reset_views
 from management_system.views import *
-from management_system.direct_upload_views import direct_upload_authorize, direct_upload_limits
+from management_system.direct_upload_views import (
+    direct_upload_authorize,
+    direct_upload_discard,
+    direct_upload_limits,
+)
 from management_system.admin_operation_views import admin_operation_download, admin_operation_status
 from management_system.job_monitor_views import background_jobs, background_job_detail, background_job_status_batch, notification_group_recipients, notification_redelivery
 from management_system.forms import UserLoginForm
@@ -339,6 +343,7 @@ urlpatterns = [
     path('api/worker/receipt/', worker_receipt, name="worker-receipt"),
     path('api/progress/heartbeat/', progress_heartbeat, name="progress-heartbeat"),
     path('api/direct-upload/authorize/', direct_upload_authorize, name="direct-upload-authorize"),
+    path('api/direct-upload/discard/', direct_upload_discard, name="direct-upload-discard"),
     path('api/direct-upload/limits/', direct_upload_limits, name="direct-upload-limits"),
     path('dashboard/progress/', progress_dashboard, name="progress-dashboard"),
 
