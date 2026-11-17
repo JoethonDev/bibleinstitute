@@ -8,7 +8,7 @@ from .media_gate import (
     MediaGateError,
     MediaGateUnavailable,
     _edge_mode_enabled,
-    repair_waf_from_committed_pair,
+    repair_gate_from_committed_pair,
     rotate_token,
     rule_matches_publication,
     stale_publication,
@@ -55,7 +55,7 @@ def check_media_gate_drift() -> dict[str, str]:
         logger.error("media_gate_drift_check_failed code=%s", exc.code)
         return {"status": "failed", "reason": exc.code}
 
-    logger.error("media_gate_waf_drift_detected")
-    if not repair_waf_from_committed_pair():
-        return {"status": "failed", "reason": "waf_repair_failed"}
+    logger.error("media_gate_edge_rule_drift_detected")
+    if not repair_gate_from_committed_pair():
+        return {"status": "failed", "reason": "gate_repair_failed"}
     return {"status": "repaired", "reason": "committed_pair_republished"}

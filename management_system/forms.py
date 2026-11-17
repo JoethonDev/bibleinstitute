@@ -1829,8 +1829,6 @@ class MediaDeliverySettingsForm(AwModelForm):
             required = (
                 "MEDIA_EDGE_BASE_URL",
                 "CLOUDFLARE_ZONE_ID",
-                "CLOUDFLARE_WAF_RULESET_ID",
-                "CLOUDFLARE_WAF_RULE_ID",
                 "CLOUDFLARE_WAF_HOST",
                 "CLOUDFLARE_API_TOKEN",
             )

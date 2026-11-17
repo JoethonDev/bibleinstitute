@@ -114,6 +114,35 @@ def check_gate_payload_rejects_expired_pair() -> None:
             raise AssertionError("gate payload returned an expired token")
 
 
+def check_edge_rule_contract() -> None:
+    """The rewrite order and the token-free deny rule are the whole gate."""
+    import django
+
+    django.setup()
+
+    from management_system import media_gate
+
+    host = "cdn.example.test"
+    current, previous = "AbCdEfGhIjKlMnOp", "QwErTyUiOpAsDfGh"
+    sentinel, strip = media_gate.transform_rules(host, current, previous)
+    if sentinel["ref"] != media_gate.SENTINEL_REF or strip["ref"] != media_gate.GATE_RULE_REF:
+        raise AssertionError("rewrite order changed; the sentinel must be evaluated first")
+    if media_gate.SENTINEL_TARGET != 'concat("/__lms_media_denied__", "/missing.ts")':
+        raise AssertionError("the sentinel target must be a constant concat() expression")
+    for token in (current, previous):
+        if f"/g/{token}/" not in strip["expression"]:
+            raise AssertionError("the rewrite filter dropped a live token")
+    target = strip["action_parameters"]["uri"]["path"]["expression"]
+    if target != "substring(http.request.uri.path, 19)":
+        raise AssertionError("the gate prefix offset no longer matches a 16 character token")
+    deny = media_gate.static_waf_rule(host)["expression"]
+    if 'starts_with(http.request.uri.path, "/g/")' not in deny:
+        raise AssertionError("the deny rule no longer blocks an unstripped gate path")
+    for token in (current, previous):
+        if token in deny:
+            raise AssertionError("the deny rule must stay free of token state")
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--contract-only", action="store_true")
@@ -131,6 +160,7 @@ def main() -> int:
         check_rotation_task_hides_tokens()
         check_start_response_keeps_session_token()
         check_gate_payload_rejects_expired_pair()
+        check_edge_rule_contract()
     except Exception as exc:  # noqa: BLE001 - report a concise smoke failure
         print(f"Phase 7 contract smoke failed: {exc}", file=sys.stderr)
         return 1

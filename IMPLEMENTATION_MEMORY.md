@@ -4850,3 +4850,73 @@ provider checks, test concurrency/recovery and export/authorization parity, and
 measure PostgreSQL plans at representative scale. Production rollout remains
 separate: verify environment, secrets/ingress, backup/import reconciliation,
 worker capacity and the migration plan before any authorized release.
+
+## Edge gate redesign: two rules, token in the transform filter (2026-11-17)
+
+The gate now runs as two rules instead of one dynamic WAF rule:
+
+1. `http_request_transform` holds two rewrite rules, in this order:
+   - `lms_media_gate_sentinel` (static): a host request whose path does not
+     start with `/g/` is rewritten to the constant key
+     `__lms_media_denied__/missing.ts`, which does not exist in the bucket.
+   - `lms_media_gate_rewrite` (rotating): the filter carries the current and
+     previous token plus the `*/Audio%20Segments/*.ts` /
+     `*/Video%20Segments/*.ts` pattern, and rewrites the path to
+     `substring(http.request.uri.path, 19)`.
+2. `http_request_firewall_custom` holds one static deny rule
+   (`lms_media_gate`): block when the path still starts with `/g/`, or is not a
+   media segment, or starts with one of the private prefixes. It carries no
+   token state and is published once.
+
+Order matters: this zone applies the LAST matching rewrite rule, so the sentinel
+must be evaluated first and the tokenized strip last. The reverse order strips
+the gate path and then resolves it to the sentinel key, which refuses every
+segment (measured live).
+
+Measured live on 2026-11-17 with the production builders, after waiting for the
+phase entrypoint to read back and a 12 second settle:
+
+| configuration | current | previous | stale | raw key | root | private |
+| --- | --- | --- | --- | --- | --- | --- |
+| sentinel + strip + deny (production) | 200 | 200 | 403 | 403 | 403 | 403 |
+| strip + deny | 200 | 200 | 403 | 200 | 403 | 403 |
+| strip only | 200 | 200 | 404 | 200 | 404 | 404 |
+| sentinel + strip only | 200 | 200 | 404 | 404 | 404 | 404 |
+
+The second row is the decisive one: without the sentinel a plain bucket URL is
+served with 200 and the token is decorative. Earlier contradictory readings came
+from curling before the provider had applied the ruleset; every row in this
+table was measured after the entrypoint read back with the expected refs.
+
+Provider facts re-confirmed: a rewrite target must be a function call
+(`concat("/__lms_media_denied__", "/missing.ts")`); a bare string literal is
+rejected with `20089`, and so are `substring("literal", 0)` and
+`lower("literal")`.
+
+Code state: `media_gate` exposes `transform_expression`, `transform_rule`,
+`sentinel_rule`, `transform_rules`, `static_waf_expression`, `static_waf_rule`,
+`push_transform_rule`, `ensure_deny_rule`, `gate_rule_published`,
+`deny_rule_published`, `repair_gate_from_committed_pair` and
+`rule_matches_publication`. `push_waf_rule`, `fetch_rule_expression` and the
+`CLOUDFLARE_WAF_RULESET_ID` / `CLOUDFLARE_WAF_RULE_ID` settings are removed;
+publication goes through the phase entrypoint `PUT` and preserves sibling rules.
+
+Bootstrap: `deploy/setup_edge_rules.py --apply-waf --apply-rewrite` publishes
+the deny rule and the sentinel only, so a fresh zone denies every media request.
+The first rotation publishes the tokenized strip with the committed pair.
+
+Live zone state at this commit: the deny rule `lms_media_gate` is published, the
+transform phase holds `lms_media_gate_sentinel` only, and `/`,
+`/applications/1/x.png`, `/g/AAAAAAAAAAAAAAAA/...` and a raw segment URL all
+return 403. The tokenized strip is not published yet because the local database
+has no committed `MediaGateToken` row (migrations 0127-0130 are not applied
+locally) and the delivery mode is still `worker`.
+
+`load_tests/smoke/phase07_gate.py --contract-only` now also asserts the rule
+order, the constant sentinel target, the 19 character offset and that the deny
+rule holds no token state.
+
+Next safe step: apply 0127-0130 to the disposable PostgreSQL database, switch
+`MediaDeliverySettings` to `edge_gate` there, run `rotate_token()`, confirm the
+live matrix above from the committed pair, and only then remove the `worker`,
+`direct_r2` and selector code paths.

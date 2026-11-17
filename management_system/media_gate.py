@@ -1,4 +1,10 @@
-"""Serialized publication of short-lived media-edge path tokens."""
+"""Publish the two Cloudflare edge rules that gate private media paths.
+
+The token check lives in the transform filter: the rewrite phase is the only
+phase that still sees the ``/g/<token>/`` prefix, because the rewrite already
+removed it before later phases run. The firewall rule is token free, so it is
+published once and never rewritten by rotation.
+"""
 
 from __future__ import annotations
 
@@ -39,6 +45,20 @@ PRIVATE_MEDIA_PREFIXES = (
     "Telegram Support",
     "Telegram Broadcast",
     "app-releases",
+)
+GATE_PHASE = "http_request_transform"
+WAF_PHASE = "http_request_firewall_custom"
+GATE_RULE_REF = "lms_media_gate_rewrite"
+SENTINEL_REF = "lms_media_gate_sentinel"
+DENY_RULE_REF = "lms_media_gate"
+SENTINEL_KEY = "__lms_media_denied__/missing.ts"
+# A rewrite target must be a function call on this plan; the API parser rejects
+# a bare string literal. Keep this in step with SENTINEL_KEY.
+SENTINEL_TARGET = 'concat("/__lms_media_denied__", "/missing.ts")'
+GATE_PREFIX_LENGTH = len(GATE_PREFIX) + 16
+SEGMENT_PATH_PATTERN = (
+    '(http.request.uri.path wildcard "*/Audio%20Segments/*.ts" '
+    'or http.request.uri.path wildcard "*/Video%20Segments/*.ts")'
 )
 
 
@@ -256,26 +276,94 @@ def _validated_host(host: str) -> str:
     return normalized
 
 
-def waf_expression(host: str, current: str, previous: str | None) -> str:
+def transform_expression(host: str, current: str, previous: str | None) -> str:
+    """Filter that runs while the ``/g/<token>/`` prefix is still present.
+
+    Rewrite rules cannot read a stripped path, so the token is compared here:
+    the phase runs before the firewall and before the rewrite is applied.
+    """
     host = _validated_host(host)
     if not _valid_token(current) or (previous and not _valid_token(previous)):
         raise MediaGateError("invalid_published_token")
-    tokens = [f'starts_with(raw.http.request.uri.path, "/g/{current}/")']
+    tokens = [f'starts_with(http.request.uri.path, "/g/{current}/")']
     if previous:
-        tokens.append(f'starts_with(raw.http.request.uri.path, "/g/{previous}/")')
-    token_check = "(" + " or ".join(tokens) + ")"
-    segment_check = (
-        '(http.request.uri.path wildcard "*/Video%20Segments/*.ts" '
-        'or http.request.uri.path wildcard "*/Audio%20Segments/*.ts")'
+        tokens.append(f'starts_with(http.request.uri.path, "/g/{previous}/")')
+    return (
+        f'(http.host eq "{host}") and ({" or ".join(tokens)}) '
+        f"and {SEGMENT_PATH_PATTERN}"
     )
-    private_checks = []
+
+
+def transform_rule(host: str, current: str, previous: str | None) -> dict:
+    return {
+        "action": "rewrite",
+        "description": "LMS media gate: strip the gate prefix for authorized segments",
+        "enabled": True,
+        "ref": GATE_RULE_REF,
+        "expression": transform_expression(host, current, previous),
+        "action_parameters": {
+            "uri": {
+                "path": {
+                    "expression": f"substring(http.request.uri.path, {GATE_PREFIX_LENGTH})"
+                }
+            }
+        },
+    }
+
+
+def sentinel_rule(host: str) -> dict:
+    """Resolve every non-gate path to one object key that does not exist.
+
+    The deny rule cannot tell a rewritten gate request from a direct bucket
+    request, so without this rule the raw key would be served with no token.
+    """
+    host = _validated_host(host)
+    return {
+        "action": "rewrite",
+        "description": "LMS media gate: non-gate paths resolve to a missing key",
+        "enabled": True,
+        "ref": SENTINEL_REF,
+        "expression": (
+            f'(http.host eq "{host}") '
+            f'and not starts_with(http.request.uri.path, "{GATE_PREFIX}")'
+        ),
+        "action_parameters": {"uri": {"path": {"expression": SENTINEL_TARGET}}},
+    }
+
+
+def transform_rules(host: str, current: str, previous: str | None) -> tuple[dict, ...]:
+    """Return the rewrite rules in the order the provider must evaluate them.
+
+    This zone applies the last matching rewrite rule, so the sentinel must come
+    first and the tokenized strip last; the reverse order strips the gate path
+    and then resolves it to the sentinel key, which refuses every segment.
+    """
+    return (sentinel_rule(host), transform_rule(host, current, previous))
+
+
+def static_waf_expression(host: str) -> str:
+    """Deny rule with zero token state: an unauthorized path stays denied.
+
+    A request carrying a stale or missing token keeps its ``/g/`` prefix, so
+    the leftover check blocks it. Every other request that is not a media
+    segment path, or that targets a private prefix, is blocked as well.
+    """
+    host = _validated_host(host)
+    checks = ['starts_with(http.request.uri.path, "/g/")', f"not ({SEGMENT_PATH_PATTERN})"]
     for prefix in PRIVATE_MEDIA_PREFIXES:
         encoded = quote(prefix, safe="").lower()
-        private_checks.append(
-            f'not starts_with(lower(http.request.uri.path), "/{encoded}/")'
-        )
-    allowed = " and ".join([token_check, segment_check, *private_checks])
-    return f'(http.host eq "{host}") and not ({allowed})'
+        checks.append(f'starts_with(lower(http.request.uri.path), "/{encoded}/")')
+    return f'(http.host eq "{host}") and ({" or ".join(checks)})'
+
+
+def static_waf_rule(host: str) -> dict:
+    return {
+        "action": "block",
+        "description": "LMS media gate: deny everything except rewritten media segments",
+        "enabled": True,
+        "ref": DENY_RULE_REF,
+        "expression": static_waf_expression(host),
+    }
 
 
 def _edge_base_url() -> str:
@@ -305,24 +393,19 @@ def gated_segment_url(segment_key: str, *, token: str | None = None) -> str:
     return f"{_edge_base_url()}{GATE_PREFIX}{current}/{quote(normalized, safe='/')}"
 
 
-def _cloudflare_settings() -> tuple[str, str, str, str, str]:
-    values = (
-        str(getattr(settings, "CLOUDFLARE_ZONE_ID", "") or "").strip(),
-        str(getattr(settings, "CLOUDFLARE_WAF_RULESET_ID", "") or "").strip(),
-        str(getattr(settings, "CLOUDFLARE_WAF_RULE_ID", "") or "").strip(),
-        str(getattr(settings, "CLOUDFLARE_API_TOKEN", "") or "").strip(),
-        _validated_host(getattr(settings, "CLOUDFLARE_WAF_HOST", "")),
-    )
-    if any(not item for item in values[:4]):
+def _cloudflare_settings() -> tuple[str, str, str]:
+    zone_id = str(getattr(settings, "CLOUDFLARE_ZONE_ID", "") or "").strip()
+    api_token = str(getattr(settings, "CLOUDFLARE_API_TOKEN", "") or "").strip()
+    host = _validated_host(getattr(settings, "CLOUDFLARE_WAF_HOST", ""))
+    if not zone_id or not api_token:
         raise MediaGateError("cloudflare_configuration_incomplete")
-    return values
+    return zone_id, api_token, host
 
 
-def _rule_url(zone_id: str, ruleset_id: str, rule_id: str) -> str:
+def _phase_entrypoint_url(zone_id: str, phase: str) -> str:
     return (
         "https://api.cloudflare.com/client/v4/zones/"
-        f"{quote(zone_id, safe='')}/rulesets/{quote(ruleset_id, safe='')}"
-        f"/rules/{quote(rule_id, safe='')}"
+        f"{quote(zone_id, safe='')}/rulesets/phases/{quote(phase, safe='')}/entrypoint"
     )
 
 
@@ -350,39 +433,94 @@ def _provider_request(method: str, url: str, token: str, **kwargs):
     return body.get("result")
 
 
-def push_waf_rule(expression: str) -> None:
-    zone_id, ruleset_id, rule_id, api_token, _host = _cloudflare_settings()
-    url = _rule_url(zone_id, ruleset_id, rule_id)
-    rule = _provider_request("GET", url, api_token)
-    if not isinstance(rule, dict) or rule.get("id") != rule_id:
-        raise MediaGateError("cloudflare_rule_not_found")
-    payload = {
-        key: rule[key]
-        for key in (
-            "action",
-            "description",
-            "enabled",
-            "expression",
-            "ref",
-            "action_parameters",
-            "ratelimit",
-            "logging",
-        )
-        if key in rule
-    }
-    if not payload.get("action") or "enabled" not in payload:
-        raise MediaGateError("cloudflare_rule_shape_invalid")
-    payload["expression"] = expression
-    _provider_request("PATCH", url, api_token, json=payload)
+_PUBLISHED_RULE_KEYS = (
+    "action",
+    "description",
+    "enabled",
+    "expression",
+    "ref",
+    "action_parameters",
+    "ratelimit",
+    "logging",
+)
 
 
-def fetch_rule_expression() -> str:
-    zone_id, ruleset_id, rule_id, api_token, _host = _cloudflare_settings()
-    rule = _provider_request("GET", _rule_url(zone_id, ruleset_id, rule_id), api_token)
-    expression = rule.get("expression") if isinstance(rule, dict) else None
-    if not isinstance(expression, str):
-        raise MediaGateError("cloudflare_rule_shape_invalid")
-    return expression
+def _phase_rules(zone_id: str, phase: str, api_token: str) -> list[dict]:
+    try:
+        entry = _provider_request("GET", _phase_entrypoint_url(zone_id, phase), api_token)
+    except MediaGateError as exc:
+        if exc.status == 404:
+            return []
+        raise
+    rules = entry.get("rules") if isinstance(entry, dict) else None
+    return [item for item in rules or [] if isinstance(item, dict)]
+
+
+def _published_rule(rule: dict) -> dict:
+    return {key: rule[key] for key in _PUBLISHED_RULE_KEYS if key in rule}
+
+
+def _rule_published(current: list[dict], ref: str, desired: dict) -> bool:
+    wanted = _published_rule(desired)
+    for item in current:
+        if item.get("ref") == ref:
+            return all(item.get(key) == value for key, value in wanted.items())
+    return False
+
+
+def _publish_phase_rules(phase: str, rules: tuple[dict, ...]) -> None:
+    """Publish the named rules into a phase entrypoint, keeping siblings.
+
+    Rule order is significant inside the rewrite phase, so the published
+    subsequence must equal the requested order before the call is skipped.
+    """
+    refs = tuple(str(rule.get("ref") or "") for rule in rules)
+    if not all(refs) or len(set(refs)) != len(refs):
+        raise MediaGateError("cloudflare_rule_ref_invalid")
+    zone_id, api_token, _host = _cloudflare_settings()
+    existing = _phase_rules(zone_id, phase, api_token)
+    if all(_rule_published(existing, rule["ref"], rule) for rule in rules):
+        if [item.get("ref") for item in existing if item.get("ref") in refs] == list(refs):
+            return
+    kept = [_published_rule(item) for item in existing if item.get("ref") not in refs]
+    merged = [*kept, *(_published_rule(rule) for rule in rules)]
+    _provider_request(
+        "PUT",
+        _phase_entrypoint_url(zone_id, phase),
+        api_token,
+        json={"rules": merged},
+    )
+
+
+def push_transform_rule(current: str, previous: str | None) -> None:
+    """Publish the tokenized rewrite filter; this is the only rotating state."""
+    _zone_id, _api_token, host = _cloudflare_settings()
+    _publish_phase_rules(GATE_PHASE, transform_rules(host, current, previous))
+
+
+def ensure_deny_rule() -> None:
+    """Publish the token-free deny rule once; later calls are no-ops."""
+    _zone_id, _api_token, host = _cloudflare_settings()
+    _publish_phase_rules(WAF_PHASE, (static_waf_rule(host),))
+
+
+def gate_rule_published(current: str, previous: str | None) -> bool:
+    zone_id, api_token, host = _cloudflare_settings()
+    existing = _phase_rules(zone_id, GATE_PHASE, api_token)
+    rules = transform_rules(host, current, previous)
+    refs = [rule["ref"] for rule in rules]
+    return all(
+        _rule_published(existing, rule["ref"], rule) for rule in rules
+    ) and [item.get("ref") for item in existing if item.get("ref") in refs] == refs
+
+
+def deny_rule_published() -> bool:
+    zone_id, api_token, host = _cloudflare_settings()
+    return _rule_published(
+        _phase_rules(zone_id, WAF_PHASE, api_token),
+        DENY_RULE_REF,
+        static_waf_rule(host),
+    )
 
 
 def _lock_gate_row() -> None:
@@ -414,8 +552,8 @@ def _reconcile_committed_pair() -> None:
             row = MediaGateToken.objects.select_for_update().filter(singleton="default").first()
             if row is None:
                 return
-            _zone, _ruleset, _rule, _api_token, host = _cloudflare_settings()
-            push_waf_rule(waf_expression(host, row.current_token, row.previous_token))
+            push_transform_rule(row.current_token, row.previous_token)
+            ensure_deny_rule()
             publication = _publication(row)
             period = period_seconds()
             transaction.on_commit(lambda: _cache_publication(publication, period))
@@ -445,10 +583,9 @@ def rotate_token(now: datetime | None = None) -> RotationResult:
             current = new_gate_token()
             previous = row.current_token if row else None
             try:
-                _zone, _ruleset, _rule, _api_token, host = _cloudflare_settings()
-                expression = waf_expression(host, current, previous)
-                push_waf_rule(expression)
+                push_transform_rule(current, previous)
                 provider_pushed = True
+                ensure_deny_rule()
             except (MediaGateError, MediaGateUnavailable) as exc:
                 _save_attempt_error(row, moment, exc.code)
                 logger.error("media_gate_rotation_failed code=%s", exc.code)
@@ -487,15 +624,15 @@ def rotate_token(now: datetime | None = None) -> RotationResult:
         return RotationResult("failed", reason=reason)
 
 
-def repair_waf_from_committed_pair() -> bool:
+def repair_gate_from_committed_pair() -> bool:
     try:
         with transaction.atomic():
             _lock_gate_row()
             row = MediaGateToken.objects.select_for_update().filter(singleton="default").first()
             if row is None:
                 raise MediaGateUnavailable("published_token_missing")
-            _zone, _ruleset, _rule, _api_token, host = _cloudflare_settings()
-            push_waf_rule(waf_expression(host, row.current_token, row.previous_token))
+            push_transform_rule(row.current_token, row.previous_token)
+            ensure_deny_rule()
             publication = _publication(row)
             period = period_seconds()
             transaction.on_commit(lambda: _cache_publication(publication, period))
@@ -518,10 +655,11 @@ def stale_publication(now: datetime | None = None) -> bool:
 
 
 def rule_matches_publication() -> bool:
-    """Compare the provider rule with the committed database pair.
+    """Compare both published edge rules with the committed database pair.
 
     The short-lived publication cache may lag one rotation behind, so drift
-    detection reads the committed row directly. This stays a single row read.
+    detection reads the committed row directly. This stays a single row read
+    plus two phase reads.
     """
     try:
         row = MediaGateToken.objects.filter(singleton="default").first()
@@ -530,7 +668,6 @@ def rule_matches_publication() -> bool:
     if row is None:
         raise MediaGateUnavailable("published_token_missing")
     _publication(row)
-    _zone, _ruleset, _rule, _api_token, host = _cloudflare_settings()
-    return fetch_rule_expression() == waf_expression(
-        host, row.current_token, row.previous_token
-    )
+    return gate_rule_published(
+        row.current_token, row.previous_token
+    ) and deny_rule_published()

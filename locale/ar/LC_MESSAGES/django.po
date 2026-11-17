@@ -17485,11 +17485,11 @@ msgstr "مدة صلاحية ذاكرة بوابة الوسائط: %(seconds)s ث
 msgid "none"
 msgstr "لا يوجد"
 
-msgid "Expected WAF expression (token segments masked):"
-msgstr "تعبير WAF المتوقع (أجزاء الرمز محجوبة):"
+msgid "Expected gate expression (token segments masked):"
+msgstr "تعبير البوابة المتوقع (أجزاء الرمز محجوبة):"
 
-msgid "Expected WAF expression: not computable (%(reason)s)"
-msgstr "تعبير WAF المتوقع: غير قابل للحساب (%(reason)s)"
+msgid "Expected gate expression: not computable (%(reason)s)"
+msgstr "تعبير البوابة المتوقع: غير قابل للحساب (%(reason)s)"
 
 msgid "Report the read-only status of the Cloudflare edge gate."
 msgstr "اعرض حالة بوابة الحافة في Cloudflare للقراءة فقط."
@@ -17557,8 +17557,8 @@ msgstr "آخر محاولة تدوير"
 msgid "No edge token has been published. The status check does not create a token or contact Cloudflare."
 msgstr "لم يُنشر أي رمز للحافة. لا ينشئ فحص الحالة رمزاً ولا يتصل بـ Cloudflare."
 
-msgid "Expected Cloudflare WAF expression"
-msgstr "تعبير WAF المتوقع في Cloudflare"
+msgid "Expected Cloudflare gate expression"
+msgstr "تعبير البوابة المتوقع في Cloudflare"
 
 msgid "This diagnostic reads local configuration and the committed token row only. It does not call Cloudflare."
 msgstr "يقرأ هذا التشخيص الإعدادات المحلية وسجل الرمز المثبّت فقط، ولا يتصل بـ Cloudflare."

@@ -2,8 +2,8 @@
 
 The command reads the committed ``MediaGateToken`` row and local settings only.
 It never creates the token row, never contacts Cloudflare and never mutates
-database state. The expected WAF expression is printed with token segments
-masked so a terminal or CI log never receives a complete path token.
+database state. The expected edge gate expression is printed with token
+segments masked so a terminal or CI log never receives a complete path token.
 """
 
 from __future__ import annotations
@@ -24,15 +24,13 @@ from management_system.media_gate import (
     MediaGateUnavailable,
     cache_ttl_seconds,
     period_seconds,
-    waf_expression,
+    transform_expression,
 )
 from management_system.models import MediaDeliverySettings, MediaGateToken
 
 REQUIRED_ENVIRONMENT_NAMES = (
     "MEDIA_EDGE_BASE_URL",
     "CLOUDFLARE_ZONE_ID",
-    "CLOUDFLARE_WAF_RULESET_ID",
-    "CLOUDFLARE_WAF_RULE_ID",
     "CLOUDFLARE_WAF_HOST",
     "CLOUDFLARE_API_TOKEN",
 )
@@ -99,7 +97,7 @@ def build_gate_report() -> dict[str, object]:
     if row is not None:
         if current_valid and previous_valid:
             try:
-                expression = waf_expression(
+                expression = transform_expression(
                     str(getattr(settings, "CLOUDFLARE_WAF_HOST", "") or ""),
                     current,
                     previous,
@@ -149,10 +147,9 @@ def build_gate_report() -> dict[str, object]:
         "period_error": period_error,
         "cache_ttl_seconds": cache_ttl,
         "missing_settings": missing_settings,
-        "waf_expression_available": expression_available,
-        "waf_expression": expression_text,
-        "waf_expression_error": expression_error,
-        "last_attempt_at": _iso(row.last_attempt_at) if row is not None else None,
+        "gate_expression_available": expression_available,
+        "gate_expression": expression_text,
+        "gate_expression_error": expression_error,        "last_attempt_at": _iso(row.last_attempt_at) if row is not None else None,
         "last_error": row.last_error if row is not None else "",
         "ready": ready,
     }
@@ -224,13 +221,13 @@ def _report_lines(report: dict[str, object]) -> list[str]:
         _("Missing settings: %(names)s")
         % {"names": ", ".join(missing) if missing else _("none")}
     )
-    if report["waf_expression_available"]:
-        lines.append(_("Expected WAF expression (token segments masked):"))
-        lines.append(str(report["waf_expression"]))
+    if report["gate_expression_available"]:
+        lines.append(_("Expected gate expression (token segments masked):"))
+        lines.append(str(report["gate_expression"]))
     else:
-        reason = report["waf_expression_error"] or _("not published")
+        reason = report["gate_expression_error"] or _("not published")
         lines.append(
-            _("Expected WAF expression: not computable (%(reason)s)")
+            _("Expected gate expression: not computable (%(reason)s)")
             % {"reason": reason}
         )
     lines.append(

@@ -23,7 +23,7 @@ from .direct_uploads import DirectUploadError, finalize_direct_upload
 from .mobile_versioning import MAX_VERSION_CODE, is_valid_update_url, normalize_platform
 from .forms import MediaDeliverySettingsForm
 from .media_delivery import effective_segment_delivery_mode, media_presigned_url_seconds
-from .media_gate import MediaGateError, period_seconds, waf_expression
+from .media_gate import MediaGateError, period_seconds, transform_expression
 from .models import DirectUploadAuthorization, MediaDeliverySettings, MediaGateToken, MobileAppRelease, MobileAppUpdatePolicy, MobileDownloadPolicy, MobilePushSettings, StudentBanner
 from .models import StudentMode
 from .student_experience.mode import resolve_student_mode
@@ -444,8 +444,6 @@ def media_delivery_settings(request):
     required_gate_settings = (
         "MEDIA_EDGE_BASE_URL",
         "CLOUDFLARE_ZONE_ID",
-        "CLOUDFLARE_WAF_RULESET_ID",
-        "CLOUDFLARE_WAF_RULE_ID",
         "CLOUDFLARE_WAF_HOST",
         "CLOUDFLARE_API_TOKEN",
     )
@@ -461,7 +459,7 @@ def media_delivery_settings(request):
         if gate_row:
             gate_due_at = gate_row.current_started_at + timedelta(seconds=period_seconds())
             if not missing_gate_settings:
-                gate_expected_expression = waf_expression(
+                gate_expected_expression = transform_expression(
                     settings.CLOUDFLARE_WAF_HOST,
                     gate_row.current_token,
                     gate_row.previous_token,
