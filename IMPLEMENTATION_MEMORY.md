@@ -57,6 +57,16 @@ here, not silently dropped.
 
 ### Ready to deploy (2026-11-17)
 
+Pre-push audit of the 24 release commits (`4b651bc..b84de53`): no `cfut_`
+token, no `CLOUDFLARE_API_TOKEN=` value, no `POSTGRES_PASSWORD` value, no R2
+secret and no private key in any added line; no `.sqlite3`, `.log`, `runtime/`
+or `tmp/` file tracked; `.env`, `.compose.env`, `tmp/`, `runtime/` and `docs/`
+all correctly ignored; no added file over 200 KB; and every runtime artifact is
+tracked (direct-upload modules, the browser uploader, `deploy/setup_edge_rules.py`,
+migrations 0127-0130 and the three new smokes). 64 files changed, 9,324
+insertions. Both remotes still resolve to `3273e0d`, so nothing is pushed and
+no deploy has happened; signup work is deliberately deferred until it is.
+
 Final whole-suite pass on the tree at `3d6254c` (nothing changed after it):
 `manage.py check` 0 issues, `makemigrations --check` no changes, the disposable
 database at leaf `0130` and a clean-zero database also migrated 0129 -> 0130,
