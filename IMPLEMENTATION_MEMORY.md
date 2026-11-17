@@ -115,6 +115,36 @@ time and re-homed into `applications/<user id>/<document_type>/` at finalize;
 an end-to-end signup POST (form + token + user creation) is still unverified and
 is the next check to write.
 
+### Next unit: background upload + persistent applicant attachments
+
+User request (2026-11-17): upload attachments in the background while the form is
+being filled, and keep already-uploaded signup documents when the visitor leaves
+and returns, including after a rejected submission. Two parts:
+
+1. `direct_upload.js` uploads on the `change` event instead of on submit, keeps
+   one in-flight transfer per field, and only waits for pending transfers at
+   submit time.
+2. Capabilities persist in `sessionStorage` per form + field, rehydrate the
+   hidden `direct_upload_token_*` inputs on load, and render an uploaded state
+   plus a JS-injected Remove control (so no per-picker template edits). Remove
+   calls a new `POST /api/direct-upload/discard/`, which must verify the same
+   actor/applicant-session binding as finalize before expiring the row and
+   deleting the staged object; picking a replacement supersedes the old token.
+
+Server defaults proposed (change them before implementation if wrong):
+signup-only capabilities live **24 hours** so a returning applicant can finish,
+while every authenticated flow keeps the current 15-minute upload URL and
+30-minute finalize grace. `expire_abandoned_direct_uploads` must respect the
+longer applicant window. The longer bearer life is acceptable only because the
+capability is session-bound, single-use and can attach one document to the
+account created from that same session.
+
+Verification to add: extend `phase08_signup_upload.py` to finalize after a
+simulated reload from the same session, and prove a discard removes the staged
+object and cannot be finalized afterwards. Plus `manage.py check`, no migration
+drift (no schema change expected), `audit_text_encoding`, and Arabic entries for
+the new uploaded/remove wording.
+
 ### Ready to deploy (2026-11-17)
 
 Second whole-suite pass on the tree at `1950b50` (after the payment, CSV,
