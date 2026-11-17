@@ -168,11 +168,12 @@
                 {% include "partials/admin_operation_status.html" with operation_job=intake_job status_url=intake_status_url status=intake_job.status total=intake_job.total processed=intake_job.processed %}
                 {% endif %}
                 <details class="aw-mt-2"><summary class="aw-small">{% translate "Expected columns" %}</summary><p class="aw-small">{% for column in intake_columns %}<code>{{ column }}</code> {% endfor %}</p></details>
-                <form method="post" enctype="multipart/form-data" hx-post="" hx-encoding="multipart/form-data" hx-target="#content" hx-swap="outerHTML" hx-select="#content" hx-select-oob="#toast-stack" hx-push-url="true" class="aw-mt-3">
+                <form method="post" enctype="multipart/form-data" hx-post="" hx-encoding="multipart/form-data" hx-target="#content" hx-swap="outerHTML" hx-select="#content" hx-select-oob="#toast-stack" hx-push-url="true" class="aw-mt-3" data-direct-upload="{% url 'direct-upload-authorize' %}">
                     {% csrf_token %}
                     <div class="aw-field">
                         <label for="intake-file" class="aw-field-label">{% translate "Intake CSV or XLSX" %}</label>
-                        <input id="intake-file" class="aw-input" type="file" name="intake_file" accept=".csv,.xlsx" required>
+                        <input id="intake-file" class="aw-input" type="file" name="intake_file" accept=".csv,.xlsx" required
+                               data-upload-purpose="historical_intake" data-upload-field="intake_file">
                     </div>
                     <div class="aw-form-actions">
                         <button class="aw-btn aw-btn--outline" type="submit" name="preview_upload" value="yes">

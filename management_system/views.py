@@ -131,6 +131,7 @@ from .direct_uploads import (
     read_finalized_object,
 )
 from .models import DirectUploadAuthorization
+from django.core.files.uploadedfile import SimpleUploadedFile
 from .utils.application_uploads import (
     APPLICATION_DOCUMENT_FIELDS,
     APPLICATION_DOCUMENT_LABELS,
@@ -1719,6 +1720,30 @@ def _direct_application_document_tokens(request) -> dict[str, str]:
     return tokens
 
 
+def _finalized_intake_upload(request):
+    """Return the browser's finalized intake file as an uploaded-file object."""
+
+    finalized = finalize_direct_upload(
+        actor=request.user,
+        token=(request.POST.get("direct_upload_token_intake_file") or "").strip(),
+        expected_purpose=DirectUploadAuthorization.Purpose.HISTORICAL_INTAKE,
+        final_folder="historical-intake",
+    )
+    payload = read_finalized_object(
+        client=CLOUD_CLIENT,
+        bucket=bucket_name,
+        key=finalized.key,
+        max_bytes=int(
+            PURPOSE_LIMITS[DirectUploadAuthorization.Purpose.HISTORICAL_INTAKE]["max_bytes"]
+        ),
+    )
+    return SimpleUploadedFile(
+        finalized.original_filename,
+        payload,
+        content_type=finalized.content_type,
+    )
+
+
 @capability_required(can_manage_content)
 def user_profile(request, user_id):
     if request.method == "POST" and not can_manage_applications(request.user):
@@ -2047,9 +2072,12 @@ def historical_intake(request):
                             "has_record": summary is not None,
                             "already_promoted": bool(summary and summary.promoted_at),
                         })
-        elif request.FILES.get("intake_file"):
+        elif request.FILES.get("intake_file") or request.POST.get("direct_upload_token_intake_file"):
             try:
-                upload = request.FILES["intake_file"]
+                if request.FILES.get("intake_file"):
+                    upload = request.FILES["intake_file"]
+                else:
+                    upload = _finalized_intake_upload(request)
                 rows, upload_digest = parse_intake_upload(upload)
                 preview = preview_intake_rows(rows)
                 if request.POST.get("apply_upload") == "yes":

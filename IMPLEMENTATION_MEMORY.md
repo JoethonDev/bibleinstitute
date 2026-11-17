@@ -233,9 +233,13 @@ State at this entry:
   the stored bytes with `validate_application_file`, builds the private webp
   preview from those same bytes, and hands the keys to
   `stage_application_documents(finalized=...)` so nothing is uploaded twice.
-  **Not migrated yet**: signup, Telegram reply/broadcast, historical intake
-  and quiz JSON. Do not claim Task 5 complete. Legacy user CSV is migrated:
-  `CSVUploadForm.csv_file` became `required=False` with the requirement enforced
+  **Not migrated yet**: signup, Telegram reply/broadcast and quiz JSON. Do not
+  claim Task 5 complete. Historical intake is migrated: the view accepts either
+  the browser file or `direct_upload_token_intake_file`, finalizes the
+  capability, reads the stored bytes through the same bounded helper (10 MiB
+  cap) and hands the existing parser, preview and durable intake job an ordinary
+  uploaded-file object, so the intake contract is untouched. Legacy user CSV is
+  migrated: `CSVUploadForm.csv_file` became `required=False` with the requirement enforced
   in `clean()`, and the view finalizes the capability then reads the stored
   bytes through the new bounded `read_finalized_object` helper (2 MiB cap) before
   the existing parser and durable job run unchanged. A focused check confirms
