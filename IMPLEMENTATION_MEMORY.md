@@ -211,15 +211,18 @@ State at this entry:
   PUTs and posts only the token; `send_student_message` accepts a finalized key
   plus its validated spec and rejects a body file combined with a capability;
   `record_finalized_attachment` deletes the object when the row cannot be
-  created. Admin document replacement is migrated (`8da6390`): the user profile
-  and application review forms annotate their pickers through
+  created. Admin document replacement is migrated (`8da6390`): the user profile  and application review forms annotate their pickers through
   `forms.direct_document_field`, and `finalize_application_documents` validates
   the stored bytes with `validate_application_file`, builds the private webp
   preview from those same bytes, and hands the keys to
   `stage_application_documents(finalized=...)` so nothing is uploaded twice.
-  **Not migrated yet**: signup, the student missing-documents and academic
-  payment forms, Telegram reply/broadcast, historical intake, legacy user CSV
-  and quiz JSON. Do not claim Task 5 complete. Next-caller
+  **Not migrated yet**: signup, Telegram reply/broadcast, historical intake,
+  legacy user CSV and quiz JSON. Do not claim Task 5 complete. Academic payment
+  is migrated too: `AcademicPaymentForm.payment` became `required=False` with
+  the requirement enforced in `clean()` against either a file or
+  `direct_upload_token_payment`, the view finalizes the token through the same
+  helper, and a focused check confirms a receipt-less submission is rejected
+  while both the capability-only and body-file submissions pass. Next-caller
   constraint discovered: `SignupForm` declares `identity_front` and `profile`
   as `required=True` and makes `identity_back` conditionally required, so those
   fields must become `required=False` with a `clean()` that accepts either the

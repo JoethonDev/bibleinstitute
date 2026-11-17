@@ -1415,7 +1415,12 @@ class MissingApplicationDocumentsForm(forms.Form):
 
 
 class AcademicPaymentForm(forms.Form):
-    """Upload one missing receipt for an authorized academic scope."""
+    """Upload one missing receipt for an authorized academic scope.
+
+    The receipt may arrive either as a form file (transitional) or as a
+    direct-upload capability token, so the field is optional here and the
+    requirement is enforced in ``clean`` against whichever form was submitted.
+    """
 
     academic_year_level = forms.ModelChoiceField(
         queryset=AcademicYearLevel.objects.none(),
@@ -1423,9 +1428,16 @@ class AcademicPaymentForm(forms.Form):
         empty_label=None,
     )
     payment = forms.FileField(
-        required=True,
+        required=False,
         label=_("Payment Receipt"),
         validators=[validate_application_file],
+        widget=forms.FileInput(
+            attrs={
+                "data-upload-purpose": "application_document",
+                "data-upload-document-type": "payment",
+                "data-upload-field": "payment",
+            }
+        ),
     )
 
     def __init__(self, *args, student=None, **kwargs):
@@ -1433,6 +1445,14 @@ class AcademicPaymentForm(forms.Form):
         self.student = student
         if student is not None:
             self.fields["academic_year_level"].queryset = academic_payment_scopes_for_student(student)
+
+    def clean(self):
+        cleaned_data = super().clean()
+        if not cleaned_data.get("payment") and not (
+            self.data.get("direct_upload_token_payment") or ""
+        ).strip():
+            self.add_error("payment", _("This field is required."))
+        return cleaned_data
 
 
 class SignupDetailsForm(forms.ModelForm):

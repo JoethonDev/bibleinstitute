@@ -6718,13 +6718,28 @@ def profile_academic_payment(request):
                 academic_year_level=scope,
             ).exists():
                 raise ValidationError(_("A payment receipt already exists for this academic level."))
-            uploaded = upload_application_file(
-                CLOUD_CLIENT,
-                bucket_name,
-                user.pk,
-                form.cleaned_data["payment"],
-                "academic_payment",
-            )
+            payment_token = (request.POST.get("direct_upload_token_payment") or "").strip()
+            if payment_token:
+                uploaded = finalize_application_documents(
+                    actor=request.user,
+                    tokens={"payment": payment_token},
+                    cloud_client=CLOUD_CLIENT,
+                    bucket_name=bucket_name,
+                    user_id=user.pk,
+                ).get("payment")
+                if uploaded is None:
+                    raise ValidationError(_("The payment receipt could not be uploaded."))
+            else:
+                uploaded_file = form.cleaned_data.get("payment")
+                if not uploaded_file:
+                    raise ValidationError(_("Choose the payment receipt to upload."))
+                uploaded = upload_application_file(
+                    CLOUD_CLIENT,
+                    bucket_name,
+                    user.pk,
+                    uploaded_file,
+                    "academic_payment",
+                )
             if not uploaded:
                 raise ValidationError(_("The payment receipt could not be uploaded."))
             uploaded_keys.extend(uploaded.keys)

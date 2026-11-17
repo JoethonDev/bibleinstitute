@@ -164,7 +164,7 @@
                         </div>
                         <div class="p-3">
                             <p class="ps-muted-text small">{% translate "A new academic year needs its own payment receipt before promotion can be recorded." %}</p>
-                            <form method="post" action="{% url 'profile-academic-payment' %}" hx-post="{% url 'profile-academic-payment' %}" hx-encoding="multipart/form-data" hx-target="#profile-content" hx-swap="outerHTML" hx-select="#profile-content" hx-select-oob="#toast-stack" hx-push-url="true" enctype="multipart/form-data">
+                            <form method="post" action="{% url 'profile-academic-payment' %}" hx-post="{% url 'profile-academic-payment' %}" hx-encoding="multipart/form-data" hx-target="#profile-content" hx-swap="outerHTML" hx-select="#profile-content" hx-select-oob="#toast-stack" hx-push-url="true" enctype="multipart/form-data" data-direct-upload="{% url 'direct-upload-authorize' %}">
                                 {% csrf_token %}
                                 {{ academic_payment_form|crispy }}
                                 <div class="d-grid mt-3">
