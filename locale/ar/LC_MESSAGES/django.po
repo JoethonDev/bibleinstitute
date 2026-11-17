@@ -17577,3 +17577,6 @@ msgstr "السنة الثانية"
 
 msgid "Quiz is closed, You can not take it anymore!"
 msgstr "الاختبار مغلق، لم يعد بإمكانك أداءه!"
+
+msgid "This browser could not save progress for later. Keep this page open until it syncs."
+msgstr "تعذّر على هذا المتصفح حفظ التقدم لمزامنته لاحقاً. أبقِ هذه الصفحة مفتوحة حتى تتم المزامنة."

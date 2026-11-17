@@ -164,14 +164,17 @@ State at this entry:
   `<form>`; do not look for literal `<input type="file" name="identity_front">`.
   Any HTMX form must keep the uploader's `requestSubmit` follow-up, because
   `form.submit()` would bypass HTMX and force a full reload.
-- Arabic catalog: complete for this release (`64ab3f5`). 52 entries were
-  appended for the gate diagnostics and admin form, the bounded cleanup output,
-  the direct-upload limits/errors, the four progress-queue states and the
-  remaining untranslated labels. `msgfmt -c` is clean and reports 4151
-  translated messages with none untranslated or fuzzy; the four progress-queue
-  and upload strings were re-read in `ar` and render as Arabic. A future
-  `makemessages` run will rewrite 13k+ reference comments, so keep using the
-  focused-append workflow instead of a wholesale regenerate.
+- Arabic catalog: complete for this release (`64ab3f5` plus the queue fix in
+  this round). 53 entries were appended for the gate diagnostics and admin
+  form, the bounded cleanup output, the direct-upload limits/errors, the four
+  progress-queue states and the remaining untranslated labels. `msgfmt -c` is
+  clean and reports 4152 translated messages with none untranslated or fuzzy;
+  `msgattrib --untranslated` emits no file. Regression found and fixed: the
+  earlier restore-from-HEAD to avoid `makemessages` reference churn dropped an
+  uncommitted catalog entry ("This browser could not save progress for later.
+  Keep this page open until it syncs."), which `phase08_progress_queue.js`
+  caught. Lesson: never restore the catalog from HEAD while uncommitted
+  translations exist; copy the working tree first.
 - Evidence added after the first release commit (`51098ab`): full-mode
   `phase08_attendance_cleanup.py` passes on the disposable PostgreSQL - online
   attendance policy fields, 7/14-day score boundaries, grouped online
