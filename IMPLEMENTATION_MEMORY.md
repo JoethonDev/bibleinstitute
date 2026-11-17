@@ -55,6 +55,36 @@ production migration is performed here. The plans' prerequisite gates are
 waived for this release by that explicit instruction and the waiver is recorded
 here, not silently dropped.
 
+### Ready to deploy (2026-11-17)
+
+The user asked to stop widening scope and ship. This is the deployable set.
+
+- Branch `codex/lms-expansion-aligned`, 15 local commits on top of `4b651bc`,
+  nothing pushed and nothing deployed. Latest `6ee7521`.
+- Migrations applied by the normal blue/green step: `0127` (MediaGateToken,
+  edge_gate choice), `0128` (progress/attendance state, 4 indexes, 5 checks),
+  `0129` (DirectUploadAuthorization), `0130` (per-purpose bucket). All are
+  additive; old code ignores them, so the pre-switch slot keeps working.
+- Server `.env`/`.compose.env` additions before deploying:
+  `DJANGO_CONN_MAX_AGE`, `NOTIFICATION_REDELIVERY_INTERVAL_SECONDS`, the four
+  Gunicorn keys, `MEDIA_EDGE_BASE_URL`, `MEDIA_GATE_PERIOD_SECONDS`,
+  `MEDIA_GATE_ALLOW_SHORT_PERIOD`, `CLOUDFLARE_ZONE_ID`,
+  `CLOUDFLARE_WAF_RULESET_ID`, `CLOUDFLARE_WAF_RULE_ID`,
+  `CLOUDFLARE_WAF_HOST`, and the private `CLOUDFLARE_API_TOKEN`.
+- Post-deploy checks: `manage.py media_gate_status` (mode must still read
+  `worker`), publish one APK and one support attachment, replace one student
+  document, play a lesson and confirm progress saves and resumes.
+- Rollback is a redeploy of the previous commit plus a slot switch; the schema
+  is additive and the new code paths are inert without the env keys.
+- Behavior changes to watch after the switch: heartbeat cadence 60s with the
+  new receipt accounting, cached_db sessions, and the APK/support-chat upload
+  paths now require JavaScript (a body file is refused there).
+- Deliberately NOT in this ship, do not claim otherwise: signup, academic
+  payment, Telegram reply/broadcast, historical intake, legacy user CSV and
+  quiz JSON still send bytes through Django; heartbeat concurrency and
+  replay-after-crash have no database evidence; `edge_gate` is not enabled and
+  the allowed path is unproven until a deploy publishes a real token.
+
 State at this entry:
 
 - Migrations created and rehearsed on an isolated disposable PostgreSQL 18
