@@ -121,7 +121,13 @@ State at this entry:
   as `required=True` and makes `identity_back` conditionally required, so those
   fields must become `required=False` with a `clean()` that accepts either the
   file or `direct_upload_token_<field>` before the view can finalize; the
-  admin/profile/payment forms are already `required=False`.
+  admin/profile/payment forms are already `required=False`. Also: the document
+  file inputs are not written out literally in the templates - the only
+  template that mentions `identity_front` renders the stored key, not a picker -
+  so the picker annotation must come from the form widgets (add
+  `data-upload-purpose`/`data-upload-document-type` in `forms.py`) plus one
+  `data-direct-upload` attribute on each page's `<form>`; do not look for
+  literal `<input type="file" name="identity_front">` markup.
 - Arabic catalog: complete for this release (`64ab3f5`). 52 entries were
   appended for the gate diagnostics and admin form, the bounded cleanup output,
   the direct-upload limits/errors, the four progress-queue states and the
