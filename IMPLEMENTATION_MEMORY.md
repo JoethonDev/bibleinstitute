@@ -156,6 +156,47 @@ Implemented:
   control is available after reload, Remove calls the discard endpoint, and
   Remove clears the stored capability.
 
+### Live edge test (2026-11-17): the gate path design does not work as specified
+
+Proved against the live zone with a REAL R2 manifest
+(`First Year/Academic Year - 2025-2026/Semester 1/Arts/Lecture - 1/Lecture1_part1_audio.m3u8`,
+1421 segments), a local disposable lesson/student, a locally published token and
+a temporary rule rewrite. The edge rule was restored to fail-closed afterwards
+(`/` and `/g/AAAA.../Audio%20Segments/x.ts` both 403).
+
+Findings, each from a single-variable rule change:
+
+1. **The URL rewrite runs BEFORE the WAF custom phase.** Allowing when
+   `http.request.uri.path` starts with `/First%20Year/` returned 200 for the
+   gated URL, and allowing when it starts with `/g/<token>/` also returned 200 -
+   because after the rewrite that prefix is gone and the negated predicate is
+   therefore true. So by the time a custom rule evaluates, the token has already
+   been stripped from the path.
+2. **`raw.http.request.uri.path` does not carry the pre-rewrite value** here
+   either, so the canonical `media_gate.waf_expression` token clause can never
+   match. A rule built from it blocks every gated segment.
+3. **The `%20` segment wildcard does not match.** A space form
+   (`*/Audio Segments/*.ts`) and a `contains()` form were also rejected or did
+   not match (`contains` returned provider error 20127).
+4. **`media_gate.push_waf_rule` cannot rotate with this credential.** The
+   per-rule endpoint returns `405` code `10405` "method not allowed for this
+   authentication scheme"; updating the rule through the entrypoint `PUT` works.
+
+Consequences: switching to `edge_gate` today would break all playback, so the
+mode must stay `worker`. The design needs one of:
+
+- **(a) token in the query string** - the playlist emits
+  `/Course/.../seg.ts?t=<token>`, no rewrite rule at all, and the WAF clause
+  checks the query plus `ends_with(path, ".ts")`. This removes the ordering
+  dependence entirely and is the recommended fix.
+- **(b) keep the path prefix and drop the rewrite**, mapping the bucket so the
+  object key already contains `/g/<token>/...` - not possible with R2 keys.
+- **(c) a phase that runs before the transform and can block** - Cloudflare does
+  not offer a blocking custom rule before `http_request_transform`.
+
+Also to fix regardless: rotation must publish through the entrypoint, and
+`waf_expression` needs a predicate vocabulary that this plan accepts.
+
 ### Ready to deploy (2026-11-17)
 
 Second whole-suite pass on the tree at `1950b50` (after the payment, CSV,
