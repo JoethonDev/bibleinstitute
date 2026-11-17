@@ -12,6 +12,7 @@ rules; it is not a generic upload engine.
 
 from __future__ import annotations
 
+import logging
 import os
 import re
 import secrets
@@ -29,6 +30,8 @@ from django.utils.translation import gettext as _
 from .models import DirectUploadAuthorization
 from .storage_coordination import assert_storage_namespace_available, lock_storage_namespace
 from .utils.storage_operations import delete_from_bucket, get_r2_client
+
+logger = logging.getLogger(__name__)
 
 STAGING_PREFIX = "direct-upload-staging"
 FINAL_PREFIX = "direct-uploads"
@@ -458,7 +461,7 @@ def _publish_final(*, client, bucket: str, temp_path: str, final_key: str, conte
         ) from exc
 
 
-def finalize_direct_upload(
+def _finalize_direct_upload(
     *,
     actor,
     token: str,
@@ -508,9 +511,6 @@ def finalize_direct_upload(
                 "expired", _("This upload expired. Please upload the file again.")
             )
         if now > authorization.expires_at + FINALIZE_GRACE:
-            authorization.status = DirectUploadAuthorization.Status.EXPIRED
-            authorization.failure_reason = "finalize_window_expired"
-            authorization.save(update_fields=["status", "failure_reason"])
             raise DirectUploadError(
                 "expired", _("This upload expired. Please upload the file again.")
             )
@@ -523,9 +523,6 @@ def finalize_direct_upload(
         real_size = int(head.get("ContentLength") or 0)
         real_type = str(head.get("ContentType") or "").split(";")[0].strip().lower()
         if real_size <= 0 or real_size > authorization.max_bytes:
-            authorization.status = DirectUploadAuthorization.Status.FAILED
-            authorization.failure_reason = "stored_size_rejected"
-            authorization.save(update_fields=["status", "failure_reason"])
             _delete_staging(client, bucket, authorization.staging_key)
             raise DirectUploadError(
                 "file_too_large",
@@ -535,9 +532,6 @@ def finalize_direct_upload(
             # The declared size is part of the capability: a transfer that does
             # not match it is either truncated or padded, so it is never
             # published under the user's original authorization.
-            authorization.status = DirectUploadAuthorization.Status.FAILED
-            authorization.failure_reason = "stored_size_mismatch"
-            authorization.save(update_fields=["status", "failure_reason"])
             _delete_staging(client, bucket, authorization.staging_key)
             raise DirectUploadError(
                 "size_mismatch",
@@ -549,9 +543,6 @@ def finalize_direct_upload(
             except DirectUploadError:
                 limits = None
             if limits is None or real_type not in limits.content_types:
-                authorization.status = DirectUploadAuthorization.Status.FAILED
-                authorization.failure_reason = "stored_type_rejected"
-                authorization.save(update_fields=["status", "failure_reason"])
                 _delete_staging(client, bucket, authorization.staging_key)
                 raise DirectUploadError(
                     "unsupported_type", _("This file type is not allowed.")
@@ -594,10 +585,7 @@ def finalize_direct_upload(
                 final_key=final_key,
                 content_type=authorization.declared_content_type,
             )
-        except Exception as exc:
-            authorization.status = DirectUploadAuthorization.Status.FAILED
-            authorization.failure_reason = getattr(exc, "code", "validation_failed")[:200]
-            authorization.save(update_fields=["status", "failure_reason"])
+        except Exception:
             _delete_staging(client, bucket, authorization.staging_key)
             raise
         finally:
@@ -632,6 +620,77 @@ def finalize_direct_upload(
         size=real_size,
         metadata=dict(authorization.metadata or {}),
     )
+
+
+TERMINAL_FAILURE_CODES = frozenset(
+    {
+        "file_too_large",
+        "size_mismatch",
+        "unsupported_type",
+        "validation_failed",
+        "expired",
+    }
+)
+
+
+def _persist_failure(*, token: str, actor, code: str) -> None:
+    """Record a terminal failure after the failed attempt's transaction rolled back.
+
+    The attempt itself runs inside ``atomic()`` so a rejected upload cannot leave
+    a partial row, which also means its own status write is rolled back. This
+    runs afterwards in a fresh transaction, and only for a row that still
+    belongs to the same actor and is still pending.
+    """
+
+    normalized = str(code or "validation_failed")[:200]
+    if normalized not in TERMINAL_FAILURE_CODES:
+        return
+    target_status = (
+        DirectUploadAuthorization.Status.EXPIRED
+        if normalized == "expired"
+        else DirectUploadAuthorization.Status.FAILED
+    )
+    try:
+        with transaction.atomic():
+            DirectUploadAuthorization.objects.filter(
+                token=str(token or ""),
+                actor_id=getattr(actor, "pk", None),
+                status=DirectUploadAuthorization.Status.PENDING,
+            ).update(status=target_status, failure_reason=normalized)
+    except Exception:  # noqa: BLE001 - never mask the original failure
+        logger.warning("direct upload failure state could not be recorded")
+
+
+def finalize_direct_upload(
+    *,
+    actor,
+    token: str,
+    validator: Callable[[object], None] | None = None,
+    expected_purpose: str | None = None,
+    metadata: dict | None = None,
+    final_folder: str | None = None,
+) -> FinalizedUpload:
+    """Finalize one capability, persisting a terminal failure outside its transaction."""
+
+    try:
+        return _finalize_direct_upload(
+            actor=actor,
+            token=token,
+            validator=validator,
+            expected_purpose=expected_purpose,
+            metadata=metadata,
+            final_folder=final_folder,
+        )
+    except DirectUploadError as exc:
+        _persist_failure(token=token, actor=actor, code=exc.code)
+        raise
+    except Exception as exc:
+        _persist_failure(
+            token=token,
+            actor=actor,
+            code=str(getattr(exc, "code", "") or "validation_failed"),
+        )
+        raise
 
 
 def _delete_staging(client, bucket: str, key: str) -> None:
