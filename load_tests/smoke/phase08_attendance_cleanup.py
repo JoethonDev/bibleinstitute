@@ -43,10 +43,30 @@ def _rollback_fixtures(checks: list[str]) -> None:
     from management_system.progress_activity import online_attendance_for_students
     from management_system.session_cleanup import cleanup_expired_viewing_sessions
 
-    applied = set(__import__("django.db.migrations.executor", fromlist=["MigrationExecutor"]).MigrationExecutor(connection).loader.applied_migrations)
-    required_migration = ("management_system", "0128_viewing_session_mode_and_online_attendance_policy")
-    if required_migration not in applied:
-        raise RuntimeError("The Phase 8 forward migration is not applied to this disposable database.")
+    # Prove the Phase 8 schema is really applied instead of trusting one
+    # migration filename, which is renamed whenever the migration is split.
+    with connection.cursor() as schema_cursor:
+        schema_cursor.execute(
+            "SELECT table_name, column_name FROM information_schema.columns "
+            "WHERE table_name IN (%s, %s)",
+            [
+                "management_system_viewingsession",
+                "management_system_attendancepolicy",
+            ],
+        )
+        columns: dict[str, set[str]] = {}
+        for table_name, column_name in schema_cursor.fetchall():
+            columns.setdefault(table_name, set()).add(column_name)
+    session_columns = columns.get("management_system_viewingsession", set())
+    policy_columns = columns.get("management_system_attendancepolicy", set())
+    if not {"started_at", "superseded_at", "segment_delivery_mode", "edge_earned_seconds_consumed"} <= session_columns or not {
+        "online_full_days",
+        "online_partial_days",
+        "online_partial_value",
+    } <= policy_columns:
+        raise RuntimeError(
+            "The Phase 8 forward migration is not applied to this disposable database."
+        )
 
     suffix = uuid4().hex[:12]
     now = datetime.now(timezone.utc)

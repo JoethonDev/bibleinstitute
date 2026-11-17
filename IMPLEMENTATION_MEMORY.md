@@ -119,6 +119,16 @@ State at this entry:
   NOT translated yet. A `makemessages -l ar` run rewrites 13k+ reference
   comments, so the catalog update will be a focused manual append followed by
   `compilemessages`; restoring the file from HEAD was used to avoid the churn.
+- Evidence added after the first release commit (`51098ab`): full-mode
+  `phase08_attendance_cleanup.py` passes on the disposable PostgreSQL - online
+  attendance policy fields, 7/14-day score boundaries, grouped online
+  attendance for 3 students in 3 queries, and bounded cleanup preserving
+  active/replayable sessions and progress history. Its forward-migration guard
+  now inspects `information_schema` columns instead of one migration filename,
+  because the Phase 8 migration was split into `0128`. Full-mode
+  `phase08_progress.py` proves the isolated connection but NOT the 100-request
+  concurrency, replay-after-crash or superseded-window scenarios the plan
+  requires; those remain open.
 
 
 - Current implementation focus: Cloudflare edge-gated HLS delivery with a
