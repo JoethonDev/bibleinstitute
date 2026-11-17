@@ -100,9 +100,16 @@ State at this entry:
   `MEDIA_EDGE_BASE_URL` are recorded in the local ignored `.env`
   (`CLOUDFLARE_ZONE_ID`, `CLOUDFLARE_WAF_RULESET_ID`,
   `CLOUDFLARE_WAF_RULE_ID`, `CLOUDFLARE_WAF_HOST`). Still open: the allowed
-  path can only be proven after a deploy publishes the first token; cache and
-  rate-limit rules are not created yet; `edge_gate` mode is still not enabled;
-  and the operator token was pasted into chat, so it must be revoked.
+  path can only be proven after a deploy publishes the first token; `edge_gate`
+  mode is still not enabled; and the operator token was pasted into chat, so it
+  must be revoked. Cache rule and rate-limit rule are now created too: cache
+  ruleset `03e39eab4b6240d1a788bef26bf4f529` (edge TTL 86400) and rate-limit
+  ruleset `e62dcd2113ba4e7abbf8f2856633b819` (300 requests per 10 seconds,
+  block 10 seconds). Free plan counts rate limits per colocation, so
+  `cf.colo.id` is a mandatory characteristic and the effective ceiling is per
+  IP per colo - record that before promising a global per-IP ceiling. A
+  regression pass after both rules still returns 403 for `/`,
+  `/applications/...`, `/Telegram Support/...` and an unknown gate token.
 - Phase 7 server side: `media_delivery_mode.effective_segment_delivery_mode`
   now reads the stored row before falling back to `CLOUD_WORKER`, so
   `edge_gate` survives Phase 10's removal of `CLOUD_WORKER`;

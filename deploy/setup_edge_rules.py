@@ -172,10 +172,83 @@ def apply_rewrite(zone_id: str, host: str) -> int:
     return 0
 
 
+def apply_cache(zone_id: str, host: str) -> int:
+    """Cache gate segment responses at the edge instead of re-fetching R2."""
+
+    entry = _entrypoint(zone_id, "http_request_cache_settings")
+    rule = {
+        "action": "set_cache_settings",
+        "description": "LMS media gate: cache gated segments at the edge",
+        "enabled": True,
+        "ref": "lms_media_gate_cache",
+        "expression": (
+            f'(http.host eq "{host}" and starts_with(raw.http.request.uri.path, "/g/"))'
+        ),
+        "action_parameters": {
+            "cache": True,
+            "edge_ttl": {"mode": "override_origin", "default": 86400},
+        },
+    }
+    kept = [
+        item for item in ((entry or {}).get("rules") or [])
+        if item.get("ref") != "lms_media_gate_cache"
+    ]
+    payload = _call(
+        "PUT",
+        f"/zones/{zone_id}/rulesets/phases/http_request_cache_settings/entrypoint",
+        json={"rules": [*kept, rule]},
+    )
+    if not payload.get("success"):
+        print(f"cache_apply: FAILED {_errors(payload)}")
+        return 1
+    print(f"cache_apply: OK ruleset_id={(payload.get('result') or {}).get('id')}")
+    return 0
+
+
+def apply_rate_limit(zone_id: str, host: str) -> int:
+    """Bound one client to 300 segment requests per 10 seconds, block 10s."""
+
+    entry = _entrypoint(zone_id, "http_ratelimit")
+    rule = {
+        "action": "block",
+        "description": "LMS media gate: per-IP segment request ceiling",
+        "enabled": True,
+        "ref": "lms_media_gate_ratelimit",
+        "expression": (
+            f'(http.host eq "{host}" and starts_with(raw.http.request.uri.path, "/g/"))'
+        ),
+        "ratelimit": {
+            # Free plan counts per colocation, so cf.colo.id is mandatory; the
+            # effective ceiling is therefore per IP per colo.
+            "characteristics": ["cf.colo.id", "ip.src"],
+            "period": 10,
+            "requests_per_period": 300,
+            "mitigation_timeout": 10,
+            "requests_to_origin": False,
+        },
+    }
+    kept = [
+        item for item in ((entry or {}).get("rules") or [])
+        if item.get("ref") != "lms_media_gate_ratelimit"
+    ]
+    payload = _call(
+        "PUT",
+        f"/zones/{zone_id}/rulesets/phases/http_ratelimit/entrypoint",
+        json={"rules": [*kept, rule]},
+    )
+    if not payload.get("success"):
+        print(f"rate_apply: FAILED {_errors(payload)}")
+        return 1
+    print(f"rate_apply: OK ruleset_id={(payload.get('result') or {}).get('id')}")
+    return 0
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--apply-waf", action="store_true", help="create or update the deny rule")
     parser.add_argument("--apply-rewrite", action="store_true", help="create or update the gate rewrite")
+    parser.add_argument("--apply-cache", action="store_true", help="create or update the segment cache rule")
+    parser.add_argument("--apply-rate", action="store_true", help="create or update the rate-limit rule")
     parser.add_argument(
         "--placeholder-token",
         default="",
@@ -185,8 +258,11 @@ def main() -> int:
     host = _edge_host()
     zone_id = _zone_id(_zone_name_from_host(host))
     print(f"zone_id_resolved: yes ({len(zone_id)} chars)")
-    if not args.apply_waf and not args.apply_rewrite:
-        print("no action requested; pass --apply-waf and/or --apply-rewrite")
+    requested = (
+        args.apply_waf or args.apply_rewrite or args.apply_cache or args.apply_rate
+    )
+    if not requested:
+        print("no action requested; pass --apply-waf/--apply-rewrite/--apply-cache/--apply-rate")
         return 0
     if args.apply_waf:
         placeholder = args.placeholder_token or secrets.token_urlsafe(12)[:16]
@@ -195,6 +271,10 @@ def main() -> int:
         if apply_waf(zone_id, host, placeholder):
             return 1
     if args.apply_rewrite and apply_rewrite(zone_id, host):
+        return 1
+    if args.apply_cache and apply_cache(zone_id, host):
+        return 1
+    if args.apply_rate and apply_rate_limit(zone_id, host):
         return 1
     return 0
 
