@@ -17421,3 +17421,159 @@ msgstr "وضع Cloudflare Worker القديم نشط. تأكد من أن إعد�
 
 #~ msgid "Lesson %(position)s of %(total)s - %(course)s"
 #~ msgstr "الدرس %(position)s من %(total)s - %(course)s"
+
+msgid "You cannot upload this file here."
+msgstr "لا يمكنك رفع هذا الملف هنا."
+
+msgid "Choose which document this file is."
+msgstr "اختر نوع المستند الذي يمثله هذا الملف."
+
+msgid "This file exceeds the %(limit)s MB limit for this field."
+msgstr "يتجاوز هذا الملف الحد المسموح %(limit)s ميجابايت لهذا الحقل."
+
+msgid "The uploaded file did not arrive completely. Please upload it again."
+msgstr "لم يصل الملف المرفوع كاملاً. يرجى رفعه مرة أخرى."
+
+msgid "The uploaded file changed during validation. Please upload it again."
+msgstr "تغيّر الملف المرفوع أثناء التحقق. يرجى رفعه مرة أخرى."
+
+msgid "Configure the media edge URL and Cloudflare rule settings before enabling edge gate."
+msgstr "اضبط رابط حافة الوسائط وإعدادات قواعد Cloudflare قبل تفعيل بوابة الحافة."
+
+msgid "Clean up viewing-session evidence after the replay window ends."
+msgstr "نظّف أدلة جلسات المشاهدة بعد انتهاء مدة إعادة الإرسال."
+
+msgid "Show bounded backlog counts without deleting."
+msgstr "اعرض أعداد المهام المتبقية المحدودة دون حذف."
+
+msgid "No rows were changed. The counts below are exact."
+msgstr "لم يتم تغيير أي سجل. الأعداد أدناه دقيقة."
+
+msgid "Deleted %(segments)s segment receipts, detached %(events)s progress events, and deleted %(sessions)s sessions."
+msgstr "تم حذف %(segments)s إيصال مقطع، وفصل %(events)s حدث تقدم، وحذف %(sessions)s جلسة."
+
+msgid "Maximum transaction time: %(seconds).3f seconds."
+msgstr "أقصى مدة للمعاملة: %(seconds).3f ثانية."
+
+msgid "Lock contention reduced the batch size; the next scheduled run will continue."
+msgstr "خفّض التنازع على الأقفال حجم الدفعة، وستُكمل الجولة المجدولة التالية."
+
+msgid "Cleanup reached its time or batch limit. Run this command again to continue."
+msgstr "بلغ التنظيف حدّه الزمني أو حد الدفعات. أعد تشغيل هذا الأمر للمتابعة."
+
+msgid "Effective delivery mode: %(mode)s"
+msgstr "وضع التوصيل الفعّال: %(mode)s"
+
+msgid "Gate row: unavailable (database error)"
+msgstr "سجل البوابة: غير متاح (خطأ في قاعدة البيانات)"
+
+msgid "Current token: %(prefix)s (length %(length)s)"
+msgstr "الرمز الحالي: %(prefix)s (الطول %(length)s)"
+
+msgid "Previous token: %(prefix)s (length %(length)s)"
+msgstr "الرمز السابق: %(prefix)s (الطول %(length)s)"
+
+msgid "Rotation due at"
+msgstr "موعد التدوير"
+
+msgid "Rotation period: invalid (%(reason)s)"
+msgstr "مدة التدوير: غير صالحة (%(reason)s)"
+
+msgid "Media gate cache TTL: %(seconds)s seconds"
+msgstr "مدة صلاحية ذاكرة بوابة الوسائط: %(seconds)s ثانية"
+
+msgid "none"
+msgstr "لا يوجد"
+
+msgid "Expected WAF expression (token segments masked):"
+msgstr "تعبير WAF المتوقع (أجزاء الرمز محجوبة):"
+
+msgid "Expected WAF expression: not computable (%(reason)s)"
+msgstr "تعبير WAF المتوقع: غير قابل للحساب (%(reason)s)"
+
+msgid "Report the read-only status of the Cloudflare edge gate."
+msgstr "اعرض حالة بوابة الحافة في Cloudflare للقراءة فقط."
+
+msgid "Write the status as JSON for machine consumption."
+msgstr "اكتب الحالة بصيغة JSON للاستخدام الآلي."
+
+msgid "Exit non-zero when the edge gate is not ready."
+msgstr "اخرج بقيمة غير صفرية عندما تكون بوابة الحافة غير جاهزة."
+
+msgid "The partial score window must not be shorter than the full score window."
+msgstr "يجب ألا تكون مدة الدرجة الجزئية أقصر من مدة الدرجة الكاملة."
+
+msgid "Cloudflare edge gate"
+msgstr "بوابة حافة Cloudflare"
+
+msgid "App package"
+msgstr "حزمة التطبيق"
+
+msgid "Direct Upload Authorization"
+msgstr "تفويض الرفع المباشر"
+
+msgid "Direct Upload Authorizations"
+msgstr "تفويضات الرفع المباشر"
+
+msgid "Time range is below centisecond precision."
+msgstr "النطاق الزمني أدق من حد السنتي ثانية."
+
+msgid "The cleanup deadline must be finite."
+msgstr "يجب أن تكون مدة انتهاء التنظيف قيمة محدودة."
+
+msgid "Send either a file or an upload, not both."
+msgstr "أرسل ملفاً أو رفعاً واحداً فقط، وليس كليهما."
+
+msgid "Reload the page and attach the file again."
+msgstr "أعد تحميل الصفحة وأرفق الملف مرة أخرى."
+
+msgid "Saved progress is waiting to sync."
+msgstr "التقدم المحفوظ في انتظار المزامنة."
+
+msgid "The progress queue on this device is full. Keep this page open and sync before closing it."
+msgstr "قائمة التقدم على هذا الجهاز ممتلئة. أبقِ هذه الصفحة مفتوحة وزامن قبل إغلاقها."
+
+msgid "Some progress could not be saved because this session can no longer accept it. Contact support if progress is missing."
+msgstr "تعذّر حفظ بعض التقدم لأن هذه الجلسة لم تعد تقبله. تواصل مع الدعم إذا كان هناك تقدم مفقود."
+
+msgid "Progress syncing paused because this browser switched to another student account."
+msgstr "توقفت مزامنة التقدم لأن هذا المتصفح انتقل إلى حساب طالب آخر."
+
+msgid "Some activity time could not be confirmed and was not counted."
+msgstr "تعذّر تأكيد بعض وقت النشاط ولم يُحتسب."
+
+msgid "Uploaded directly to storage. Maximum size: 500 MB."
+msgstr "يُرفع مباشرة إلى التخزين. الحد الأقصى للحجم: 500 ميجابايت."
+
+msgid "Edge gate is active for new sessions. Verify Phase 8 progress and playback acceptance before any production enablement."
+msgstr "بوابة الحافة مفعّلة للجلسات الجديدة. تحقق من قبول التقدم والتشغيل للمرحلة الثامنة قبل أي تفعيل في الإنتاج."
+
+msgid "Cloudflare edge gate status"
+msgstr "حالة بوابة حافة Cloudflare"
+
+msgid "Last rotation attempt"
+msgstr "آخر محاولة تدوير"
+
+msgid "No edge token has been published. The status check does not create a token or contact Cloudflare."
+msgstr "لم يُنشر أي رمز للحافة. لا ينشئ فحص الحالة رمزاً ولا يتصل بـ Cloudflare."
+
+msgid "Expected Cloudflare WAF expression"
+msgstr "تعبير WAF المتوقع في Cloudflare"
+
+msgid "This diagnostic reads local configuration and the committed token row only. It does not call Cloudflare."
+msgstr "يقرأ هذا التشخيص الإعدادات المحلية وسجل الرمز المثبّت فقط، ولا يتصل بـ Cloudflare."
+
+msgid "Too many media token refresh requests."
+msgstr "طلبات تحديث رمز الوسائط كثيرة جداً."
+
+msgid "Legacy worker receipts are disabled."
+msgstr "إيصالات العامل القديم معطّلة."
+
+msgid "Teacher"
+msgstr "معلم"
+
+msgid "Second Year"
+msgstr "السنة الثانية"
+
+msgid "Quiz is closed, You can not take it anymore!"
+msgstr "الاختبار مغلق، لم يعد بإمكانك أداءه!"
