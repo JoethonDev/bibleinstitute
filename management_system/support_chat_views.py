@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import hashlib
+
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
 from django.http import HttpResponse, JsonResponse
@@ -12,12 +14,11 @@ from django.utils.dateparse import parse_datetime
 from django.views.decorators.http import require_GET, require_POST
 
 from . import support_chat
-from .models import StudentMode
+from .direct_uploads import DirectUploadError, finalize_direct_upload
+from .models import DirectUploadAuthorization, StudentMode
 from .student_experience.mode import resolve_student_mode
 from .student_experience.render import render_student_page
 from .support_chat import SupportChatError
-
-SUPPORT_CHAT_MAX_UPLOAD_BYTES = 20 * 1024 * 1024
 
 
 def _is_student(user) -> bool:
@@ -116,16 +117,56 @@ def student_support_chat(request):
 @login_required
 @require_POST
 def student_support_send(request):
-    """Accept one text, image, or audio message from the student."""
+    """Accept one text, image, or audio message from the student.
+
+    Attachment bytes never pass through Django: the composer uploads them to a
+    private staging key first and posts the resulting capability token. A body
+    file arriving without a token is refused instead of silently accepted.
+    """
     _require_chat_student(request)
-    upload = request.FILES.get("attachment")
-    if upload is not None and upload.size > SUPPORT_CHAT_MAX_UPLOAD_BYTES:
-        return _chat_error(str(_("This file is too large to send.")))
+    if request.FILES.get("attachment") is not None:
+        return _chat_error(_("Reload the page and attach the file again."))
+    upload_token = (request.POST.get("direct_upload_token_attachment") or "").strip()
+    attachment_key = ""
+    attachment_spec = None
+    attachment_sha256 = ""
+    if upload_token:
+        validated: dict[str, object] = {}
+
+        def validator(upload) -> None:
+            spec = support_chat.validated_attachment(upload)
+            digest = hashlib.sha256()
+            upload.seek(0)
+            for chunk in upload.chunks():
+                digest.update(chunk)
+            upload.seek(0)
+            validated["spec"] = spec
+            validated["sha256"] = digest.hexdigest()
+
+        try:
+            finalized = finalize_direct_upload(
+                actor=request.user,
+                token=upload_token,
+                validator=validator,
+                expected_purpose=DirectUploadAuthorization.Purpose.SUPPORT_ATTACHMENT,
+                final_folder=support_chat.CHAT_ATTACHMENT_PREFIX,
+            )
+        except DirectUploadError as exc:
+            return _chat_error(exc.message)
+        except SupportChatError as exc:
+            return _chat_error(str(exc))
+        attachment_key = finalized.key
+        attachment_spec = validated.get("spec")
+        attachment_sha256 = str(validated.get("sha256") or "")
+        if attachment_spec is None:
+            return _chat_error(_("The attachment could not be stored."))
     try:
         message = support_chat.send_student_message(
             user=request.user,
             text=request.POST.get("message", ""),
-            upload=upload,
+            attachment_key=attachment_key,
+            attachment_spec=attachment_spec,
+            attachment_sha256=attachment_sha256,
         )
     except SupportChatError as exc:
         return _chat_error(str(exc))

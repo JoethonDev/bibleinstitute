@@ -212,12 +212,22 @@ def _has_older(conversation, oldest) -> bool:
     ).exists()
 
 
-def send_student_message(*, user, text: str, upload=None) -> TelegramMessage:
+def send_student_message(
+    *,
+    user,
+    text: str,
+    upload=None,
+    attachment_key: str = "",
+    attachment_spec: SupportAttachmentSpec | None = None,
+    attachment_sha256: str = "",
+) -> TelegramMessage:
     """Persist one student chat message from the website.
 
     The conversation is the same durable row the Telegram bot writes, so an
     admin sees the message in the existing support workspace and can reply
-    through either channel.
+    through either channel. A browser that uploaded its bytes straight to
+    storage passes the already-validated ``attachment_key``/``attachment_spec``
+    instead of ``upload``, so no file body reaches Django.
     """
     from .telegram.support import conversation_for_user
 
@@ -227,9 +237,15 @@ def send_student_message(*, user, text: str, upload=None) -> TelegramMessage:
             _("Messages must be %(count)s characters or fewer.")
             % {"count": CHAT_TEXT_MAX_LENGTH}
         )
+    if upload is not None and attachment_key:
+        raise SupportChatError(_("Send either a file or an upload, not both."))
     spec = None
-    if upload is not None:
-        spec = _validated_attachment(upload)
+    if attachment_key:
+        if attachment_spec is None:
+            raise SupportChatError(_("The attachment could not be stored."))
+        spec = attachment_spec
+    elif upload is not None:
+        spec = validated_attachment(upload)
     if not body and spec is None:
         raise SupportChatError(_("Write a message or attach an image or audio file."))
     if spec is not None and not chat_storage_configured():
@@ -269,7 +285,15 @@ def send_student_message(*, user, text: str, upload=None) -> TelegramMessage:
             "updated_at",
         ])
         if spec is not None:
-            _store_attachment(stored, spec, upload)
+            if attachment_key:
+                record_finalized_attachment(
+                    stored,
+                    spec,
+                    key=attachment_key,
+                    sha256=attachment_sha256,
+                )
+            else:
+                _store_attachment(stored, spec, upload)
 
     _enqueue_admin_digest(stored.pk)
     return stored
@@ -285,7 +309,9 @@ def _content_type_for(spec: SupportAttachmentSpec | None) -> str:
     return TelegramMessage.ContentType.AUDIO
 
 
-def _validated_attachment(upload) -> SupportAttachmentSpec:
+def validated_attachment(upload) -> SupportAttachmentSpec:
+    """Validate one browser attachment through the canonical Telegram rules."""
+
     try:
         spec = classify_uploaded_file(upload, audio_max_seconds=CHAT_AUDIO_MAX_SECONDS)
     except AttachmentValidationError as exc:
@@ -293,6 +319,45 @@ def _validated_attachment(upload) -> SupportAttachmentSpec:
     if spec.kind not in CHAT_ATTACHMENT_KINDS:
         raise SupportChatError(_("Only images and audio recordings can be sent in the chat."))
     return spec
+
+
+def record_finalized_attachment(
+    message: TelegramMessage,
+    spec: SupportAttachmentSpec,
+    *,
+    key: str,
+    sha256: str = "",
+) -> TelegramAttachment:
+    """Record one already-validated, already-stored private attachment.
+
+    Used after a direct browser upload published the bytes; the object is
+    removed again if the database row cannot be created, so a failed send never
+    leaves an unreferenced attachment behind.
+    """
+
+    try:
+        return TelegramAttachment.objects.create(
+            message=message,
+            telegram_file_id="",
+            media_type=spec.kind,
+            r2_key=key,
+            original_name=spec.filename,
+            mime_type=spec.mime_type,
+            size_bytes=spec.size,
+            duration_seconds=int(spec.duration_seconds) if spec.duration_seconds else None,
+            sha256=sha256,
+            is_available=True,
+        )
+    except Exception:
+        logger.exception("support chat attachment record failed")
+        client = get_r2_client()
+        bucket = _support_bucket_name()
+        if client is not None and bucket and key:
+            try:
+                client.delete_object(Bucket=bucket, Key=key)
+            except Exception:
+                logger.warning("support chat attachment cleanup failed")
+        raise SupportChatError(_("The attachment could not be stored.")) from None
 
 
 def _store_attachment(
@@ -323,26 +388,12 @@ def _store_attachment(
     except Exception as exc:
         logger.exception("support chat attachment storage failed")
         raise SupportChatError(_("The attachment could not be stored.")) from exc
-    try:
-        return TelegramAttachment.objects.create(
-            message=message,
-            telegram_file_id="",
-            media_type=spec.kind,
-            r2_key=key,
-            original_name=spec.filename,
-            mime_type=spec.mime_type,
-            size_bytes=spec.size,
-            duration_seconds=int(spec.duration_seconds) if spec.duration_seconds else None,
-            sha256=digest.hexdigest(),
-            is_available=True,
-        )
-    except Exception:
-        logger.exception("support chat attachment record failed")
-        try:
-            client.delete_object(Bucket=bucket, Key=key)
-        except Exception:
-            logger.warning("support chat attachment cleanup failed")
-        raise SupportChatError(_("The attachment could not be stored.")) from None
+    return record_finalized_attachment(
+        message,
+        spec,
+        key=key,
+        sha256=digest.hexdigest(),
+    )
 
 
 def chat_storage_configured() -> bool:

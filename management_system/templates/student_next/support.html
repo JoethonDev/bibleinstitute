@@ -25,6 +25,7 @@
       data-poll-url="{% url 'student-support' %}?fragment=poll"
       data-older-url="{% url 'student-support' %}?fragment=older"
       data-send-url="{% url 'student-support-send' %}"
+      data-upload-url="{% url 'direct-upload-authorize' %}"
       data-delete-url="{% url 'student-support-message-delete' 0 %}"
       data-last-id="{{ chat_last_id }}"
       data-oldest-at="{% if chat_oldest %}{{ chat_oldest.created_at|date:'c' }}{% endif %}"

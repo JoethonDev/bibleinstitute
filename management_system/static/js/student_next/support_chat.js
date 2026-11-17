@@ -60,6 +60,48 @@
     errorBox.hidden = !message;
   }
 
+  // Attachment bytes go straight to private storage: authorize one exact key,
+  // PUT the file there, then send only the capability token with the message.
+  async function uploadAttachment(file) {
+    const authorizeUrl = root.dataset.uploadUrl;
+    if (!authorizeUrl) throw new Error("upload_unavailable");
+    const response = await fetch(authorizeUrl, {
+      method: "POST",
+      credentials: "same-origin",
+      cache: "no-store",
+      headers: {
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+        "X-Requested-With": "fetch",
+        "X-CSRFToken": csrfToken
+      },
+      body: JSON.stringify({
+        purpose: "support_attachment",
+        filename: file.name,
+        size: file.size,
+        content_type: file.type || "application/octet-stream"
+      })
+    });
+    const grant = await response.json().catch(function () {
+      return {};
+    });
+    if (!response.ok) throw new Error(grant.error || "authorize_failed");
+    await new Promise(function (resolve, reject) {
+      const request = new XMLHttpRequest();
+      request.open("PUT", grant.upload_url, true);
+      request.setRequestHeader("Content-Type", file.type || "application/octet-stream");
+      request.onload = function () {
+        if (request.status >= 200 && request.status < 300) resolve();
+        else reject(new Error("transfer_" + request.status));
+      };
+      request.onerror = function () {
+        reject(new Error("transfer_failed"));
+      };
+      request.send(file);
+    });
+    return grant.token;
+  }
+
   function atBottom() {
     return body.scrollHeight - body.scrollTop - body.clientHeight < 120;
   }
@@ -265,9 +307,18 @@
     const payload = new FormData();
     payload.append("message", text);
     payload.append("csrfmiddlewaretoken", csrfToken);
-    if (preparedFile) payload.append("attachment", preparedFile, preparedFile.name);
     const label = sendButton.querySelector("span");
     const original = label ? label.textContent : "";
+    if (preparedFile) {
+      if (label) label.textContent = TEXT.upload;
+      try {
+        payload.append("direct_upload_token_attachment", await uploadAttachment(preparedFile));
+      } catch (error) {
+        if (label) label.textContent = original;
+        showError(TEXT.failed);
+        return;
+      }
+    }
     if (label) label.textContent = TEXT.sending;
     const sent = await send(payload);
     if (label) label.textContent = original;
@@ -391,10 +442,20 @@
     const payload = new FormData();
     payload.append("message", "");
     payload.append("csrfmiddlewaretoken", csrfToken);
-    payload.append("attachment", blob, "voice" + info.ext);
     if (fileName) {
       fileName.textContent = TEXT.upload;
       fileName.hidden = false;
+    }
+    try {
+      const recorded = new File([blob], "voice" + info.ext, { type: info.mime });
+      payload.append("direct_upload_token_attachment", await uploadAttachment(recorded));
+    } catch (error) {
+      showError(TEXT.failed);
+      if (fileName) {
+        fileName.textContent = "";
+        fileName.hidden = true;
+      }
+      return;
     }
     const sent = await send(payload);
     if (fileName) {
