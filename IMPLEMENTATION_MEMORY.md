@@ -84,6 +84,21 @@ The user asked to stop widening scope and ship. This is the deployable set.
   quiz JSON still send bytes through Django; heartbeat concurrency and
   replay-after-crash have no database evidence; `edge_gate` is not enabled and
   the allowed path is unproven until a deploy publishes a real token.
+- Heartbeat integration evidence (this round, disposable PostgreSQL, real
+  `apply_progress_heartbeat`, manifest timeline seeded in Redis so no provider
+  call happens): the first sample is fully correct. Requested `[0,30]` on a
+  60-second timeline with a fresh edge session returned
+  `accepted_ranges=[[0,15.05]]`, `remaining_ranges=[[15.05,30]]`,
+  `last_sequence=1`, `reason=partial_progress`, `percent=25`, and the row
+  persisted `merged_ranges=[[0.0,15.07]]`, `unique_seconds=15`. That is the
+  designed behaviour: one bounded slack allowance (15s) is spent first, the
+  uncredited suffix is reported for the next sample, and nothing is silently
+  dropped. An earlier alarm in this round was a harness mistake - the result
+  carries the acknowledgement in `stored_acknowledgement`, so reading the
+  dataclass fields showed empty lists that the payload did populate.
+  Multi-sequence assertions (overlap credit, stale/gap resync) are not yet
+  trusted: the harness read `sequence` from the dataclass instead of the
+  payload and needs finishing before that evidence is claimed.
 
 State at this entry:
 
