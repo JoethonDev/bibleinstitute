@@ -81,6 +81,28 @@ State at this entry:
   `/dev/shm` temp dir on both web slots. `deploy/setup_env.sh` carries the 17
   new non-secret keys and keeps `CLOUDFLARE_API_TOKEN` in the private `.env`
   only.
+- Phase 7 provider state (2026-11-17): the `cdn.bibleinstitute-eg.org` R2
+  custom domain is attached to the media bucket and its certificate is
+  `active`, so the host serves. Two rules were created with a scoped operator
+  token and are live: the fail-closed WAF custom rule (ruleset
+  `68ba189cd73b42e39a33cb7f0154bb82`, rule
+  `677f06d09c78479a863e4d72cf6ca088`) built from the canonical
+  `media_gate.waf_expression`, and the gate-prefix rewrite (transform ruleset
+  `85e5458c54264f29926f0c861ff90f8a`). Verified through the public hostname
+  with the resolver pinned to a Cloudflare address: `/`,
+  `/applications/1/...`, `/Telegram%20Support/...`, `/app-releases/...` and an
+  unknown gate token all return **403**, so private prefixes are not exposed by
+  the new domain. The rule currently carries a random placeholder token, so the
+  gate fails closed until the application publishes its first real pair; the
+  rotation task `PATCH`es that rule by id. Free plan has no `regex_replace`, so
+  the rewrite uses `substring(http.request.uri.path, 19)`; keep
+  `media_gate.TOKEN_RE` and that offset in step. The ids and
+  `MEDIA_EDGE_BASE_URL` are recorded in the local ignored `.env`
+  (`CLOUDFLARE_ZONE_ID`, `CLOUDFLARE_WAF_RULESET_ID`,
+  `CLOUDFLARE_WAF_RULE_ID`, `CLOUDFLARE_WAF_HOST`). Still open: the allowed
+  path can only be proven after a deploy publishes the first token; cache and
+  rate-limit rules are not created yet; `edge_gate` mode is still not enabled;
+  and the operator token was pasted into chat, so it must be revoked.
 - Phase 7 server side: `media_delivery_mode.effective_segment_delivery_mode`
   now reads the stored row before falling back to `CLOUD_WORKER`, so
   `edge_gate` survives Phase 10's removal of `CLOUD_WORKER`;
