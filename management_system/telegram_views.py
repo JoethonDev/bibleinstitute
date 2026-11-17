@@ -727,15 +727,21 @@ def telegram_conversation_detail(request, conversation_id):
     return render_page(request, "telegram_conversation_detail.html", "partials/telegram_conversation_detail_content.html", context)
 
 
-def _finalized_telegram_attachment(request, field_name: str = "attachment"):
+def _finalized_telegram_attachment(
+    request,
+    field_name: str = "attachment",
+    *,
+    token: str = "",
+    final_folder: str = "Telegram Support/Web",
+):
     """Return a browser-uploaded Telegram attachment as an ordinary file object."""
 
     purpose = DirectUploadAuthorization.Purpose.TELEGRAM_ATTACHMENT
     finalized = finalize_direct_upload(
         actor=request.user,
-        token=(request.POST.get(f"direct_upload_token_{field_name}") or "").strip(),
+        token=token or (request.POST.get(f"direct_upload_token_{field_name}") or "").strip(),
         expected_purpose=purpose,
-        final_folder="Telegram Support/Web",
+        final_folder=final_folder,
     )
     payload = read_finalized_payload(
         finalized,
@@ -1134,6 +1140,20 @@ def telegram_broadcast_create(request):
         return render_page(request, "telegram_broadcast.html", "partials/telegram_broadcast_content.html", context)
     if not form.is_valid():
         return render_page(request, "telegram_broadcast.html", "partials/telegram_broadcast_content.html", context, status=400)
+    attachment_tokens = request.POST.getlist("direct_upload_token_attachments")
+    if attachment_tokens:
+        try:
+            form.cleaned_data["attachments"] = [
+                _finalized_telegram_attachment(
+                    request,
+                    token=token,
+                    final_folder="Telegram Broadcast",
+                )
+                for token in attachment_tokens
+            ]
+        except DirectUploadError as exc:
+            form.add_error("attachments", exc.message)
+            return render_page(request, "telegram_broadcast.html", "partials/telegram_broadcast_content.html", context, status=400)
     if active_year is None:
         form.add_error(None, _("There is no active academic year."))
         return render_page(request, "telegram_broadcast.html", "partials/telegram_broadcast_content.html", context, status=400)

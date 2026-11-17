@@ -53,7 +53,7 @@ and submitted value are unchanged. The form exposes no boolean field, so no
                 <h3>{% translate "Broadcast Details" %}</h3>
             </div>
         </div>
-        <form method="post" action="{{ compose_url }}" hx-post="{{ compose_url }}" hx-encoding="multipart/form-data" hx-target="#display-page" hx-swap="innerHTML" hx-select="#page-region" hx-select-oob="#toast-stack" hx-push-url="true" enctype="multipart/form-data">
+        <form method="post" action="{{ compose_url }}" hx-post="{{ compose_url }}" hx-encoding="multipart/form-data" hx-target="#display-page" hx-swap="innerHTML" hx-select="#page-region" hx-select-oob="#toast-stack" hx-push-url="true" enctype="multipart/form-data" data-direct-upload="{% url 'direct-upload-authorize' %}">
             {% csrf_token %}
             <div class="aw-form-section">
                 <div class="aw-stack">

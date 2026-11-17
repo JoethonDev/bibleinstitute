@@ -81,15 +81,13 @@
         return input.getAttribute('data-upload-field') || input.name || 'file';
     }
 
-    function hiddenTokenInput(form, key) {
-        var name = 'direct_upload_token_' + key;
-        var existing = form.querySelector('input[type="hidden"][name="' + name + '"]');
-        if (existing) {
-            return existing;
-        }
+    function appendTokenInput(form, key, token) {
+        // Always a new input: a multi-file picker submits the same field name
+        // once per file, so the server reads the tokens with getlist().
         var input = document.createElement('input');
         input.type = 'hidden';
-        input.name = name;
+        input.name = 'direct_upload_token_' + key;
+        input.value = token;
         form.appendChild(input);
         return input;
     }
@@ -186,30 +184,39 @@
             if (submitter) {
                 submitter.disabled = true;
             }
-            var chain = Promise.resolve();
+            // Capture every selected file synchronously, then clear the pickers
+            // so the form body never carries bytes even if a later upload fails.
+            var queue = [];
             pending.forEach(function (input) {
-                chain = chain.then(function () {
-                    var file = input.files[0];
-                    var key = fieldKey(input);
-                    setStatus(form, labels.preparing);
-                    return authorize(form, {
-                        purpose: input.getAttribute('data-upload-purpose'),
-                        document_type: input.getAttribute('data-upload-document-type') || undefined,
-                        target: input.getAttribute('data-upload-target') || undefined,
-                        filename: file.name,
-                        size: file.size,
-                        content_type: file.type || 'application/octet-stream'
-                    }).then(function (grant) {
-                        if (grant.max_bytes && file.size > grant.max_bytes) {
-                            var tooLarge = new Error(labels.tooLarge);
-                            tooLarge.code = 'file_too_large';
-                            throw tooLarge;
-                        }
-                        return putFile(grant, file, function (percent) {
-                            setStatus(form, formatMessage(labels.uploading, { percent: percent }));
-                        }).then(function () {
-                            hiddenTokenInput(form, key).value = grant.token;
-                            clearFile(input);
+                var files = Array.prototype.slice.call(input.files || []);
+                queue.push({input: input, files: files, key: fieldKey(input)});
+                clearFile(input);
+            });
+            var chain = Promise.resolve();
+            queue.forEach(function (entry) {
+                entry.files.forEach(function (file) {
+                    chain = chain.then(function () {
+                        setStatus(form, labels.preparing);
+                        return authorize(form, {
+                            purpose: entry.input.getAttribute('data-upload-purpose'),
+                            document_type: entry.input.getAttribute('data-upload-document-type') || undefined,
+                            target: entry.input.getAttribute('data-upload-target') || undefined,
+                            filename: file.name,
+                            size: file.size,
+                            content_type: file.type || 'application/octet-stream'
+                        }).then(function (grant) {
+                            if (grant.max_bytes && file.size > grant.max_bytes) {
+                                var tooLarge = new Error(labels.tooLarge);
+                                tooLarge.code = 'file_too_large';
+                                throw tooLarge;
+                            }
+                            return putFile(grant, file, function (percent) {
+                                setStatus(form, formatMessage(labels.uploading, { percent: percent }));
+                            }).then(function () {
+                                // One capability per file; a multi-file picker
+                                // therefore submits the field name repeatedly.
+                                appendTokenInput(form, entry.key, grant.token);
+                            });
                         });
                     });
                 });

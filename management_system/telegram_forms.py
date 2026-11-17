@@ -186,7 +186,13 @@ class TelegramBroadcastForm(forms.Form):
         error_messages={
             "empty": _("Empty files are not accepted."),
         },
-        widget=MultipleFileInput(attrs={"class": "tg-broadcast-files"}),
+        widget=MultipleFileInput(
+            attrs={
+                "class": "tg-broadcast-files",
+                "data-upload-purpose": "telegram_attachment",
+                "data-upload-field": "attachments",
+            }
+        ),
     )
 
     def __init__(self, *args, level_choices=None, **kwargs):

@@ -89,6 +89,17 @@ and sending a support-chat attachment now require the uploader script (a plain
 form post is refused with a translated message), while every other migrated
 caller keeps a working body-file path.
 
+Telegram broadcast is migrated too, which closes Task 5's browser file-byte
+paths: the uploader now captures every file of a multi-file picker
+synchronously, clears the picker, and appends one `direct_upload_token_<field>`
+per file so a multi-value field submits repeatedly. The broadcast view reads
+them with `getlist`, finalizes each capability into `Telegram Broadcast/`, and
+sets `form.cleaned_data["attachments"]` before the draft is created; the widget
+carries the purpose and the template opts in. Check
+(`tmp/broadcast_direct/check.py`, transient): the widget is annotated, a
+token-only broadcast passes validation, a finalized capability becomes an
+uploaded file, and a rejected capability surfaces its error.
+
 ### Ready to deploy (2026-11-17)
 
 Second whole-suite pass on the tree at `1950b50` (after the payment, CSV,
