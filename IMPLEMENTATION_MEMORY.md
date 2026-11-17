@@ -84,6 +84,19 @@ The user asked to stop widening scope and ship. This is the deployable set.
   quiz JSON still send bytes through Django; heartbeat concurrency and
   replay-after-crash have no database evidence; `edge_gate` is not enabled and
   the allowed path is unproven until a deploy publishes a real token.
+- Phase 5 analysis and session evidence (this round, disposable PostgreSQL 18
+  plus Redis): the application boots and serves with the new runtime settings -
+  `runserver` against the disposable stack returned HTTP 200 for `/login/` with
+  a CSRF token and the new `direct_upload.js` included. `load_tests/smoke/
+  phase05_sessions.py` then proved the backend contract twice: engine
+  `cached_db`, cache alias `default`, the session row present in
+  `django_session`, the entry present in Redis, the session still loading after
+  the cache entry is deleted (a Redis outage is a performance problem, not a
+  logout), and the cache repopulated from the database afterwards. It refuses a
+  non-`phase08` database name and removes its fixture. Still unmeasured: total
+  PostgreSQL connections under real Gunicorn concurrency for `CONN_MAX_AGE=60`
+  (3 workers x 4 threads x two slots plus workers against the default
+  `max_connections=100`), which needs the deploy or a load run.
 - Heartbeat integration evidence (disposable PostgreSQL, real
   `apply_progress_heartbeat`, manifest timeline seeded in Redis so no provider
   call happens). The durable tool is `load_tests/smoke/phase08_heartbeat.py`
