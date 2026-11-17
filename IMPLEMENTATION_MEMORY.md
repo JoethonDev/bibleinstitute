@@ -57,6 +57,13 @@ here, not silently dropped.
 
 ### Ready to deploy (2026-11-17)
 
+Final whole-suite pass on the tree at `3d6254c` (nothing changed after it):
+`manage.py check` 0 issues, `makemigrations --check` no changes, the disposable
+database at leaf `0130` and a clean-zero database also migrated 0129 -> 0130,
+and all seven smoke tools green - Phase 7 gate and player, Phase 8 queue,
+progress contract, heartbeat, attendance/cleanup and direct uploads, plus the
+Phase 5 session check. This is the state to push.
+
 The user asked to stop widening scope and ship. This is the deployable set.
 
 - Branch `codex/lms-expansion-aligned`, 15 local commits on top of `4b651bc`,
