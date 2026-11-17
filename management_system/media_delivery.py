@@ -522,6 +522,26 @@ def build_manifest_playlist(
         or (session.media_key and session.media_key != media.media_key)
     ):
         raise MediaAccessError("forbidden", _("The viewing session is invalid."))
+    segment_delivery_mode = session.segment_delivery_mode
+    if segment_delivery_mode == ViewingSession.SegmentDeliveryMode.LEGACY:
+        segment_delivery_mode = effective_segment_delivery_mode()
+    edge_token = None
+    gate_cache_key = ""
+    if segment_delivery_mode == ViewingSession.SegmentDeliveryMode.EDGE_GATE:
+        try:
+            edge_token, _previous = published_tokens()
+        except MediaGateUnavailable as exc:
+            raise MediaAccessError("unavailable", _("The media is unavailable.")) from exc
+        # The rendered playlist depends only on the session, the media and the
+        # published token, so one build per session and token window is enough.
+        gate_cache_key = (
+            f"hls:gate-manifest:{session.session_id}:{media.file_index}:"
+            f"{audience}:{edge_token}"
+        )
+        cached_playlist = _gate_manifest_get(gate_cache_key)
+        if cached_playlist is not None:
+            return cached_playlist
+
     try:
         response = cloud_client.get_object(Bucket=bucket_name, Key=media.media_key)
         body = response["Body"]
@@ -532,15 +552,6 @@ def build_manifest_playlist(
     except Exception:  # noqa: BLE001 - provider boundary
         raise MediaAccessError("unavailable", _("The media is unavailable."))
 
-    segment_delivery_mode = session.segment_delivery_mode
-    if segment_delivery_mode == ViewingSession.SegmentDeliveryMode.LEGACY:
-        segment_delivery_mode = effective_segment_delivery_mode()
-    edge_token = None
-    if segment_delivery_mode == ViewingSession.SegmentDeliveryMode.EDGE_GATE:
-        try:
-            edge_token, _previous = published_tokens()
-        except MediaGateUnavailable as exc:
-            raise MediaAccessError("unavailable", _("The media is unavailable.")) from exc
     worker_base = (
         getattr(settings, "CLOUD_WORKER", "").rstrip("/")
         if segment_delivery_mode == ViewingSession.SegmentDeliveryMode.WORKER
@@ -589,7 +600,46 @@ def build_manifest_playlist(
                 )
         else:
             playlist_lines.append(line)
-    return "\n".join(playlist_lines) + ("\n" if playlist.endswith("\n") else "")
+    rendered = "\n".join(playlist_lines) + ("\n" if playlist.endswith("\n") else "")
+    if gate_cache_key:
+        _gate_manifest_set(gate_cache_key, rendered, session)
+    return rendered
+
+
+GATE_MANIFEST_CACHE_MAX_SECONDS = 300
+
+
+def _gate_manifest_get(cache_key: str) -> str | None:
+    """Read a rendered edge playlist; a cache outage must not block playback."""
+
+    try:
+        value = cache.get(cache_key)
+    except Exception:  # noqa: BLE001 - cache boundary
+        return None
+    return value if isinstance(value, str) else None
+
+
+def _gate_manifest_ttl(session) -> int:
+    """Bound the entry by the token window and the session's own expiry."""
+
+    from .media_gate import period_seconds
+
+    try:
+        period = max(60, int(period_seconds()))
+    except Exception:  # noqa: BLE001 - configuration boundary
+        period = 1800
+    remaining = int((session.expires_at - timezone.now()).total_seconds())
+    # A token stays acceptable while it is current and then while it is the
+    # previous one, so two periods is the ceiling; the session and a short hard
+    # cap keep the entry conservative.
+    return max(1, min(GATE_MANIFEST_CACHE_MAX_SECONDS, period * 2, remaining))
+
+
+def _gate_manifest_set(cache_key: str, rendered: str, session) -> None:
+    try:
+        cache.set(cache_key, rendered, _gate_manifest_ttl(session))
+    except Exception:  # noqa: BLE001 - cache boundary
+        pass
 
 
 def authorize_and_presign_segment(
