@@ -29,6 +29,7 @@ from .direct_uploads import (
     finalize_direct_upload,
     read_finalized_payload,
 )
+from .direct_upload_views import body_upload_rejection
 from .models import DirectUploadAuthorization
 from .job_monitor import monitored_jobs, readable_job
 from .models import (
@@ -762,9 +763,9 @@ def telegram_conversation_reply(request, conversation_id):
     panel_request = request.GET.get("fragment") == "panel"
     # A browser upload is materialized before validation, because the form's
     # own rule is "text or one attachment" and it must see the attachment.
-    files = request.FILES or None
-    attachment_error = ""
-    if (request.POST.get("direct_upload_token_attachment") or "").strip():
+    files = None
+    attachment_error = body_upload_rejection(request, ("attachment",)) or ""
+    if not attachment_error and (request.POST.get("direct_upload_token_attachment") or "").strip():
         try:
             files = {"attachment": _finalized_telegram_attachment(request)}
         except DirectUploadError as exc:
@@ -1120,9 +1121,14 @@ def telegram_broadcast_create(request):
     active_year, links, choices = _broadcast_year_context()
     form = TelegramBroadcastForm(
         request.POST or None,
-        request.FILES or None,
+        None,
         level_choices=choices,
     )
+    broadcast_rejection = (
+        body_upload_rejection(request, ("attachments",)) if request.method == "POST" else None
+    )
+    if broadcast_rejection:
+        form.add_error("attachments", broadcast_rejection)
     context = {
         "broadcast_form": form,
         "active_year": active_year,

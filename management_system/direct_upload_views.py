@@ -1,4 +1,4 @@
-﻿"""HTTP boundary for direct browser-to-R2 file transfers.
+"""HTTP boundary for direct browser-to-R2 file transfers.
 
 Only authorization is exposed as an endpoint: the browser PUTs the bytes to the
 presigned private key, and the owning view finalizes the capability inside the
@@ -169,6 +169,20 @@ def _authorize_applicant_document(request):
     )
     response["Cache-Control"] = "private, no-store"
     return response
+
+
+def body_upload_rejection(request, fields: tuple[str, ...] | list[str]) -> str | None:
+    """Return the refusal message when a body file arrives on a migrated form.
+
+    Only signup keeps a no-JavaScript body path. Every other migrated caller
+    uploads directly to storage, so a body file there is a stale client and is
+    refused with an actionable message instead of being silently ignored.
+    """
+
+    for field in fields:
+        if request.FILES.get(field) is not None:
+            return _("Reload the page with JavaScript enabled and attach the file again.")
+    return None
 
 
 @require_POST

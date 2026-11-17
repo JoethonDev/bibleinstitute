@@ -130,7 +130,7 @@ from .direct_uploads import (
     finalize_direct_upload,
     read_finalized_object,
 )
-from .direct_upload_views import applicant_session_digest
+from .direct_upload_views import applicant_session_digest, body_upload_rejection
 from .models import DirectUploadAuthorization
 from django.core.files.uploadedfile import SimpleUploadedFile
 from .utils.application_uploads import (
@@ -1753,10 +1753,17 @@ def user_profile(request, user_id):
         User.objects.select_related("role", "decided_by"),
         pk=user_id,
     )
-    form = UserUpdateForm(request.POST or None, request.FILES or None, instance=user)
+    form = UserUpdateForm(request.POST or None, None, instance=user)
+    document_rejection = (
+        body_upload_rejection(request, tuple(APPLICATION_DOCUMENT_FIELDS))
+        if request.method == "POST"
+        else None
+    )
+    if document_rejection:
+        form.add_error(None, document_rejection)
     _restrict_user_update_form(form, request.user)
 
-    if request.method == "POST" and form.is_valid():
+    if request.method == "POST" and form.is_valid() and not document_rejection:
         original = User.objects.get(pk=user.pk)
         actor_role = getattr(getattr(request.user, "role", None), "role", None)
         desired_status = form.cleaned_data.get("application_status", original.application_status)
@@ -2073,12 +2080,9 @@ def historical_intake(request):
                             "has_record": summary is not None,
                             "already_promoted": bool(summary and summary.promoted_at),
                         })
-        elif request.FILES.get("intake_file") or request.POST.get("direct_upload_token_intake_file"):
+        elif request.POST.get("direct_upload_token_intake_file"):
             try:
-                if request.FILES.get("intake_file"):
-                    upload = request.FILES["intake_file"]
-                else:
-                    upload = _finalized_intake_upload(request)
+                upload = _finalized_intake_upload(request)
                 rows, upload_digest = parse_intake_upload(upload)
                 preview = preview_intake_rows(rows)
                 if request.POST.get("apply_upload") == "yes":
@@ -2238,7 +2242,7 @@ def exceptional_course_assign(request, user_id):
 @capability_required(can_manage_applications)
 def user_bulk_create(request):
     if request.method == 'POST':
-        form = CSVUploadForm(request.POST, request.FILES)
+        form = CSVUploadForm(request.POST, None)
         if form.is_valid():
             csv_token = (request.POST.get("direct_upload_token_csv_file") or "").strip()
             if csv_token:
@@ -2262,17 +2266,12 @@ def user_bulk_create(request):
                     return redirect('user-bulk-create')
                 csv_name = finalized.original_filename
             else:
-                csv_file = request.FILES['csv_file']
-                csv_name = csv_file.name
-                if not csv_name.lower().endswith('.csv'):
-                    error(request, _('This is not a CSV file'), extra_tags="alert-danger")
-                    return redirect('user-bulk-create')
-                try:
-                    content = read_legacy_import_upload(csv_file)
-                except ValidationError as exc:
-                    for message in exc.messages:
-                        error(request, message, extra_tags="alert-danger")
-                    return redirect('user-bulk-create')
+                error(
+                    request,
+                    _("Reload the page with JavaScript enabled and attach the CSV again."),
+                    extra_tags="alert-danger",
+                )
+                return redirect('user-bulk-create')
 
             try:
                 # Bounded pre-check without hashing: the authoritative pass,
@@ -6446,8 +6445,11 @@ def application_review(request, user_id):
         original_status = user.application_status
         original_role_id = user.role_id
         original_is_active = user.is_active
-        form = ApplicationAdminForm(request.POST, request.FILES, instance=user)
-        if form.is_valid():
+        form = ApplicationAdminForm(request.POST, None, instance=user)
+        document_rejection = body_upload_rejection(request, tuple(APPLICATION_DOCUMENT_FIELDS))
+        if document_rejection:
+            form.add_error(None, document_rejection)
+        if form.is_valid() and not document_rejection:
             staged = None
             change = None
             database_committed = False
@@ -6684,11 +6686,12 @@ def profile_missing_documents(request):
         user = User.objects.get(pk=request.user.pk)
         form = MissingApplicationDocumentsForm(
             request.POST,
-            request.FILES,
+            None,
             instance=user,
         )
         document_tokens = _direct_application_document_tokens(request)
-        submitted_types = set(request.FILES) | set(document_tokens)
+        document_rejection = body_upload_rejection(request, tuple(form.document_types))
+        submitted_types = set(document_tokens)
         allowed_types = set(form.document_types)
         if not submitted_types:
             raise ValidationError(_("Select at least one missing document."))
@@ -6718,27 +6721,12 @@ def profile_missing_documents(request):
             )
             for document_type in current_document_types:
                 uploaded = finalized_documents.get(document_type)
-                if uploaded is not None:
-                    uploaded_by_type[document_type] = uploaded
-                    uploaded_keys.extend(uploaded.keys)
+                if uploaded is None:
                     continue
-                uploaded_file = form.cleaned_data.get(document_type)
-                if not uploaded_file:
-                    continue
-                uploaded = upload_application_file(
-                    CLOUD_CLIENT,
-                    bucket_name,
-                    user.pk,
-                    uploaded_file,
-                    document_type,
-                )
-                if not uploaded:
-                    raise ValidationError(
-                        _("The %(document)s could not be uploaded.")
-                        % {"document": form.fields[document_type].label}
-                    )
                 uploaded_by_type[document_type] = uploaded
                 uploaded_keys.extend(uploaded.keys)
+            if document_rejection:
+                raise ValidationError(document_rejection)
             if not uploaded_by_type:
                 raise ValidationError(_("Select at least one missing document."))
             update_fields = []
@@ -6786,7 +6774,7 @@ def profile_academic_payment(request):
     uploaded_keys = []
     try:
         user = User.objects.get(pk=request.user.pk)
-        form = AcademicPaymentForm(request.POST, request.FILES, student=user)
+        form = AcademicPaymentForm(request.POST, None, student=user)
         if not form.is_valid():
             raise ValidationError(form.errors.as_text())
         scope = form.cleaned_data["academic_year_level"]
@@ -6812,18 +6800,9 @@ def profile_academic_payment(request):
                 if uploaded is None:
                     raise ValidationError(_("The payment receipt could not be uploaded."))
             else:
-                uploaded_file = form.cleaned_data.get("payment")
-                if not uploaded_file:
-                    raise ValidationError(_("Choose the payment receipt to upload."))
-                uploaded = upload_application_file(
-                    CLOUD_CLIENT,
-                    bucket_name,
-                    user.pk,
-                    uploaded_file,
-                    "academic_payment",
+                raise ValidationError(
+                    _("Reload the page with JavaScript enabled and choose the receipt again.")
                 )
-            if not uploaded:
-                raise ValidationError(_("The payment receipt could not be uploaded."))
             uploaded_keys.extend(uploaded.keys)
             AcademicPayment.objects.create(
                 student=user,
