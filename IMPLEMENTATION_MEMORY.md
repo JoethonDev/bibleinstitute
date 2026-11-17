@@ -100,6 +100,15 @@ carries the purpose and the template opts in. Check
 token-only broadcast passes validation, a finalized capability becomes an
 uploaded file, and a rejected capability surfaces its error.
 
+Honest limit on Task 5: every browser upload now *uses* direct R2, but the
+Django file-body **fallback is still present** in the forms and views that were
+migrated with a dual path (`request.FILES` appears in 16 places; only support
+chat refuses a body file outright, and APK requires a capability). The plan's
+stricter instruction is to remove each obsolete body path in the same caller
+unit, so Task 5 is not formally closed until those fallbacks are deleted. They
+were kept deliberately for no-JS clients and to keep the release shippable;
+removing them is the remaining Task 5 step.
+
 ### Ready to deploy (2026-11-17)
 
 Second whole-suite pass on the tree at `1950b50` (after the payment, CSV,
