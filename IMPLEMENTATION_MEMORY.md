@@ -100,14 +100,20 @@ carries the purpose and the template opts in. Check
 token-only broadcast passes validation, a finalized capability becomes an
 uploaded file, and a rejected capability surfaces its error.
 
-Honest limit on Task 5: every browser upload now *uses* direct R2, but the
-Django file-body **fallback is still present** in the forms and views that were
-migrated with a dual path (`request.FILES` appears in 16 places; only support
-chat refuses a body file outright, and APK requires a capability). The plan's
-stricter instruction is to remove each obsolete body path in the same caller
-unit, so Task 5 is not formally closed until those fallbacks are deleted. They
-were kept deliberately for no-JS clients and to keep the release shippable;
-removing them is the remaining Task 5 step.
+Honest limit on Task 5, and the user's ruling (2026-11-17): keep the
+no-JavaScript body path **only for signup**, because registration must work on
+any browser. Implemented in `a3979de`: every other migrated caller builds its
+form without `request.FILES` and refuses a body file through one shared
+`body_upload_rejection` rule with an actionable translated message - admin user
+edit, application review, missing documents, academic payment, legacy CSV,
+historical intake, Telegram reply and Telegram broadcast. `request.FILES` now
+appears only in the three signup lines plus the deliberate support-chat
+rejection (16 -> 4 references). The plan's stricter "remove every body path" is
+therefore satisfied everywhere except signup by explicit product decision.
+Anonymous applicant capabilities are bound to a hashed session key at authorize
+time and re-homed into `applications/<user id>/<document_type>/` at finalize;
+an end-to-end signup POST (form + token + user creation) is still unverified and
+is the next check to write.
 
 ### Ready to deploy (2026-11-17)
 
