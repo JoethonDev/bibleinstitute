@@ -55,6 +55,52 @@ production migration is performed here. The plans' prerequisite gates are
 waived for this release by that explicit instruction and the waiver is recorded
 here, not silently dropped.
 
+### Signup direct-upload contract (not implemented yet)
+
+Signup is the last Task 5 caller. The shape is now known from the source, so it
+does not need the "applicant pending namespace" the earlier notes assumed:
+`signup` already calls `form.save()` inside `transaction.atomic()` and then
+uploads each document with the new `user.pk` (views.py around 6203-6245), so a
+browser document can be finalized against the real account exactly like the
+admin forms. The only genuinely new piece is that the authorize call happens
+**before** the account exists.
+
+Required steps, in one commit:
+
+1. `direct_uploads.finalize_direct_upload`: accept
+   `applicant_session: str | None = None`; when set, require the stored row to
+   have `actor_id IS NULL` and `metadata["applicant_session"]` equal to the
+   hashed session key, and raise `forbidden` before any provider work otherwise.
+2. `direct_upload_views.direct_upload_authorize`: allow an anonymous request
+   **only** for `APPLICATION_DOCUMENT` when a session exists; create the session
+   key if absent, set `target="applicant:<hash>"` and
+   `metadata={"applicant_session": <hash>, "document_type": ...}`, and bound
+   abuse with a cache counter per session (about 8 capabilities per hour) since
+   the endpoint has no login gate. Everything else keeps returning 401.
+3. `utils.application_uploads.finalize_application_documents`: accept
+   `applicant_session` and a possibly anonymous actor, pass both through, and
+   keep using `user_id` for the `applications/<id>/<type>` folder because the
+   user row already exists by then.
+4. `SignupForm`: make `identity_front`, `identity_back` and `profile` optional
+   at field level, enforce them in `clean()` against either a file or
+   `direct_upload_token_<field>`, and include the token in the existing
+   national-id/passport conditional rules.
+5. `signup` view: build the token map like `_direct_application_document_tokens`
+   and merge the finalized documents into the same `uploaded_by_type` loop that
+   already handles body files.
+6. `signup.html`: `data-direct-upload` on the form plus `data-upload-*` widget
+   attributes on the three pickers.
+
+Verification for that commit: a form-level check (missing documents rejected
+with neither file nor token, accepted with a token), the existing disposable
+`phase08_direct_uploads.py`, `manage.py check`, `makemigrations --check` (no
+schema change expected) and `audit_text_encoding`.
+
+Also record the JavaScript dependency the migrated callers introduced: publishing
+an APK and sending a support-chat attachment now require the uploader script
+(a plain form post is refused with a translated message), while every other
+migrated caller keeps a working body-file path.
+
 ### Ready to deploy (2026-11-17)
 
 Second whole-suite pass on the tree at `1950b50` (after the payment, CSV,
