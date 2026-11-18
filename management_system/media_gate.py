@@ -23,8 +23,7 @@ from django.core.exceptions import ImproperlyConfigured
 from django.db import DatabaseError, connection, transaction
 from django.utils import timezone
 
-from .media_delivery_mode import effective_segment_delivery_mode
-from .models import MediaDeliverySettings, MediaGateToken
+from .models import MediaGateToken
 from .media_segment_keys import normalize_segment_key
 
 logger = logging.getLogger(__name__)
@@ -530,13 +529,6 @@ def _lock_gate_row() -> None:
         cursor.execute("SELECT pg_advisory_xact_lock(%s)", [GATE_LOCK_KEY])
 
 
-def _edge_mode_enabled() -> bool:
-    return (
-        effective_segment_delivery_mode()
-        == MediaDeliverySettings.SegmentDeliveryMode.EDGE_GATE
-    )
-
-
 def _save_attempt_error(row: MediaGateToken | None, moment: datetime, code: str) -> None:
     if row is None:
         return
@@ -566,8 +558,6 @@ def rotate_token(now: datetime | None = None) -> RotationResult:
     if timezone.is_naive(moment):
         return RotationResult("failed", reason="rotation_time_must_be_aware")
     try:
-        if not _edge_mode_enabled():
-            return RotationResult("skipped", reason="edge_gate_not_enabled")
         period = period_seconds()
     except (DatabaseError, MediaGateError, MediaGateUnavailable, ImproperlyConfigured) as exc:
         reason = getattr(exc, "code", "gate_configuration_invalid")

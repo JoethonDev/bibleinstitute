@@ -806,32 +806,12 @@ def apply_progress_heartbeat(
         saved_before = normalize_ranges(progress.merged_ranges or [])
         already_saved = intersect_ranges(requested_on_timeline, saved_before)
         new_candidates = subtract_ranges(requested_on_timeline, saved_before)
-        edge_mode = (
-            locked_session.segment_delivery_mode
-            == ViewingSession.SegmentDeliveryMode.EDGE_GATE
+        _earned, available_centiseconds = edge_credit_budget_centiseconds(
+            locked_session.started_at,
+            window_end,
+            locked_session.edge_earned_seconds_consumed,
+            progress.edge_slack_remaining_seconds,
         )
-        verified_ranges = []
-        if not edge_mode:
-            verified = set(
-                locked_session.verified_requests.values_list("segment_number", flat=True)
-            )
-            if verified:
-                verified_ranges = [
-                    (segment.get("start", 0), segment.get("end", 0))
-                    for segment in lesson_segments
-                    if segment.get("number") in verified
-                ]
-            new_candidates = intersect_ranges(new_candidates, verified_ranges)
-
-        available_centiseconds = 30_000
-        earned_available_centiseconds = 0
-        if edge_mode:
-            _earned, available_centiseconds = edge_credit_budget_centiseconds(
-                locked_session.started_at,
-                window_end,
-                locked_session.edge_earned_seconds_consumed,
-                progress.edge_slack_remaining_seconds,
-            )
         accepted_ranges, _remaining_by_budget = take_ordered_prefix(
             new_candidates,
             min(30_000, available_centiseconds) / 100,
@@ -840,32 +820,31 @@ def apply_progress_heartbeat(
             int(Decimal(str(end)) * 100) - int(Decimal(str(start)) * 100)
             for start, end in accepted_ranges
         )
-        if edge_mode:
-            earned_total, _available = edge_credit_budget_centiseconds(
-                locked_session.started_at,
-                window_end,
-                locked_session.edge_earned_seconds_consumed,
-                progress.edge_slack_remaining_seconds,
+        earned_total, _available = edge_credit_budget_centiseconds(
+            locked_session.started_at,
+            window_end,
+            locked_session.edge_earned_seconds_consumed,
+            progress.edge_slack_remaining_seconds,
+        )
+        consumed_before = int(
+            (Decimal(str(locked_session.edge_earned_seconds_consumed)) * 100).to_integral_value(
+                rounding=ROUND_HALF_UP,
             )
-            consumed_before = int(
-                (Decimal(str(locked_session.edge_earned_seconds_consumed)) * 100).to_integral_value(
-                    rounding=ROUND_HALF_UP,
-                )
+        )
+        slack_before = int(
+            (Decimal(str(progress.edge_slack_remaining_seconds)) * 100).to_integral_value(
+                rounding=ROUND_HALF_UP,
             )
-            slack_before = int(
-                (Decimal(str(progress.edge_slack_remaining_seconds)) * 100).to_integral_value(
-                    rounding=ROUND_HALF_UP,
-                )
-            )
-            earned_available_centiseconds = max(0, earned_total - consumed_before)
-            earned_spent = min(accepted_centiseconds, earned_available_centiseconds)
-            slack_spent = accepted_centiseconds - earned_spent
-            locked_session.edge_earned_seconds_consumed = Decimal(
-                consumed_before + earned_spent
-            ) / 100
-            progress.edge_slack_remaining_seconds = Decimal(
-                max(0, slack_before - slack_spent)
-            ) / 100
+        )
+        earned_available_centiseconds = max(0, earned_total - consumed_before)
+        earned_spent = min(accepted_centiseconds, earned_available_centiseconds)
+        slack_spent = accepted_centiseconds - earned_spent
+        locked_session.edge_earned_seconds_consumed = Decimal(
+            consumed_before + earned_spent
+        ) / 100
+        progress.edge_slack_remaining_seconds = Decimal(
+            max(0, slack_before - slack_spent)
+        ) / 100
 
         merged = normalize_ranges(saved_before + accepted_ranges)
         total_seconds = unique_seconds(timeline)
@@ -906,8 +885,6 @@ def apply_progress_heartbeat(
                 int(heartbeat["active_seconds"] + 0.5),
                 elapsed_seconds,
             )
-            if not edge_mode and not verified_ranges:
-                requested_activity = 0
             credited_active_seconds = credit_watch_sample(
                 locked_session,
                 progress,
@@ -965,12 +942,8 @@ def apply_progress_heartbeat(
         if ack_ranges["remaining_ranges"]:
             if requested_ranges and not requested_on_timeline:
                 reason = "outside_media_timeline"
-            elif not edge_mode and not verified_ranges:
-                reason = "no_verified_segments"
-            elif edge_mode and available_centiseconds <= 0:
+            elif available_centiseconds <= 0:
                 reason = "credit_budget_exhausted"
-            elif not edge_mode:
-                reason = "unverified_ranges"
             else:
                 reason = "partial_progress"
         elif not live_window and heartbeat["active_centiseconds"]:

@@ -21,7 +21,7 @@ from django.views.i18n import JavaScriptCatalog
 from django.views.generic import RedirectView
 from django.templatetags.static import static
 from management_system.telegram_views import telegram_webhook
-from management_system import error_views, pwa_views, views
+from management_system import error_views, pwa_views
 
 urlpatterns = [
     path("favicon.ico", RedirectView.as_view(url=static("login-logo.png"), permanent=False)),
@@ -29,11 +29,6 @@ urlpatterns = [
     path("service-worker.js", pwa_views.pwa_service_worker, name="pwa-service-worker"),
     path('admin/', admin.site.urls),
     path("i18n/", include("django.conf.urls.i18n")),
-    path(
-        "media/seg/<str:session_id>/<path:segment_key>",
-        views.media_segment,
-        name="media-segment",
-    ),
     path(
         "api/mobile/v1/",
         include(("management_system.mobile_urls", "mobile-v1"), namespace="mobile-v1"),

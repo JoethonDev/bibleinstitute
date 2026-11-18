@@ -4,10 +4,8 @@ from django.forms.models import construct_instance
 import secrets
 
 from django.core.exceptions import ValidationError
-from django.db import DatabaseError
 from django.db.models import Q
-from .models import User, Role, Course, AcademicYear, AcademicYearLevel, AttendancePolicy, CourseOffering, Enrollment, Level, QuizType, PromotionRule, HistoricalAcademicSummary, QUIZ_TYPE_CODES, SignupSettings, PublicationStatus, StudentExperienceOverride, StudentExperienceSettings, MediaDeliverySettings, assign_academic_date
-from .media_gate import MediaGateUnavailable, published_tokens
+from .models import User, Role, Course, AcademicYear, AcademicYearLevel, AttendancePolicy, CourseOffering, Enrollment, Level, QuizType, PromotionRule, HistoricalAcademicSummary, QUIZ_TYPE_CODES, SignupSettings, PublicationStatus, StudentExperienceOverride, StudentExperienceSettings, assign_academic_date
 from .utils.validators import normalize_username, validate_identity_by_type, validate_unique_phone
 from .utils.application_uploads import validate_application_file
 from django.utils.translation import gettext_lazy as _ # Import gettext_lazy
@@ -1788,61 +1786,6 @@ class StudentExperienceSettingsForm(AwModelForm):
             "This is the default for students who inherit the global setting. "
             "Use the force action to apply it to every student and ignore per-account overrides."
         )
-
-
-class MediaDeliverySettingsForm(AwModelForm):
-    """Admin toggle between direct R2 302 redirects and the legacy Worker proxy."""
-
-    class Meta:
-        model = MediaDeliverySettings
-        fields = ["segment_delivery_mode"]
-        widgets = {
-            "segment_delivery_mode": forms.Select(attrs={"class": "aw-select"}),
-        }
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        if not self.is_bound and not getattr(settings, "CLOUD_WORKER", "").rstrip("/"):
-            self.initial["segment_delivery_mode"] = (
-                MediaDeliverySettings.SegmentDeliveryMode.DIRECT_R2
-            )
-        self.fields["segment_delivery_mode"].label = _("HLS segment delivery mode")
-        self.fields["segment_delivery_mode"].help_text = _(
-            "Direct R2 presigned redirect (302) routes segment checks through Django "
-            "and redirects playback to short-lived R2 URLs while recording verified "
-            "segment progress on GET. Edge gate serves authorized cached segments "
-            "through Cloudflare and refreshes rotating path tokens. Progress must be "
-            "deployed and verified before enabling edge gate. Legacy Worker keeps "
-            "routing segments through the configured Cloudflare Worker."
-        )
-
-    def clean_segment_delivery_mode(self):
-        mode = self.cleaned_data["segment_delivery_mode"]
-        if (
-            mode == MediaDeliverySettings.SegmentDeliveryMode.WORKER
-            and not getattr(settings, "CLOUD_WORKER", "").rstrip("/")
-        ):
-            raise forms.ValidationError(
-                _("Cloudflare Worker URL (CLOUD_WORKER) is not configured in the environment.")
-            )
-        if mode == MediaDeliverySettings.SegmentDeliveryMode.EDGE_GATE:
-            required = (
-                "MEDIA_EDGE_BASE_URL",
-                "CLOUDFLARE_ZONE_ID",
-                "CLOUDFLARE_WAF_HOST",
-                "CLOUDFLARE_API_TOKEN",
-            )
-            if any(not getattr(settings, name, "") for name in required):
-                raise forms.ValidationError(
-                    _("Configure the media edge URL and Cloudflare rule settings before enabling edge gate.")
-                )
-            try:
-                published_tokens()
-            except (DatabaseError, MediaGateUnavailable):
-                raise forms.ValidationError(
-                    _("A valid published media-gate token is required before enabling edge gate.")
-                )
-        return mode
 
 
 class SignupSettingsForm(AwModelForm):

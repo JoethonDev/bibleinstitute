@@ -34,13 +34,11 @@ class Command(BaseCommand):
         if options["dry_run"]:
             self.stdout.write(_("No rows were changed. The counts below are exact."))
         else:
-            self.stdout.write(_("Deleted %(segments)s segment receipts, detached %(events)s progress events, and deleted %(sessions)s sessions.") % {
-                "segments": result["segments_deleted"],
+            self.stdout.write(_("Detached %(events)s progress events and deleted %(sessions)s sessions.") % {
                 "events": result["events_detached"],
                 "sessions": result["sessions_deleted"],
             })
         for label, key, more_key in (
-            (_("segment receipts"), "remaining_segments", "segments_more"),
             (_("progress events"), "remaining_events", "events_more"),
             (_("sessions"), "remaining_sessions", "sessions_more"),
         ):

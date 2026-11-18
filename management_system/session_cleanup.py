@@ -13,7 +13,7 @@ from django.db.models.query import QuerySet
 from django.utils import timezone
 from django.utils.translation import gettext as _
 
-from .models import LectureProgressEvent, VerifiedSegmentRequest, ViewingSession
+from .models import LectureProgressEvent, ViewingSession
 
 REPLAY_WINDOW_DAYS = 7
 MAX_CHILD_BATCH_SIZE = 5000
@@ -129,7 +129,7 @@ def cleanup_expired_viewing_sessions(
     session_batch_size: int = MAX_SESSION_BATCH_SIZE,
     deadline: float | None = None,
 ) -> dict[str, object]:
-    """Delete only replay-expired segment rows and empty sessions in short batches."""
+    """Delete only replay-expired progress evidence and empty sessions in short batches."""
     if connection.vendor != "postgresql":
         raise SessionCleanupError(_("Viewing-session cleanup requires PostgreSQL."))
     if not 1 <= child_batch_size <= MAX_CHILD_BATCH_SIZE:
@@ -150,19 +150,15 @@ def cleanup_expired_viewing_sessions(
     )
     cutoff = timezone.now() - timedelta(days=REPLAY_WINDOW_DAYS)
     expired = _expired_sessions(cutoff)
-    segment_rows = VerifiedSegmentRequest.objects.filter(session_id__in=expired.values("pk"))
     event_rows = LectureProgressEvent.objects.filter(viewing_session_id__in=expired.values("pk"))
     session_rows = expired
     result: dict[str, object] = {
         "dry_run": dry_run,
         "lease_acquired": False,
-        "segments_deleted": 0,
         "events_detached": 0,
         "sessions_deleted": 0,
-        "remaining_segments": 0,
         "remaining_events": 0,
         "remaining_sessions": 0,
-        "segments_more": False,
         "events_more": False,
         "sessions_more": False,
         "contended": False,
@@ -181,9 +177,6 @@ def cleanup_expired_viewing_sessions(
 
     try:
         if dry_run:
-            result["remaining_segments"], result["segments_more"] = _remaining(
-                segment_rows, child_batch_size, exact=True
-            )
             result["remaining_events"], result["events_more"] = _remaining(
                 event_rows, child_batch_size, exact=True
             )
@@ -191,12 +184,6 @@ def cleanup_expired_viewing_sessions(
                 session_rows, session_batch_size, exact=True
             )
         else:
-            segments_deleted, segment_time, segment_contended, segment_transactions = _drain_batches(
-                segment_rows,
-                child_batch_size,
-                deadline,
-                lambda ids: VerifiedSegmentRequest.objects.filter(pk__in=ids).delete()[0],
-            )
             events_detached, event_time, event_contended, event_transactions = _drain_batches(
                 event_rows,
                 child_batch_size,
@@ -205,22 +192,19 @@ def cleanup_expired_viewing_sessions(
             )
             sessions_deleted, session_time, session_contended, session_transactions = _drain_batches(
                 session_rows.annotate(
-                    has_segments=Exists(VerifiedSegmentRequest.objects.filter(session_id=OuterRef("pk"))),
                     has_events=Exists(LectureProgressEvent.objects.filter(viewing_session_id=OuterRef("pk"))),
-                ).filter(has_segments=False, has_events=False),
+                ).filter(has_events=False),
                 session_batch_size,
                 deadline,
                 _delete_sessions,
             )
             result.update(
-                segments_deleted=segments_deleted,
                 events_detached=events_detached,
                 sessions_deleted=sessions_deleted,
-                contended=segment_contended or event_contended or session_contended,
-                max_transaction_seconds=max(segment_time, event_time, session_time),
+                contended=event_contended or session_contended,
+                max_transaction_seconds=max(event_time, session_time),
             )
-            result["transactions"] = segment_transactions + event_transactions + session_transactions
-            result["remaining_segments"], result["segments_more"] = _bounded_rows(segment_rows, child_batch_size)
+            result["transactions"] = event_transactions + session_transactions
             result["remaining_events"], result["events_more"] = _bounded_rows(event_rows, child_batch_size)
             result["remaining_sessions"], result["sessions_more"] = _bounded_rows(session_rows, session_batch_size)
     finally:
@@ -231,7 +215,6 @@ def cleanup_expired_viewing_sessions(
             connection.close()
 
     result["has_backlog"] = any((
-        result["remaining_segments"], result["segments_more"],
         result["remaining_events"], result["events_more"],
         result["remaining_sessions"], result["sessions_more"],
     ))

@@ -7,7 +7,6 @@ import logging
 from datetime import timedelta
 from io import BytesIO
 
-from django.conf import settings
 from django.contrib.auth import authenticate
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.core.paginator import Paginator
@@ -62,7 +61,6 @@ from .models import (
     PublicationStatus,
     Quiz,
     LectureProgress,
-    MediaDeliverySettings,
     MobilePushDevice,
     AcademicYearLevel,
     GraduationGalleryItem,
@@ -99,7 +97,6 @@ from .media_delivery import (
     sign_session,
     valid_session_token,
 )
-from .media_delivery_mode import effective_segment_delivery_mode
 from .progress_activity import ProgressHeartbeatError, apply_progress_heartbeat
 from .storage_clients import CLOUD_CLIENT, bucket_name
 
@@ -918,15 +915,6 @@ def media_session(request, offering_id, lesson_id, file_index):
     payload = _json_body(request)
     if payload is None:
         return _error(request, "invalid_request", _localized(request, "Invalid request format."), 400)
-    # The mobile/PWA-native manifest has no gate refresh endpoint, so edge
-    # delivery is web-only; pin the session to a non-edge mode.
-    delivery_mode = effective_segment_delivery_mode()
-    if delivery_mode == MediaDeliverySettings.SegmentDeliveryMode.EDGE_GATE:
-        delivery_mode = (
-            MediaDeliverySettings.SegmentDeliveryMode.WORKER
-            if getattr(settings, "CLOUD_WORKER", "").rstrip("/")
-            else MediaDeliverySettings.SegmentDeliveryMode.DIRECT_R2
-        )
     # Keep heartbeat sequences isolated per player/tab, including token refresh.
     session = create_viewing_session(
         request.user,
@@ -934,7 +922,6 @@ def media_session(request, offering_id, lesson_id, file_index):
         media.part_id,
         mobile_session=request.mobile_session,
         media_key=media.media_key,
-        segment_delivery_mode=delivery_mode,
     )
     progress_row = LectureProgress.objects.filter(
         student=request.user, lesson=media.lesson, part_id=media.part_id
@@ -1015,7 +1002,6 @@ def media_manifest(request, offering_id, lesson_id, file_index):
             audience="mobile",
             cloud_client=CLOUD_CLIENT,
             bucket_name=bucket_name,
-            segment_base_url=request.build_absolute_uri("/").rstrip("/"),
         )
     except MediaAccessError as exc:
         if exc.code == "expired":

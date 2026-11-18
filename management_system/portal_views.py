@@ -3,15 +3,13 @@
 from __future__ import annotations
 
 import logging
-from datetime import timedelta
 
 from django import forms
-from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
 from django.core.paginator import Paginator
-from django.db import DatabaseError, IntegrityError, transaction
+from django.db import IntegrityError, transaction
 from django.http import Http404
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -21,10 +19,7 @@ from django.views.decorators.http import require_POST
 from .announcements import AnnouncementError, clean_announcement_action
 from .direct_uploads import DirectUploadError, finalize_direct_upload
 from .mobile_versioning import MAX_VERSION_CODE, is_valid_update_url, normalize_platform
-from .forms import MediaDeliverySettingsForm
-from .media_delivery import effective_segment_delivery_mode, media_presigned_url_seconds
-from .media_gate import MediaGateError, period_seconds, transform_expression
-from .models import DirectUploadAuthorization, MediaDeliverySettings, MediaGateToken, MobileAppRelease, MobileAppUpdatePolicy, MobileDownloadPolicy, MobilePushSettings, StudentBanner
+from .models import DirectUploadAuthorization, MobileAppRelease, MobileAppUpdatePolicy, MobileDownloadPolicy, MobilePushSettings, StudentBanner
 from .models import StudentMode
 from .student_experience.mode import resolve_student_mode
 from .student_experience.render import render_student_page
@@ -418,74 +413,3 @@ def banner_delete(request, banner_id: int):
     get_object_or_404(StudentBanner, pk=banner_id).delete()
     messages.success(request, _("Banner deleted."))
     return redirect("banner-manage")
-
-
-@capability_required(can_manage_academic_setup)
-def media_delivery_settings(request):
-    """Manage transition media modes and inspect committed edge-gate state."""
-    settings_row = MediaDeliverySettings.load()
-    worker_configured = bool(getattr(settings, "CLOUD_WORKER", "").rstrip("/"))
-    if request.method == "POST":
-        form = MediaDeliverySettingsForm(request.POST, instance=settings_row)
-        if form.is_valid():
-            settings_row = form.save(commit=False)
-            settings_row.updated_by = request.user
-            settings_row.save()
-            messages.success(request, _("Media delivery settings saved."))
-            return redirect("media-delivery-settings")
-    else:
-        form = MediaDeliverySettingsForm(instance=settings_row)
-
-    effective_mode = effective_segment_delivery_mode()
-    effective_label = dict(MediaDeliverySettings.SegmentDeliveryMode.choices).get(
-        effective_mode,
-        effective_mode,
-    )
-    required_gate_settings = (
-        "MEDIA_EDGE_BASE_URL",
-        "CLOUDFLARE_ZONE_ID",
-        "CLOUDFLARE_WAF_HOST",
-        "CLOUDFLARE_API_TOKEN",
-    )
-    missing_gate_settings = [
-        name for name in required_gate_settings if not getattr(settings, name, "")
-    ]
-    gate_row = None
-    gate_due_at = None
-    gate_expected_expression = ""
-    gate_state_error = ""
-    try:
-        gate_row = MediaGateToken.load()
-        if gate_row:
-            gate_due_at = gate_row.current_started_at + timedelta(seconds=period_seconds())
-            if not missing_gate_settings:
-                gate_expected_expression = transform_expression(
-                    settings.CLOUDFLARE_WAF_HOST,
-                    gate_row.current_token,
-                    gate_row.previous_token,
-                )
-    except (DatabaseError, MediaGateError) as exc:
-        gate_state_error = getattr(exc, "code", "media_gate_state_unavailable")
-    return render_page(
-        request,
-        "media_delivery_settings.html",
-        "partials/media_delivery_settings_content.html",
-        {
-            "settings_row": settings_row,
-            "form": form,
-            "worker_configured": worker_configured,
-            "effective_mode": effective_mode,
-            "effective_mode_label": effective_label,
-            "presigned_url_seconds": media_presigned_url_seconds(),
-            "media_gate_config_complete": not missing_gate_settings,
-            "media_gate_missing_settings": missing_gate_settings,
-            "media_gate_token_row": gate_row,
-            "media_gate_rotation_due_at": gate_due_at,
-            "media_gate_expected_expression": gate_expected_expression,
-            "media_gate_state_error": gate_state_error,
-            "breadcrumb_items": generate_breadcrumb([
-                (_("Admin"), reverse("admin-panel")),
-                (_("Media Delivery"), None),
-            ]),
-        },
-    )

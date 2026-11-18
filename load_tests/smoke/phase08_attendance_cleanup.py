@@ -37,7 +37,6 @@ def _rollback_fixtures(checks: list[str]) -> None:
         PublicationStatus,
         Role,
         User,
-        VerifiedSegmentRequest,
         ViewingSession,
     )
     from management_system.progress_activity import online_attendance_for_students
@@ -59,7 +58,7 @@ def _rollback_fixtures(checks: list[str]) -> None:
             columns.setdefault(table_name, set()).add(column_name)
     session_columns = columns.get("management_system_viewingsession", set())
     policy_columns = columns.get("management_system_attendancepolicy", set())
-    if not {"started_at", "superseded_at", "segment_delivery_mode", "edge_earned_seconds_consumed"} <= session_columns or not {
+    if not {"started_at", "superseded_at", "edge_earned_seconds_consumed"} <= session_columns or not {
         "online_full_days",
         "online_partial_days",
         "online_partial_value",
@@ -218,16 +217,6 @@ def _rollback_fixtures(checks: list[str]) -> None:
                 expires_at=now + timedelta(days=1),
                 started_at=now,
             )
-            stale_receipt = VerifiedSegmentRequest.objects.create(
-                session=stale,
-                segment_number=1,
-                segment_key=f"smoke/{suffix}/stale.ts",
-            )
-            replay_receipt = VerifiedSegmentRequest.objects.create(
-                session=replayable,
-                segment_number=1,
-                segment_key=f"smoke/{suffix}/replay.ts",
-            )
             stale_event = LectureProgressEvent.objects.create(
                 student=online_students[0],
                 lesson=partial,
@@ -255,10 +244,8 @@ def _rollback_fixtures(checks: list[str]) -> None:
                 session_batch_size=1,
                 deadline=time.monotonic() + 3,
             )
-            if preview["remaining_segments"] != 1 or preview["remaining_events"] != 1:
+            if preview["remaining_events"] != 1:
                 raise AssertionError("Cleanup dry-run did not report the isolated fixture backlog.")
-            if not VerifiedSegmentRequest.objects.filter(pk=stale_receipt.pk).exists():
-                raise AssertionError("Cleanup dry-run changed segment evidence.")
             if LectureProgressEvent.objects.get(pk=stale_event.pk).viewing_session_id != stale.pk:
                 raise AssertionError("Cleanup dry-run changed progress-event history.")
 
@@ -268,14 +255,12 @@ def _rollback_fixtures(checks: list[str]) -> None:
                 session_batch_size=1,
                 deadline=time.monotonic() + 5,
             )
-            if (cleanup["segments_deleted"], cleanup["events_detached"], cleanup["sessions_deleted"]) != (1, 1, 1):
+            if (cleanup["events_detached"], cleanup["sessions_deleted"]) != (1, 1):
                 raise AssertionError("Cleanup did not report its exact fixture changes.")
             if cleanup["has_backlog"] or cleanup["max_transaction_seconds"] > 2.0:
                 raise AssertionError("Cleanup left fixture backlog or exceeded the 2-second transaction target.")
             if ViewingSession.objects.filter(pk__in=[stale.pk]).exists():
                 raise AssertionError("Replay-expired viewing session was retained.")
-            if not VerifiedSegmentRequest.objects.filter(pk=replay_receipt.pk).exists():
-                raise AssertionError("Replayable evidence was deleted early.")
             if ViewingSession.objects.filter(pk__in=[replayable.pk, active.pk]).count() != 2:
                 raise AssertionError("Active or replayable viewing session was deleted.")
             if LectureProgressEvent.objects.get(pk=stale_event.pk).viewing_session_id is not None:

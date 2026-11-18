@@ -7,7 +7,6 @@ from celery import shared_task
 from .media_gate import (
     MediaGateError,
     MediaGateUnavailable,
-    _edge_mode_enabled,
     repair_gate_from_committed_pair,
     rotate_token,
     rule_matches_publication,
@@ -41,8 +40,6 @@ def rotate_media_gate_token() -> dict[str, str]:
 )
 def check_media_gate_drift() -> dict[str, str]:
     try:
-        if not _edge_mode_enabled():
-            return {"status": "skipped", "reason": "edge_gate_not_enabled"}
         if stale_publication():
             logger.error("media_gate_rotation_stale")
             result = rotate_token()

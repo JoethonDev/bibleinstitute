@@ -395,8 +395,8 @@ if [[ -n "$automation_key" ]]; then
 fi
 echo ""
 
-# -- 7. Mobile push and media Worker ------------------------------------
-# Expo access tokens and Worker shared secrets are server-only. They are
+# -- 7. Mobile push and media tokens ------------------------------------
+# Expo access tokens and the media token secret are server-only. They are
 # hidden during input, preserved on Enter, and never copied to .compose.env.
 write_value EXPO_PUSH_ACCESS_TOKEN "$(read_secret_value EXPO_PUSH_ACCESS_TOKEN "Expo Push access token (blank = disabled)")"
 write_value EXPO_PUSH_SEND_URL "$(value_from_tmp EXPO_PUSH_SEND_URL "https://exp.host/--/api/v2/push/send")"
@@ -404,11 +404,7 @@ write_value EXPO_PUSH_RECEIPTS_URL "$(value_from_tmp EXPO_PUSH_RECEIPTS_URL "htt
 write_value EXPO_PUSH_TIMEOUT_SECONDS "$(value_from_tmp EXPO_PUSH_TIMEOUT_SECONDS "15")"
 write_value EXPO_PUSH_REQUESTS_PER_SECOND "$(value_from_tmp EXPO_PUSH_REQUESTS_PER_SECOND "5")"
 
-cloud_worker="$(read_value CLOUD_WORKER "Cloudflare Worker public HTTPS URL (blank = direct/local media)" "")"
-[[ -z "$cloud_worker" || "$cloud_worker" == https://* ]] || die "CLOUD_WORKER must be an HTTPS URL when set"
-write_value CLOUD_WORKER "$cloud_worker"
-write_value WORKER_HMAC_SECRET "$(read_secret_value WORKER_HMAC_SECRET "Worker HMAC secret (blank = disabled)")"
-write_value WORKER_RECEIPT_SECRET "$(read_secret_value WORKER_RECEIPT_SECRET "Worker receipt secret (blank = disabled)")"
+write_value WORKER_HMAC_SECRET "$(read_secret_value WORKER_HMAC_SECRET "Media token HMAC secret (blank = disabled)")"
 echo ""
 
 # -- 8. Cloudflare edge gate (Phase 7) ---------------------------------

@@ -21,9 +21,10 @@ session logs and old proposals are in [the archive](docs/archive/README.md).
 - SQLite contains real migration-source data, not the production behavior
   reference. Never recreate it. Applied database state is not implied by this map.
 - Celery/Redis provide existing quiz/media/gallery/delivery tasks. Cloudflare R2
-  stores media/private artifacts; `MediaDeliverySettings` (Site & Apps -> Media
-  Delivery) toggles HLS `.ts` delivery between Option B (302 to 60s R2 presigned
-  URLs, always used when `CLOUD_WORKER` is blank) and legacy `worker.js`.
+  stores media/private artifacts. HLS `.ts` delivery has one path: the Cloudflare
+  edge gate (`MEDIA_EDGE_BASE_URL` plus a published path token), built by
+  `media_delivery.build_manifest_playlist` and published by `media_gate`. There
+  is no delivery-mode selector and no in-app segment proxy.
 - This checkout provides mobile APIs; native student/admin client UI is outside
   this server repository. prototype/admin-redesign is a standalone study, not
   deployed Django UI and not authority to redesign the app.
@@ -57,7 +58,6 @@ session logs and old proposals are in [the archive](docs/archive/README.md).
 | [management_system/management/commands](management_system/management/commands) | Academic/image audits, import/fixture/bootstrap commands. Not all old scripts are safe on real data. |
 | [management_system/scripts](management_system/scripts) | Legacy manual utilities; caller/data-safety inspection required before use. |
 | [locale](locale) | Arabic/English PO/MO catalogs; maintain translated messages and catalog consistency. |
-| [worker.js](worker.js) | Legacy Cloudflare playback/public-resource/signature/receipt boundary (active when `CLOUD_WORKER` is set and `MediaDeliverySettings` selects `worker`). Keep public/ namespace and Django authorization distinct. |
 | compose.*.yml; Dockerfile; [deploy](deploy); [nginx](nginx) | Local/deployment topology, queues, healthchecks, proxy/TLS/runtime includes. Never infer production status from config files. |
 | [docs/current](docs/current) | Only active approved work and current release gates. |
 | [docs/pending](docs/pending) | Preserved unfinished/unverified external-client/operator/UI plans; explicit status index. |
@@ -126,11 +126,11 @@ Arrows show ownership/reference direction, not permission by themselves.
 Use the model catalog for exact fields/relationships; these groups locate the
 relevant records without creating another ORM layer:
 
-- Playback: ViewingSession, LectureProgressEvent, VerifiedSegmentRequest,
+- Playback: ViewingSession, LectureProgressEvent,
   LectureProgress, LectureWatchSession, LectureWatchDay. Coverage/completion and
   active watch time are separate facts; do not replace one with the other. The
-  Phase 8 local model contract snapshots segment mode and original session start
-  and supersession times; a session owns its earned-credit counter, activity
+  Phase 8 local model contract snapshots the original session start, supersession
+  times and the edge-earned counter; a session owns its activity
   cursor, payload digest and latest bounded acknowledgement, while the unique
   LectureProgress row owns shared slack across sessions. These prepared fields
   are not migrated or runtime-validated yet. Browser pending progress lives in
@@ -218,7 +218,7 @@ approved or efficient. Prefer the owners above; inspect callers before reuse.
 | Academic management/promotion | views.py promotion_formula/bulk_promotion_results/calendar handlers | academic_* domain modules, scope forms/templates, saved result/export consumers; bulk promotion preloads PromotionFacts per chunk and keeps per-student locks. |
 | Student course/quiz | views.py course/lesson/take_exam/quiz_start handlers; utils/student_data.py | academic_access -> content/attempt operation -> course_detail/display_quiz/questions partials; mobile readers share data/domain functions. Upcoming quiz pages are metadata-only until explicit start, and scheduled lessons are omitted until available. |
 | Mobile API | learning_platform/urls.py -> mobile_urls.py -> mobile_api.py; notification withdrawal is in mobile_notifications.py | mobile_auth.py, mobile_http.py, mobile_otp.py/tasks, mobile_versioning.py, mobile_downloads.py, localization helper. Notification withdrawal lookups accept only bounded, authenticated IDs owned by the current mobile account. |
-| Protected playback/progress | learning_platform/urls.py (`media-segment`); portal_views.media_delivery_settings (`MediaDeliverySettings`); views.py start_viewing_session/lesson_manifest/media_segment/worker_receipt/lesson_document/progress_heartbeat; mobile_api.py media/progress/document endpoints; legacy worker.js | media_delivery.py owns media link/session/token/manifest/segment-presign/audio/book resolution and `use_legacy_worker_segments()`; progress_activity.apply_progress_heartbeat owns merged progress/events; web and mobile keep their own transport auth/HTTP formatting. In `direct_r2` mode (or when `CLOUD_WORKER` is blank), HLS `.ts` segments rewrite to `/media/seg/<session_id>/<segment_key>?token=...` where `media_segment` rechecks authorization, verifies the HMAC token, records `VerifiedSegmentRequest` on `GET` only, and returns `302` (`private, no-store`) to a 60s R2 presigned URL (`MEDIA_PRESIGNED_URL_SECONDS`). In `worker` mode with `CLOUD_WORKER` set, playlists use the legacy Worker and `worker_receipt` remains active (also allowing in-flight receipts while `CLOUD_WORKER` stays configured). Book PDFs stream through the app (`lesson-document` in views.py, `open_book_document` range reads), never through an object-store URL; the mobile reader owns its own equivalent endpoint. |
+| Protected playback/progress | learning_platform/urls.py (`media-gate-refresh` and the manifest routes); views.py start_viewing_session/lesson_manifest/lesson_document/progress_heartbeat; mobile_api.py media/progress/document endpoints | media_delivery.py owns media link/session/token/manifest/audio/book resolution and renders every `.ts` URL through `media_gate.gated_segment_url` (`/g/<token>/<key>`); progress_activity.apply_progress_heartbeat owns merged progress/events and the edge-earned budget; web and mobile keep their own transport auth and HTTP formatting. The Cloudflare transform phase strips the gate prefix only when the path carries the current or previous token and a media segment path, and the static deny rule blocks every other path, so no application route serves a segment. Book PDFs stream through the app (`lesson-document`, `open_book_document` range reads), never through an object-store URL; the mobile reader owns its own equivalent endpoint. |
 | Media management/automation | views.py media_job_*; automation_urls.py/automation_api.py | media_processing/storage/tasks and MediaProcessingJob; client reference manual. `_media_job_ui_state`/`_serialize_media_job` expose the persisted row (status, phase, percent, outputs, attachment, staging, cleanup) and apply the Redis progress hash only for the current attempt of an active job; the drawer renders that same state with the row's can_* action gates. |
 | Attendance | views.py scanner/scan_preview/record_attendance/correction | capability, token, meeting scope, utils.attendance, policy and schedule. The scanner page posts `/scan/<token>/<action>/` with fetch while the camera keeps running: entrance is the default mode, an exit toggle arms exit for one scan then resets, and the JSON answer carries the resolved student and course for the in-page banner. A decoded code is cached client-side for five seconds; the server still owns duplicate rejection. |
 | Reporting/exports | views.py export_* / report dashboard | utils.reports, report_export.py, xlsx_export.py and matrix modules; whole-scope evaluation and report workbook exports run on the J01 ledger with owner/admin private-artifact downloads, while CSV stays a bounded streaming response. |

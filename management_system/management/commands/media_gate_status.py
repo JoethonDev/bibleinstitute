@@ -17,7 +17,6 @@ from django.db import DatabaseError
 from django.utils import timezone
 from django.utils.translation import gettext as _
 
-from management_system.media_delivery_mode import effective_segment_delivery_mode
 from management_system.media_gate import (
     TOKEN_RE,
     MediaGateError,
@@ -26,7 +25,7 @@ from management_system.media_gate import (
     period_seconds,
     transform_expression,
 )
-from management_system.models import MediaDeliverySettings, MediaGateToken
+from management_system.models import MediaGateToken
 
 REQUIRED_ENVIRONMENT_NAMES = (
     "MEDIA_EDGE_BASE_URL",
@@ -60,7 +59,6 @@ def _mask_expression(expression: str, tokens: tuple[str | None, ...]) -> str:
 
 def build_gate_report() -> dict[str, object]:
     """Collect the read-only gate status without creating or pushing state."""
-    mode = effective_segment_delivery_mode()
     missing_settings = [
         name for name in REQUIRED_ENVIRONMENT_NAMES if not getattr(settings, name, "")
     ]
@@ -126,9 +124,6 @@ def build_gate_report() -> dict[str, object]:
     )
 
     return {
-        "effective_delivery_mode": mode,
-        "edge_gate_enabled": mode
-        == MediaDeliverySettings.SegmentDeliveryMode.EDGE_GATE,
         "gate_state": gate_state,
         "gate_row_exists": row is not None,
         "current_token_set": bool(current),
@@ -157,10 +152,6 @@ def build_gate_report() -> dict[str, object]:
 
 def _report_lines(report: dict[str, object]) -> list[str]:
     lines = [_("Media gate status")]
-    lines.append(
-        _("Effective delivery mode: %(mode)s")
-        % {"mode": report["effective_delivery_mode"]}
-    )
     gate_state = report["gate_state"]
     if gate_state == "published":
         lines.append(_("Gate row: published"))

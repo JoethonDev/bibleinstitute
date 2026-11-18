@@ -134,7 +134,6 @@ def main() -> int:
             lesson,
             PART_ID,
             media_key=MEDIA_KEY,
-            segment_delivery_mode=ViewingSession.SegmentDeliveryMode.EDGE_GATE,
         )
 
         first = apply_progress_heartbeat(

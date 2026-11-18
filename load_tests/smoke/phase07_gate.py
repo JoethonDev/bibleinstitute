@@ -55,7 +55,6 @@ def check_start_response_keeps_session_token() -> None:
     session = SimpleNamespace(
         session_id="session-a",
         expires_at=datetime(2026, 11, 18, tzinfo=timezone.utc),
-        segment_delivery_mode="edge_gate",
     )
     progress = SimpleNamespace(values=lambda *_args, **_kwargs: SimpleNamespace(first=lambda: None))
     request = RequestFactory().get("/start/")
@@ -70,8 +69,6 @@ def check_start_response_keeps_session_token() -> None:
         patch.object(views, "sign_session", return_value="session-signature"),
         patch.object(views.LectureProgress.objects, "filter", return_value=progress),
         patch.object(views, "reverse", side_effect=fake_reverse),
-        # The view looks these up on its own module, not on media_gate.
-        patch.object(views, "effective_segment_delivery_mode", return_value="edge_gate"),
         patch.object(views, "gate_payload", return_value={
             "token": "edge-token-value",
             "refresh_at": "2026-11-17T12:00:00+00:00",

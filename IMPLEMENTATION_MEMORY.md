@@ -4916,7 +4916,71 @@ locally) and the delivery mode is still `worker`.
 order, the constant sentinel target, the 19 character offset and that the deny
 rule holds no token state.
 
-Next safe step: apply 0127-0130 to the disposable PostgreSQL database, switch
-`MediaDeliverySettings` to `edge_gate` there, run `rotate_token()`, confirm the
-live matrix above from the committed pair, and only then remove the `worker`,
-`direct_r2` and selector code paths.
+## Edge-only delivery, runtime proof and release gate (2026-11-18)
+
+### One delivery path
+
+Migration `0131_edge_only_delivery` drops `VerifiedSegmentRequest`,
+`ViewingSession.segment_delivery_mode` and `MediaDeliverySettings` in that order.
+With it, `media_delivery_mode.py`, both media-delivery templates, the selector
+form/view/admin/nav entry, `media_segment`, `worker_receipt`, both routes, the
+`/media/seg` route, the mode arguments in `create_viewing_session`,
+`progress_activity`, `mobile_api` and the smokes, plus `CLOUD_WORKER`,
+`WORKER_RECEIPT_SECRET`, `MEDIA_PRESIGNED_URL_SECONDS` and the root `worker.js`
+are gone. `media_gate._edge_mode_enabled` is gone, so rotation and drift no
+longer skip. `MEDIA_WORKER_HMAC_SECRET` stays: it still signs the viewing-session
+token, despite the legacy name.
+
+### Runtime (compose stack: PostgreSQL 18.6, Redis 7.4, gunicorn 23.0.0)
+
+- Network `lms_network` and volume `lms_static_data` are external; both must be
+  created before the first `up`.
+- Full chain from an empty database: 149 migrations, 13.2 seconds, leaf 0131.
+- **The web slots could not start at all**: `--keepalive` is not a gunicorn flag
+  and gunicorn exited with `unrecognized arguments: --keepalive`. Both slots now
+  pass `--keep-alive`. A blue/green deploy would have replaced a healthy slot
+  with a crash loop and then failed its own health gate.
+- Connections: 200-300 requests from 12-16 concurrent clients held the peak at
+  16-17 backends (12 web threads plus Celery and Beat) against
+  `max_connections=100`. Idle backends persist because `CONN_MAX_AGE=60`, so the
+  pool is bounded by threads, not by request rate.
+- Sessions: `cached_db` rewrote 1 row for 240-300 authenticated requests, so
+  ordinary reads do not touch the session row.
+- Static files: the image has no `collectstatic` step; `deploy/blue_green_deploy.sh`
+  runs it (412 files locally). A bare `docker compose up` serves no CSS or JS.
+- `.env` sets `GUNICORN_TIMEOUT=1800`, overriding the 60 second default: a stuck
+  worker holds its connection for 30 minutes. Use 60 unless a route needs more.
+- Compose warns about `$` sequences inside `.env` values; keep such secrets in
+  `env_file` and out of the interpolated `environment:` block.
+- `manage.py check --deploy` flags `SECURE_HSTS_SECONDS` and
+  `SECURE_SSL_REDIRECT`; nginx performs the redirect and HSTS is still unset. The
+  DEBUG and secure-cookie warnings come from the local `.env` only, because
+  production writes `DJANGO_DEBUG=False` and the cookie settings follow DEBUG.
+
+### Edge gate proof from the committed pair
+
+Inside the compose network: rotation published the pair, `check_media_gate_drift`
+through Celery returned `matched`, and the live checks returned 200 for the
+current token, 200 for the previous token, 403 for a stale token, 403 for the raw
+bucket key, 403 for root and 403 for a private prefix.
+
+`media_delivery` used `cache` without importing it ever since the playlist cache
+landed in `ead58bb`, so the cache was silently dead behind two `except Exception`
+guards. The import is restored and the proof now asserts a cache hit with
+identical rendered output.
+
+### Phase 8 evidence on PostgreSQL
+
+On the disposable database at leaf 0131 all four tools pass: `phase08_heartbeat`
+(accepted range, exact replay acknowledgement, overlap credits only the new
+second, stale and gap resync, server-time ceiling), `phase08_progress` (schema,
+bounded acknowledgement, replay-only expired session), `phase08_attendance_cleanup`
+(3 students grouped in 3 queries, bounded cleanup, max transaction 0.016s) and
+`phase08_direct_uploads` (10 cases against the real bucket: size caps, owner
+binding, validator rejection, idempotent finalize, expiry sweep).
+
+### Next safe step
+
+Apply `0127`-`0131` in the release window, run `collectstatic`, start the new
+slot, then confirm `check_media_gate_drift` returns `matched` before switching
+traffic.

@@ -1,6 +1,6 @@
 # Django Core Imports
 from django.shortcuts import render, redirect, get_object_or_404
-from django.http import Http404, HttpRequest, HttpResponse, HttpResponseRedirect, FileResponse, JsonResponse, StreamingHttpResponse
+from django.http import Http404, HttpRequest, HttpResponse, FileResponse, JsonResponse, StreamingHttpResponse
 from django.urls import reverse, reverse_lazy
 from django.views.generic import CreateView, UpdateView, DeleteView, FormView, DetailView
 from django.utils.translation import gettext as _, gettext_lazy
@@ -21,9 +21,7 @@ from django.utils import formats
 from django.utils.dateparse import parse_date
 from django.utils.timezone import now
 from django.views.decorators.http import require_GET, require_POST, require_http_methods
-from django.views.decorators.csrf import csrf_exempt
 from django.forms import formset_factory
-import hmac
 import io
 import secrets
 import uuid
@@ -110,7 +108,6 @@ from .storage_clients import CLOUD_CLIENT, bucket_name, cloudflare_client
 from .utils.file_validator import (
     downloadable_audio_key,
     validate_downloadable_audio_key,
-    validate_hls_object_key,
 )
 from .utils.storage_operations import list_current_folder, list_current_folder_page, search_files_page, generate_unique_url, get_r2_client
 from .utils.helpers import build_scan_url, render_dashboard, select_content_academic_year, unpack_quiz_form, get_student_quiz_status, get_student_quiz_status_map, user_has_management_role, pagination_query_string, generate_breadcrumb, hx_target_id, is_htmx, render_page
@@ -237,26 +234,20 @@ from .report_export import (
 from .xlsx_export import XLSX_CONTENT_TYPE
 from .academic_access import READABLE_ENROLLMENT_STATUSES, accessible_offerings, get_accessible_offering_or_403
 from .media_delivery import (
-    MEDIA_AUDIENCES,
     MEDIA_SEGMENT_TOKEN_LIFETIME,
-    MEDIA_TOKEN_VERSION,
     MediaAccessError,
-    authorize_and_presign_segment,
     authorize_viewing_session,
     build_manifest_playlist,
     create_viewing_session,
-    effective_segment_delivery_mode,
     open_book_document,
     resolve_audio_download,
     resolve_media_link,
-    sign_media_message,
     sign_session,
     valid_session_token,
 )
 from .media_gate import MediaGateUnavailable, gate_payload
 from .course_content import course_navigation, with_offering_content_counts
 from .mobile_auth import revoke_user_mobile_access
-from .utils.hls_parser import get_segment_number
 from .utils.grouped_choices import offering_option_groups
 from .media_processing import (
     ACTIVE_WORKER_STATUSES,
@@ -8544,15 +8535,12 @@ def start_viewing_session(request, offering_id, lesson_id, file_index):
         if exc.code == "not_found":
             raise Http404
         return JsonResponse({"error": exc.message}, status=400)
-    delivery_mode = effective_segment_delivery_mode()
-    gate_state = None
-    if delivery_mode == MediaDeliverySettings.SegmentDeliveryMode.EDGE_GATE:
-        try:
-            gate_state = gate_payload()
-        except MediaGateUnavailable:
-            response = JsonResponse({"error": _("Media delivery is temporarily unavailable.")}, status=503)
-            response["Cache-Control"] = "private, no-store"
-            return response
+    try:
+        gate_state = gate_payload()
+    except MediaGateUnavailable:
+        response = JsonResponse({"error": _("Media delivery is temporarily unavailable.")}, status=503)
+        response["Cache-Control"] = "private, no-store"
+        return response
     # Each player/tab gets an independent authorization session and sequence.
     # Logical study sessions are shared and serialized by the progress row lock.
     session = create_viewing_session(
@@ -8560,7 +8548,6 @@ def start_viewing_session(request, offering_id, lesson_id, file_index):
         media.lesson,
         media.part_id,
         media_key=media.media_key,
-        segment_delivery_mode=delivery_mode,
     )
     token = sign_session(session.session_id, session.expires_at, audience="web")
     progress_row = LectureProgress.objects.filter(
@@ -8581,15 +8568,14 @@ def start_viewing_session(request, offering_id, lesson_id, file_index):
         ),
         "progress_percent": progress_percent,
         "resume_seconds": resume_seconds,
-    }
-    if gate_state is not None:
-        payload["gate_token"] = gate_state["token"]
-        payload["gate_refresh_at"] = gate_state["refresh_at"]
-        payload["gate_valid_until"] = gate_state["valid_until"]
-        payload["gate_url"] = reverse(
+        "gate_token": gate_state["token"],
+        "gate_refresh_at": gate_state["refresh_at"],
+        "gate_valid_until": gate_state["valid_until"],
+        "gate_url": reverse(
             "media-gate-refresh",
             args=[media.offering.pk, media.lesson.pk, media.file_index],
-        )
+        ),
+    }
     return JsonResponse(payload)
 
 @login_required
@@ -8684,14 +8670,6 @@ def media_gate_refresh(request, offering_id, lesson_id, file_index):
         response["Cache-Control"] = "private, no-store"
         return response
 
-    mode = session.segment_delivery_mode
-    if mode == ViewingSession.SegmentDeliveryMode.LEGACY:
-        mode = effective_segment_delivery_mode()
-    if mode != ViewingSession.SegmentDeliveryMode.EDGE_GATE:
-        response = JsonResponse({"error": _("Media gate is unavailable for this session.")}, status=404)
-        response["Cache-Control"] = "private, no-store"
-        return response
-
     window = int(timezone.now().timestamp() // 60)
     cache_key = f"media-gate-refresh:{request.user.pk}:{session.pk}:{window}"
     try:
@@ -8721,133 +8699,6 @@ def media_gate_refresh(request, offering_id, lesson_id, file_index):
     response["Cache-Control"] = "private, no-store"
     return response
 
-
-@require_http_methods(["GET", "HEAD"])
-def media_segment(request, session_id, segment_key):
-    """Authorize a signed HLS segment request, record proof on GET, and 302 to R2."""
-    session = (
-        ViewingSession.objects.select_related(
-            "student",
-            "student__role",
-            "lesson",
-            "lesson__course_offering",
-            "mobile_session",
-        )
-        .filter(session_id=session_id)
-        .first()
-    )
-    try:
-        presigned_url = authorize_and_presign_segment(
-            session=session,
-            request_user=request.user,
-            segment_key=segment_key,
-            token=request.GET.get("token", ""),
-            record_verified=(request.method == "GET"),
-            cloud_client=CLOUD_CLIENT,
-            bucket_name=bucket_name,
-        )
-    except MediaAccessError as exc:
-        status_map = {
-            "not_found": 404,
-            "unauthenticated": 401,
-            "expired": 401,
-            "forbidden": 403,
-            "unavailable": 503,
-        }
-        response = JsonResponse(
-            {"error": exc.message},
-            status=status_map.get(exc.code, 403),
-        )
-        response["Cache-Control"] = "private, no-store"
-        return response
-    response = HttpResponseRedirect(presigned_url)
-    response["Cache-Control"] = "private, no-store"
-    return response
-
-
-@csrf_exempt
-@require_POST
-def worker_receipt(request):
-    """Legacy Cloudflare Worker segment-receipt receiver (active when CLOUD_WORKER is set)."""
-    if not getattr(settings, "CLOUD_WORKER", ""):
-        return JsonResponse({"error": _("Legacy worker receipts are disabled.")}, status=403)
-    try:
-        data = json.loads(request.body)
-    except json.JSONDecodeError:
-        return JsonResponse({"error": _("Invalid request format.")}, status=400)
-
-    session_id = data.get("session_id")
-    segment_key = data.get("segment_key")
-    segment_number = data.get("segment_number")
-    signature = data.get("signature")
-    audience = data.get("audience")
-    token_expires_at = data.get("expires_at")
-
-    if (
-        not isinstance(session_id, str)
-        or not isinstance(segment_key, str)
-        or not isinstance(signature, str)
-        or not isinstance(audience, str)
-        or isinstance(token_expires_at, bool)
-        or not session_id
-        or not segment_key
-        or audience not in MEDIA_AUDIENCES
-        or segment_number is None
-        or token_expires_at is None
-    ):
-        return JsonResponse({"error": _("Missing required fields.")}, status=400)
-    provided_secret = request.headers.get("X-Worker-Secret", "")
-    expected_secret = settings.WORKER_RECEIPT_SECRET or ""
-    if not expected_secret or not hmac.compare_digest(provided_secret, expected_secret):
-        return JsonResponse({"error": _("Invalid worker credentials.")}, status=403)
-    if not validate_hls_object_key(segment_key)[0]:
-        return JsonResponse({"error": _("Invalid request format.")}, status=400)
-    if isinstance(segment_number, bool):
-        return JsonResponse({"error": _("Invalid segment number.")}, status=400)
-    try:
-        segment_number = int(segment_number)
-    except (TypeError, ValueError, OverflowError):
-        return JsonResponse({"error": _("Invalid segment number.")}, status=400)
-    try:
-        token_expires_at = int(token_expires_at)
-    except (TypeError, ValueError, OverflowError):
-        return JsonResponse({"error": _("Invalid request format.")}, status=400)
-
-    session = get_object_or_404(ViewingSession, session_id=session_id)
-
-    expected_audience = (
-        "mobile"
-        if session.access_channel == ViewingSession.AccessChannel.MOBILE
-        else "web"
-    )
-    if audience != expected_audience:
-        return JsonResponse({"error": _("Invalid request signature.")}, status=403)
-
-    if session.ended_at is not None or timezone.now() >= session.expires_at:
-        return JsonResponse({"error": _("Session expired.")}, status=410)
-
-    if token_expires_at > int(session.expires_at.timestamp()) or token_expires_at <= 0:
-        return JsonResponse({"error": _("Invalid request format.")}, status=400)
-
-    if get_segment_number(segment_key) != segment_number:
-        return JsonResponse({"error": _("Invalid segment number.")}, status=400)
-    expected = sign_media_message(
-        f"{MEDIA_TOKEN_VERSION}|{audience}|{session_id}|"
-        f"{token_expires_at}|{segment_key}"
-    )
-    if not hmac.compare_digest(signature, expected):
-        return JsonResponse({"error": _("Invalid request signature.")}, status=403)
-
-    _receipt, created = VerifiedSegmentRequest.objects.get_or_create(
-        session=session,
-        segment_number=segment_number,
-        defaults={
-            "segment_key": segment_key,
-            "signature": signature,
-            "expires_at": session.expires_at,
-        },
-    )
-    return JsonResponse({"status": "recorded" if created else "already_recorded"})
 
 @require_POST
 def progress_heartbeat(request, *, allow_management=False):

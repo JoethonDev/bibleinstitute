@@ -2763,12 +2763,6 @@ class AttendanceRecord(models.Model):
 
 
 class ViewingSession(models.Model):
-    class SegmentDeliveryMode(models.TextChoices):
-        LEGACY = "legacy", _("Legacy verified delivery")
-        DIRECT_R2 = "direct_r2", _("Direct R2 presigned redirect (302)")
-        WORKER = "worker", _("Cloudflare Worker proxy (legacy)")
-        EDGE_GATE = "edge_gate", _("Cloudflare edge gate")
-
     class AccessChannel(models.TextChoices):
         WEB = "web", _("Web")
         MOBILE = "mobile", _("Mobile")
@@ -2788,11 +2782,6 @@ class ViewingSession(models.Model):
         default=AccessChannel.WEB,
     )
     part_id = models.CharField(max_length=100)
-    segment_delivery_mode = models.CharField(
-        max_length=16,
-        choices=SegmentDeliveryMode.choices,
-        default=SegmentDeliveryMode.LEGACY,
-    )
     started_at = models.DateTimeField(null=True, blank=True)
     superseded_at = models.DateTimeField(null=True, blank=True)
     edge_earned_seconds_consumed = models.DecimalField(
@@ -2917,26 +2906,6 @@ class LectureProgressEvent(models.Model):
 
     def __str__(self):
         return f"{self.student.username} - {self.lesson.name} part {self.part_id}: {self.get_event_type_display()}"
-
-
-class VerifiedSegmentRequest(models.Model):
-    session = models.ForeignKey(ViewingSession, on_delete=models.CASCADE, related_name="verified_requests")
-    segment_number = models.PositiveIntegerField()
-    segment_key = models.CharField(max_length=500)
-    signature = models.CharField(max_length=128, blank=True, default='')
-    expires_at = models.DateTimeField(null=True, blank=True)
-    requested_at = models.DateTimeField(auto_now_add=True)
-
-    class Meta:
-        constraints = [
-            models.UniqueConstraint(
-                fields=["session", "segment_number"],
-                name="unique_verified_segment_number_per_session",
-            ),
-        ]
-
-    def __str__(self):
-        return f"{self.session.session_id} - {self.segment_key}"
 
 
 class LectureProgress(models.Model):
@@ -3690,48 +3659,6 @@ class MobilePushSettings(models.Model):
     @classmethod
     def load(cls) -> "MobilePushSettings":
         return cls.objects.get_or_create(singleton="default")[0]
-
-
-class MediaDeliverySettings(models.Model):
-    """Admin-controlled media delivery mode during the approved transition."""
-
-    class SegmentDeliveryMode(models.TextChoices):
-        DIRECT_R2 = "direct_r2", _("Direct R2 presigned redirect (302)")
-        WORKER = "worker", _("Cloudflare Worker proxy (legacy)")
-        EDGE_GATE = "edge_gate", _("Cloudflare edge gate")
-
-    singleton = models.CharField(max_length=20, unique=True, default="default", editable=False)
-    segment_delivery_mode = models.CharField(
-        max_length=16,
-        choices=SegmentDeliveryMode.choices,
-        default=SegmentDeliveryMode.WORKER,
-    )
-    updated_at = models.DateTimeField(auto_now=True)
-    updated_by = models.ForeignKey(
-        User,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name="media_delivery_settings_updates",
-    )
-
-    class Meta:
-        verbose_name = _("Media Delivery Settings")
-        verbose_name_plural = _("Media Delivery Settings")
-
-    def __str__(self):
-        return str(_("Media Delivery Settings"))
-
-    @classmethod
-    def load(cls) -> "MediaDeliverySettings":
-        return cls.objects.get_or_create(singleton="default")[0]
-
-    def save(self, *args, **kwargs):
-        result = super().save(*args, **kwargs)
-        from .media_delivery import invalidate_media_delivery_mode_cache
-
-        transaction.on_commit(invalidate_media_delivery_mode_cache)
-        return result
 
 
 class MediaGateToken(models.Model):

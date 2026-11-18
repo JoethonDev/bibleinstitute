@@ -20,7 +20,6 @@ from management_system.models import (
     Quiz,
     Submission,
     User,
-    VerifiedSegmentRequest,
     ViewingSession,
 )
 
@@ -97,7 +96,6 @@ class Command(BaseCommand):
             "grades": qs(Grade).count(),
             "attendance": qs(AttendanceRecord).count(),
             "viewing_sessions": qs(ViewingSession).count(),
-            "verified_segments": qs(VerifiedSegmentRequest).count(),
             "lecture_progress": qs(LectureProgress).count(),
         }
         self.stdout.write("Row counts:")

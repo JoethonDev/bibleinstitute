@@ -41,7 +41,6 @@ def main() -> int:
         from django.utils import timezone as django_timezone
 
         required_session_fields = {
-            "segment_delivery_mode",
             "started_at",
             "superseded_at",
             "edge_earned_seconds_consumed",

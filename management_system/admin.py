@@ -234,12 +234,6 @@ class LectureProgressEventAdmin(admin.ModelAdmin):
     raw_id_fields = ["student", "lesson", "viewing_session"]
 
 
-@admin.register(VerifiedSegmentRequest)
-class VerifiedSegmentRequestAdmin(admin.ModelAdmin):
-    list_display = ["session", "segment_number", "segment_key", "requested_at"]
-    raw_id_fields = ["session"]
-
-
 @admin.register(QuizType)
 class QuizTypeAdmin(admin.ModelAdmin):
     list_display = ["code", "name_en", "name_ar"]
@@ -525,24 +519,6 @@ class MobilePushSettingsAdmin(AdminOnlyModelAdmin):
     list_display = [
         "singleton",
         "expo_push_enabled",
-        "updated_at",
-    ]
-    readonly_fields = ["updated_at"]
-
-    def has_add_permission(self, request):
-        return False
-
-    def has_delete_permission(self, request, obj=None):
-        return False
-
-
-@admin.register(MediaDeliverySettings)
-class MediaDeliverySettingsAdmin(AdminOnlyModelAdmin):
-    """Editable fallback for switching HLS segment delivery between R2 302 and Worker."""
-
-    list_display = [
-        "singleton",
-        "segment_delivery_mode",
         "updated_at",
     ]
     readonly_fields = ["updated_at"]
