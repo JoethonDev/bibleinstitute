@@ -218,6 +218,13 @@ ADMIN_DOMAINS: tuple[AdminDomain, ...] = (
                 ),
             ),
             AdminSection(
+                key="quiz-settings",
+                label=_("Quiz Settings"),
+                url_name="quiz-settings",
+                icon="i-settings",
+                capability=can_manage_academic_setup,
+            ),
+            AdminSection(
                 key="content-qa",
                 label=_("Content QA"),
                 url_name="content-qa",

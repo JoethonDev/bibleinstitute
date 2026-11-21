@@ -93,7 +93,13 @@
                         <div>
                             <strong>{% translate "Quiz Closed" %}</strong>
                             <div class="ps-muted-text small">
+                                {% if answers_released %}
+                                {% blocktranslate with date=quiz_closing_date_str %}This quiz closed on {{ date }}. You did not submit it; the correct answers are shown below.{% endblocktranslate %}
+                                {% elif quiz_window_closed %}
                                 {% blocktranslate with date=quiz_closing_date_str %}This quiz closed on {{ date }}. Answers are not available for quizzes you did not submit.{% endblocktranslate %}
+                                {% else %}
+                                {% translate "This quiz is still open. Answers are not available for students who have not submitted it." %}
+                                {% endif %}
                             </div>
                         </div>
                     </div>
@@ -108,6 +114,8 @@
                         data-saving-text="{% translate 'Saving answers...' %}"
                         data-saved-text="{% translate 'Answers saved.' %}"
                         data-save-error-text="{% translate 'Answers could not be saved. Keep this page open and retry.' %}"
+                        data-require-all="{% if require_all_answers %}1{% else %}0{% endif %}"
+                        data-require-all-text="{% translate 'Answer every question before submitting this quiz.' %}"
                         data-timer-format="verbose"
                         data-timer-day="{% translate 'day' %}"
                         data-timer-days="{% translate 'days' %}"
@@ -212,6 +220,7 @@
                     const unansweredModal = document.querySelector("#unansweredQuestionsModal");
                     const unansweredFallbackDialog = document.querySelector("#unansweredQuestionsFallback");
                     const submitButton = form.querySelector('button[type="submit"]');
+                    const requireAll = form.dataset.requireAll === "1";
 
                     function showUnansweredQuestionsModal() {
                         if (!unansweredModal && !unansweredFallbackDialog) return;
@@ -279,6 +288,17 @@
                         if (!unanswered.length) return;
                         event.preventDefault();
                         event.stopImmediatePropagation();
+                        if (requireAll) {
+                            const message = form.dataset.requireAllText || "";
+                            [
+                                document.querySelector("#confirmUnansweredQuizSubmit"),
+                                document.querySelector("#confirmUnansweredQuizFallback"),
+                            ].forEach((button) => { if (button) button.classList.add("d-none"); });
+                            const modalDescription = document.querySelector("#unansweredQuestionsModalDescription");
+                            const fallbackDescription = document.querySelector("#unansweredQuestionsFallbackDescription");
+                            if (modalDescription) modalDescription.textContent = message;
+                            if (fallbackDescription) fallbackDescription.textContent = message;
+                        }
                         showUnansweredQuestionsModal();
                     });
                     document.querySelector("#confirmUnansweredQuizSubmit")?.addEventListener("click", () => {

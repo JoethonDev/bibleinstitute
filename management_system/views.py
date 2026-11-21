@@ -45,7 +45,7 @@ from functools import wraps
 from .models import *
 
 # Internal Imports - Forms
-from .forms import LessonEditorForm, CSVUploadForm, CourseForm, UserCreationForm, UserUpdateForm, SignupForm, SignupDetailsForm, MissingApplicationDocumentsForm, AcademicPaymentForm, ApplicationAdminForm, QuizExceptionalOpeningForm, AcademicYearForm, CourseOfferingForm, AcademicYearLevelWeekdayForm, AttendancePolicyForm, OfferingCopyForm, PromotionFormulaForm, PromotionRuleForm, HistoricalIntakeForm, ExceptionalCourseAssignmentForm, HistoricalExistingBulkForm, SignupSettingsForm, apply_cleaned_data_to_locked_instance
+from .forms import LessonEditorForm, CSVUploadForm, CourseForm, UserCreationForm, UserUpdateForm, SignupForm, SignupDetailsForm, MissingApplicationDocumentsForm, AcademicPaymentForm, ApplicationAdminForm, QuizExceptionalOpeningForm, AcademicYearForm, CourseOfferingForm, AcademicYearLevelWeekdayForm, AttendancePolicyForm, OfferingCopyForm, PromotionFormulaForm, PromotionRuleForm, HistoricalIntakeForm, ExceptionalCourseAssignmentForm, HistoricalExistingBulkForm, SignupSettingsForm, QuizSettingsForm, apply_cleaned_data_to_locked_instance
 
 # Internal Imports - Utilities
 from .utils.csv_export import export_users_to_csv, export_single_submission_to_csv, _csv_safe_cell, _safe_filename, enqueue_quiz_export
@@ -84,6 +84,7 @@ from .student_experience.calendar import build_calendar_context
 from .student_experience.course import build_course_context
 from .student_experience.lesson import build_lesson_context
 from .student_experience.learning import build_learning_context
+from .student_experience.quizzes import quiz_home_summary
 from .student_experience.quiz import build_quiz_presentation_context
 from .student_experience.profile import (
     build_student_profile_context,
@@ -159,6 +160,7 @@ from .utils.attendance import (
     is_expected_date,
 )
 from .utils.timezones import (
+    ensure_aware,
     parse_application_datetime,
     format_human_datetime,
     timezone_name,
@@ -181,7 +183,7 @@ from .admin_tables import (
     user_scope,
     user_tab_counts,
 )
-from .utils.quiz_access import answers_releasable, grant_quiz_openings, quiz_window
+from .utils.quiz_access import answers_releasable, grant_quiz_openings
 from .quiz_questions import MAX_QUESTIONS, build_question_instance
 from .quiz_import import MAX_PAYLOAD_BYTES, parse_quiz_import
 from .public_content import get_institute_copy
@@ -904,7 +906,8 @@ def view_courses(request, course_id=None):
         })
 
     return render(request, "course_view.html", {
-        "sections": sections
+        "sections": sections,
+        "quiz_summary": None if management_preview else quiz_home_summary(user),
     })
 
 @login_required(login_url=LOGIN_URL)
@@ -1144,9 +1147,15 @@ def take_exam(request, offering_id, quiz_id, *, allow_management=False):
         if not preview_requested and not user_has_management_role(user) and grade is None:
             if snapshot is not None and snapshot.deadline_at <= submission_datetime:
                 reconcile_snapshots(quiz.pk, user_id=user.pk)
-                grade = Grade.objects.filter(quiz=quiz, user=user).first()
-                snapshot = None
-                quiz_mode = "view" if grade is not None else "closed_unsolved"
+                # An untouched attempt is discarded by reconciliation, so the
+                # state must be re-resolved instead of assuming it closed.
+                quiz_mode, grade, snapshot = get_student_quiz_status(
+                    quiz,
+                    user,
+                    submission_datetime,
+                    opening=opening,
+                    opening_loaded=True,
+                )
 
         total_grade = grade.total_grade if grade else 0
 
@@ -1176,6 +1185,18 @@ def take_exam(request, offering_id, quiz_id, *, allow_management=False):
                 quiz_mode = "closed_unsolved"
                 query_set = Question.objects.filter(quiz_id=quiz_id)
 
+            quiz_policy = QuizSettings.load()
+            quiz_window_closed = ensure_aware(effective_closing_date) <= submission_datetime
+            answers_released = (
+                False
+                if user_has_management_role(user)
+                else answers_releasable(
+                    grade,
+                    mode=quiz_mode,
+                    window_closed=quiz_window_closed,
+                    policy=quiz_policy,
+                )
+            )
             # Serialize questions; strip answer data to prevent leakage
             if quiz_mode in {"exam", "preview"}:
                 questions = [q.serialize() for q in query_set]
@@ -1188,7 +1209,16 @@ def take_exam(request, offering_id, quiz_id, *, allow_management=False):
                     q.pop("correct_answer", None)
                     q.pop("config", None)
             elif quiz_mode == "closed_unsolved":
-                questions = [q.serialize_student() for q in query_set]
+                questions = [
+                    q.serialize() if answers_released else q.serialize_student()
+                    for q in query_set
+                ]
+                if answers_released:
+                    # The review renders choices and the answer payload only.
+                    for question in questions:
+                        question.pop("config", None)
+                        question.pop("config_json", None)
+                        question.pop("answer_payload_json", None)
             else:
                 questions = [q.serialize() for q in query_set]
                 if not user_has_management_role(user):
@@ -1217,6 +1247,9 @@ def take_exam(request, offering_id, quiz_id, *, allow_management=False):
                 "extended_view": "base.html",
                 "id": "container",
                 "total_grade": total_grade,
+                "answers_released": answers_released,
+                "quiz_window_closed": quiz_window_closed,
+                "require_all_answers": quiz_policy.require_all_answers,
                 "attempt_deadline": active_snapshot.deadline_at.timestamp() if active_snapshot else None,
                 "server_now_ms": int(server_time.timestamp() * 1000),
                 "quiz_duration_minutes": quiz.duration_minutes,
@@ -1248,9 +1281,16 @@ def take_exam(request, offering_id, quiz_id, *, allow_management=False):
                 questions_data, not_used = unpack_quiz_form(request.POST)
                 try:
                     answers = {str(data["id"]): data.get("answer", "") for data in questions_data.values()}
-                    submit_answers(quiz_id, user, answers)
+                    submit_answers(
+                        quiz_id,
+                        user,
+                        answers,
+                        require_complete=QuizSettings.load().require_all_answers,
+                    )
                     success(request, _("Quiz is sent successfully!"), extra_tags="alert-success") # Translate
 
+                except ValidationError as exc:
+                    error(request, " ".join(exc.messages), extra_tags="alert-danger")
                 except PermissionDenied:
                     raise
                 except Exception:
@@ -6427,6 +6467,35 @@ def signup_settings(request):
             (_("Signup Settings"), None),
         ]),
     })
+
+@capability_required(can_manage_academic_setup)
+def quiz_settings(request):
+    """Admin control over quiz submission and answer-release policy."""
+    settings_row = QuizSettings.load()
+    if request.method == "POST":
+        form = QuizSettingsForm(request.POST, instance=settings_row)
+        if form.is_valid():
+            settings_row = form.save(commit=False)
+            settings_row.updated_by = request.user
+            settings_row.save()
+            messages.success(request, _("Quiz settings saved."))
+            return redirect("quiz-settings")
+    else:
+        form = QuizSettingsForm(instance=settings_row)
+    return render_page(
+        request,
+        "quiz_settings.html",
+        "partials/quiz_settings_content.html",
+        {
+            "settings_row": settings_row,
+            "form": form,
+            "breadcrumb_items": generate_breadcrumb([
+                (_("Admin"), reverse("admin-panel")),
+                (_("Quiz Settings"), None),
+            ]),
+        },
+    )
+
 
 @capability_required(can_manage_applications)
 def application_review(request, user_id):

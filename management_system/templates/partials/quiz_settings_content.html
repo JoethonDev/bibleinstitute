@@ -1,0 +1,45 @@
+{% load i18n %}
+{% translate "Curriculum" as page_eyebrow %}
+{% translate "Quiz Settings" as page_title %}
+{% translate "Control how quiz submission and answer release behave for every quiz." as page_description %}
+<div id="content" class="aw-dashboard-page">
+    <div class="aw-page-head aw-flex-wrap">
+        {% include "partials/components/aw_page_head_main.html" with page_eyebrow=page_eyebrow page_title=page_title page_description=page_description %}
+    </div>
+
+    <form method="post" action="{% url 'quiz-settings' %}" hx-post="{% url 'quiz-settings' %}" hx-target="#content" hx-swap="outerHTML" hx-select="#content" hx-select-oob="#toast-stack" hx-push-url="true">
+        {% csrf_token %}
+        <section class="aw-card">
+            <div class="aw-card-head">
+                <div class="aw-card-title">
+                    <svg class="aw-ico" aria-hidden="true"><use href="#i-settings"></use></svg>
+                    <h3>{% translate "Submission and answer release" %}</h3>
+                </div>
+            </div>
+            <div class="aw-card-body">
+                <div class="aw-form-grid">
+                    {% include "partials/components/aw_field.html" with field=form.release_answers_to_unsolved %}
+                    {% include "partials/components/aw_field.html" with field=form.require_all_answers %}
+                </div>
+                {% if form.non_field_errors %}
+                <div class="aw-alert aw-alert--danger aw-mt-3" role="alert">
+                    <svg class="aw-ico" aria-hidden="true"><use href="#i-alert"></use></svg>
+                    <div>{{ form.non_field_errors }}</div>
+                </div>
+                {% endif %}
+                <p class="aw-small aw-muted aw-mt-3">{% translate "A timed attempt still submits automatically at its deadline, even when unanswered questions remain." %}</p>
+                {% if settings_row.updated_at %}
+                <p class="aw-small aw-muted aw-mt-2">
+                    {% translate "Last changed" %} {{ settings_row.updated_at|date:"Y-m-d H:i" }} - {{ settings_row.updated_by|default:"-" }}
+                </p>
+                {% endif %}
+                <div class="aw-form-actions">
+                    <button type="submit" class="aw-btn aw-btn--primary">
+                        <svg class="aw-ico" aria-hidden="true"><use href="#i-check"></use></svg>
+                        <span>{% translate "Save settings" %}</span>
+                    </button>
+                </div>
+            </div>
+        </section>
+    </form>
+</div>

@@ -22,6 +22,8 @@
         data-save-error-text="{% translate 'Answers could not be saved. Keep this page open and retry.' %}"
         data-submit-confirm-text="{% translate 'Submit this quiz?' %}"
         data-submit-warning-text="{% translate 'You can submit now, but unanswered questions will be marked blank.' %}"
+        data-require-all="{% if require_all_answers %}1{% else %}0{% endif %}"
+        data-require-all-text="{% translate 'Answer every question before submitting this quiz.' %}"
         data-unanswered-singular="{% translate 'You still have 1 unanswered question.' %}"
         data-unanswered-plural="{% blocktrans %}You still have __count__ unanswered questions.{% endblocktrans %}">
     {% csrf_token %}
@@ -184,7 +186,27 @@
   </div>
   {% endif %}
 {% else %}
-  <div class="sn-alert sn-alert--warning" role="status"><span class="sn-alert-icon"><svg class="sn-ico" aria-hidden="true"><use href="#i-lock"></use></svg></span><div class="sn-alert-copy"><b>{% translate "Quiz closed" %}</b><p>{% blocktrans with date=quiz_closing_label %}This quiz closed on {{ date }}. Answers are not available for quizzes you did not submit.{% endblocktrans %}</p></div></div>
+  {% if answers_released %}
+  <section class="sn-result-hero">
+    <div class="sn-result-copy">
+      <span class="sn-eyebrow">{% translate "Answers released" %}</span>
+      <h1 dir="auto">{{ quiz.name }}</h1>
+      <p>{{ offering.course.name }} - {{ quiz_closing_label }}</p>
+      <p>{% translate "You did not submit this quiz. The correct answers are shown below." %}</p>
+    </div>
+    <div class="sn-result-actions"><a class="sn-btn sn-btn--primary" href="{{ back_url }}"><svg class="sn-ico" aria-hidden="true"><use href="#i-arrow-left"></use></svg><span>{% translate "Back to course" %}</span></a><a class="sn-btn sn-btn--ghost" href="{% url 'student-quizzes' %}"><svg class="sn-ico" aria-hidden="true"><use href="#i-file-check"></use></svg><span>{% translate "My Quizzes" %}</span></a></div>
+  </section>
+  <div class="sn-layout-main-aside">
+    <div class="sn-stack">
+      <section class="sn-section"><div class="sn-section-head"><div class="sn-section-head-main"><h2><svg class="sn-ico" aria-hidden="true"><use href="#i-check-circle"></use></svg>{% translate "Correct answers" %}</h2><p>{% translate "Review the questions and their answers." %}</p></div></div>{% include "student_next/partials/quiz_questions.html" with mode="view" questions=questions review_unsolved=True %}</section>
+    </div>
+    <aside class="sn-aside">
+      <section class="sn-card sn-aside-card"><div class="sn-section-head"><div class="sn-section-head-main"><h2>{% translate "Need help?" %}</h2></div></div><div class="sn-card-body"><p class="sn-small-copy">{% translate "Contact your academic office if you think this quiz should be reopened for you." %}</p><div class="sn-card-actions"><a class="sn-btn sn-btn--ghost sn-btn--sm" href="{{ back_url }}">{% translate "Back to course" %}</a></div></div></section>
+    </aside>
+  </div>
+  {% else %}
+  <div class="sn-alert sn-alert--warning" role="status"><span class="sn-alert-icon"><svg class="sn-ico" aria-hidden="true"><use href="#i-lock"></use></svg></span><div class="sn-alert-copy"><b>{% translate "Quiz closed" %}</b>{% if quiz_window_closed %}<p>{% blocktrans with date=quiz_closing_label %}This quiz closed on {{ date }}. Answers are not available for quizzes you did not submit.{% endblocktrans %}</p>{% else %}<p>{% translate "This quiz is still open. Answers are not available for students who have not submitted it." %}</p>{% endif %}</div></div>
   <section class="sn-section"><div class="sn-section-head"><div class="sn-section-head-main"><h1 dir="auto">{{ quiz.name }}</h1><p>{{ offering.course.name }} - {{ quiz_closing_label }}</p></div><a class="sn-btn sn-btn--ghost" href="{{ back_url }}"><svg class="sn-ico" aria-hidden="true"><use href="#i-arrow-left"></use></svg>{% translate "Back to course" %}</a></div></section>
+  {% endif %}
 {% endif %}
 {% endblock %}

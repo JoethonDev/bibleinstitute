@@ -127,6 +127,50 @@ def user_can_write_offering_activity(
     ).exists()
 
 
+def active_enrollment_scope(user: User) -> tuple[set[int], set[int]]:
+    """Batched enrollment facts for write checks over a bounded offering set.
+
+    Returns the active normal academic-year-level ids and the active targeted
+    offering ids. Callers combine them with ``can_write_offering_from_scope``
+    instead of issuing one exists query per row.
+    """
+    normal_scopes: set[int] = set()
+    targeted_offerings: set[int] = set()
+    rows = (
+        Enrollment.objects.filter(student=user, status=Enrollment.Status.ACTIVE)
+        .filter(
+            Q(enrollment_type=Enrollment.Type.NORMAL)
+            | Q(enrollment_type__in=TARGETED_ENROLLMENT_TYPES)
+        )
+        .values_list("enrollment_type", "academic_year_level_id", "course_offering_id")
+    )
+    for enrollment_type, scope_id, offering_id in rows:
+        if enrollment_type == Enrollment.Type.NORMAL:
+            normal_scopes.add(scope_id)
+        elif offering_id is not None:
+            targeted_offerings.add(offering_id)
+    return normal_scopes, targeted_offerings
+
+
+def can_write_offering_from_scope(
+    offering: CourseOffering,
+    normal_scopes: set[int],
+    targeted_offerings: set[int],
+) -> bool:
+    """Batched equivalent of ``user_can_write_offering_activity``.
+
+    The offering must be loaded with ``academic_year_level__academic_year``.
+    """
+    return bool(
+        offering.status == PublicationStatus.PUBLISHED
+        and offering.academic_year_level.academic_year.is_active
+        and (
+            offering.academic_year_level_id in normal_scopes
+            or offering.pk in targeted_offerings
+        )
+    )
+
+
 def get_accessible_offering_or_403(
     user: User,
     offering_id: int,

@@ -15,6 +15,21 @@
     </div>
   </header>
 
+  {% if quiz_summary %}
+  <nav class="sn-quiz-shortcuts" aria-label="{% translate 'Quiz shortcuts' %}">
+    <a class="sn-quiz-shortcut" href="{% url 'student-quizzes' %}?status=pending">
+      <span class="sn-quiz-shortcut-icon"><svg class="sn-ico" aria-hidden="true"><use href="#i-file-check"></use></svg></span>
+      <span class="sn-quiz-shortcut-copy"><b>{{ quiz_summary.pending }}</b><small>{% translate "Pending quizzes" %}</small></span>
+      <svg class="sn-ico" aria-hidden="true"><use href="#i-chevron-right"></use></svg>
+    </a>
+    <a class="sn-quiz-shortcut" href="{% url 'student-quizzes' %}?status=completed">
+      <span class="sn-quiz-shortcut-icon"><svg class="sn-ico" aria-hidden="true"><use href="#i-check-circle"></use></svg></span>
+      <span class="sn-quiz-shortcut-copy"><b>{{ quiz_summary.completed }}</b><small>{% translate "Completed quizzes" %}</small></span>
+      <svg class="sn-ico" aria-hidden="true"><use href="#i-chevron-right"></use></svg>
+    </a>
+  </nav>
+  {% endif %}
+
   {% if active_scope and not is_management_view %}
   <div class="sn-context-strip">
     <span class="sn-ctx-item"><svg class="sn-ico" aria-hidden="true"><use href="#i-calendar"></use></svg><span><b>{{ active_scope.academic_year.name }}</b> {% translate "active year" %}</span></span>

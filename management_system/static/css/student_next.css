@@ -1066,6 +1066,54 @@ body.sn-student .sn-notif-meta .sn-text-link{ font-size: .7rem; }
 body.sn-student .sn-load-more{ display: flex; justify-content: center; margin-top: 6px; }
 
 /* --------------------------------------------------------------------------
+   My learning - quiz shortcuts
+   -------------------------------------------------------------------------- */
+body.sn-student .sn-quiz-shortcuts{ display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-bottom: 16px; }
+body.sn-student .sn-quiz-shortcut{
+    display: flex; align-items: center; gap: 12px; padding: 12px 15px;
+    border: 1px solid var(--sn-line); border-radius: var(--sn-radius);
+    background: var(--sn-paper); color: var(--sn-ink); text-decoration: none;
+    box-shadow: var(--sn-shadow); transition: border-color var(--sn-ease), transform var(--sn-ease);
+}
+body.sn-student .sn-quiz-shortcut:hover{ border-color: var(--sn-gold); transform: translateY(-1px); }
+body.sn-student .sn-quiz-shortcut-icon{ width: 38px; height: 38px; display: grid; place-items: center; flex: none; border-radius: 11px; background: var(--sn-gold-soft); color: var(--sn-gold-deep); }
+body.sn-student .sn-quiz-shortcut-icon .sn-ico{ width: 19px; height: 19px; }
+body.sn-student .sn-quiz-shortcut-copy{ display: flex; flex-direction: column; min-width: 0; flex: 1; }
+body.sn-student .sn-quiz-shortcut-copy b{ font-family: var(--sn-display); font-size: 1.35rem; line-height: 1.1; }
+body.sn-student .sn-quiz-shortcut-copy small{ color: var(--sn-muted); font-size: .72rem; font-weight: 700; }
+body.sn-student .sn-quiz-shortcut > .sn-ico{ width: 16px; height: 16px; color: var(--sn-muted); flex: none; }
+@media (max-width: 600px) {
+    body.sn-student .sn-quiz-shortcuts{ grid-template-columns: 1fr; }
+}
+
+/* --------------------------------------------------------------------------
+   My quizzes - grouped course index
+   -------------------------------------------------------------------------- */
+body.sn-student .sn-quiz-groups{ display: flex; flex-direction: column; gap: 12px; }
+body.sn-student .sn-quiz-course{ overflow: hidden; border: 1px solid var(--sn-line); border-radius: var(--sn-radius); background: var(--sn-paper); box-shadow: var(--sn-shadow); }
+body.sn-student .sn-quiz-course-head{ display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 16px; background: rgba(238, 243, 244, .55); }
+body.sn-student .sn-quiz-course-head .sn-eyebrow{ margin: 0; }
+body.sn-student .sn-quiz-course-head h2{ margin: 2px 0 0; font-family: var(--sn-display); font-size: 1.2rem; line-height: 1.2; }
+body.sn-student .sn-quiz-rows{ display: flex; flex-direction: column; }
+body.sn-student .sn-quiz-row{ display: flex; align-items: center; gap: 12px; padding: 11px 16px; color: var(--sn-ink); text-decoration: none; border-top: 1px solid var(--sn-line); }
+body.sn-student .sn-quiz-row:first-child{ border-top: 0; }
+body.sn-student .sn-quiz-row:hover{ background: var(--sn-cream); }
+body.sn-student .sn-quiz-row-icon{ width: 34px; height: 34px; display: grid; place-items: center; flex: none; border-radius: 10px; background: rgba(238, 243, 244, .8); color: var(--sn-muted); }
+body.sn-student .sn-quiz-row-icon.is-open{ background: var(--sn-gold-soft); color: var(--sn-gold-deep); }
+body.sn-student .sn-quiz-row-icon.is-done{ background: #d7ebdf; color: #1e5b40; }
+body.sn-student .sn-quiz-row-icon .sn-ico{ width: 17px; height: 17px; }
+body.sn-student .sn-quiz-row-main{ display: flex; flex-direction: column; min-width: 0; flex: 1; }
+body.sn-student .sn-quiz-row-main b{ font-size: .92rem; }
+body.sn-student .sn-quiz-row-main small{ color: var(--sn-muted); font-size: .7rem; }
+body.sn-student .sn-quiz-row-side{ display: flex; align-items: center; gap: 8px; flex: none; }
+body.sn-student .sn-quiz-row-side > .sn-ico{ width: 15px; height: 15px; color: var(--sn-muted); }
+@media (max-width: 600px) {
+    body.sn-student .sn-quiz-row{ padding: 10px 12px; gap: 9px; }
+    body.sn-student .sn-quiz-row-main b{ font-size: .86rem; }
+    body.sn-student .sn-quiz-row-side > .sn-ico{ display: none; }
+}
+
+/* --------------------------------------------------------------------------
    My learning - next meeting and year groups
    -------------------------------------------------------------------------- */
 body.sn-student .sn-upcoming-meeting{

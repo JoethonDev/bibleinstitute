@@ -28,6 +28,7 @@ from ..utils.student_data import (
 from ..utils.helpers import pagination_query_string
 from .calendar import next_student_meeting
 from .mode import is_management_student_view
+from .quizzes import quiz_home_summary
 
 STUDENT_OFFERING_PAGE_SIZE = 20
 _LEARNING_FILTERS = {"all", "current", "completed"}
@@ -394,6 +395,7 @@ def build_learning_context(request) -> dict:
         "next_meeting": next_meeting,
         "resume": resume,
         "due_soon": due_soon,
+        "quiz_summary": quiz_home_summary(user),
         "announcements": announcements,
         "week_meetings": week_meetings,
         "greeting": greeting,

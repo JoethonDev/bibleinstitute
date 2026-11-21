@@ -5,7 +5,15 @@ from django.db import transaction
 from django.db.models import Exists, OuterRef
 from django.utils.translation import gettext_lazy as _
 
-from ..models import Enrollment, Grade, Quiz, QuizStudentOpening, User
+from ..models import (
+    Enrollment,
+    Grade,
+    PublicationStatus,
+    Quiz,
+    QuizSettings,
+    QuizStudentOpening,
+    User,
+)
 from .timezones import ensure_aware
 
 
@@ -81,16 +89,40 @@ def quiz_attempt_status_from(quiz, grade, opening, current_time, can_write, snap
     return mode, None
 
 
-def answers_releasable(grade: Grade | None) -> bool:
-    """Canonical answer-release rule: solved students see the correct answers.
+def management_quiz_status(quiz: Quiz, current_time) -> str:
+    """Canonical management preview state for one quiz."""
+    if quiz.status != PublicationStatus.PUBLISHED:
+        return "draft"
+    if quiz.opening_date and quiz.opening_date > current_time:
+        return "upcoming"
+    if quiz.closing_date and quiz.closing_date <= current_time:
+        return "closed_unsolved"
+    return "ready"
 
-    Answers are released as soon as this student has a submitted grade, even
-    while the quiz is still open for peers. A closed-and-unsolved student never
-    receives answers (web renders ``serialize_student`` and the mobile payload
-    omits ``correct_answer``). Management preview/correction callers bypass this
-    rule and must gate separately.
+
+def answers_releasable(
+    grade: Grade | None,
+    *,
+    mode: str | None = None,
+    window_closed: bool = False,
+    policy: QuizSettings | None = None,
+) -> bool:
+    """Canonical answer-release rule for solved and closed-unsolved students.
+
+    A submitted student always sees the correct answers, even while the quiz is
+    still open for peers. An unsolved student sees the key only when the quiz
+    window itself has closed and the institute setting
+    ``release_answers_to_unsolved`` is enabled. A student whose own attempt
+    expired while peers may still be taking the quiz is therefore never
+    released. Management preview/correction callers bypass this rule and must
+    gate separately.
     """
-    return grade is not None
+    if grade is not None:
+        return True
+    if mode != "closed_unsolved" or not window_closed:
+        return False
+    policy = policy or QuizSettings.load()
+    return policy.release_answers_to_unsolved
 
 
 @transaction.atomic

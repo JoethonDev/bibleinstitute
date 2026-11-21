@@ -17580,3 +17580,84 @@ msgstr "الاختبار مغلق، لم يعد بإمكانك أداءه!"
 
 msgid "This browser could not save progress for later. Keep this page open until it syncs."
 msgstr "تعذّر على هذا المتصفح حفظ التقدم لمزامنته لاحقاً. أبقِ هذه الصفحة مفتوحة حتى تتم المزامنة."
+
+msgid "Quiz shortcuts"
+msgstr "اختصارات الاختبارات"
+
+msgid "Pending quizzes"
+msgstr "اختبارات معلقة"
+
+msgid "Completed quizzes"
+msgstr "اختبارات مكتملة"
+
+msgid "Quiz status"
+msgstr "حالة الاختبار"
+
+msgid "Your quizzes, grouped by course."
+msgstr "اختباراتك مجمعة حسب المقرر."
+
+msgid "Open now"
+msgstr "مفتوح الآن"
+
+msgid "No completed quizzes yet"
+msgstr "لا توجد اختبارات مكتملة بعد"
+
+msgid "No pending quizzes"
+msgstr "لا توجد اختبارات معلقة"
+
+msgid "Quizzes appear here when they are published for your courses."
+msgstr "تظهر الاختبارات هنا عند نشرها لمقرراتك."
+
+msgid "Answers released"
+msgstr "تم إتاحة الإجابات"
+
+msgid "You did not submit this quiz. The correct answers are shown below."
+msgstr "لم تسلم هذا الاختبار. الإجابات الصحيحة معروضة أدناه."
+
+msgid "Correct answers"
+msgstr "الإجابات الصحيحة"
+
+msgid "Review the questions and their answers."
+msgstr "راجع الأسئلة وإجاباتها."
+
+msgid "Contact your academic office if you think this quiz should be reopened for you."
+msgstr "تواصل مع الشؤون الأكاديمية إذا كنت ترى أن هذا الاختبار يجب أن يعاد فتحه لك."
+
+msgid "Answer every question before submitting this quiz."
+msgstr "أجب عن كل الأسئلة قبل تسليم هذا الاختبار."
+
+msgid "Answer at least one question before submitting this quiz."
+msgstr "أجب عن سؤال واحد على الأقل قبل تسليم هذا الاختبار."
+
+msgid "Quiz Settings"
+msgstr "إعدادات الاختبارات"
+
+msgid "Control how quiz submission and answer release behave for every quiz."
+msgstr "تحكم في سلوك تسليم الاختبارات وإتاحة الإجابات لكل اختبار."
+
+msgid "Submission and answer release"
+msgstr "التسليم وإتاحة الإجابات"
+
+msgid "A timed attempt still submits automatically at its deadline, even when unanswered questions remain."
+msgstr "المحاولة الموقوتة تُسلم تلقائياً عند انتهاء وقتها حتى لو بقيت أسئلة دون إجابة."
+
+msgid "Release answers to students who did not submit"
+msgstr "إتاحة الإجابات للطلاب الذين لم يسلموا"
+
+msgid "Require every question to be answered"
+msgstr "اشتراط الإجابة عن كل الأسئلة"
+
+msgid "Quiz settings saved."
+msgstr "تم حفظ إعدادات الاختبارات."
+
+msgid "When enabled, a student who did not submit a quiz can review its correct answers after the quiz closes."
+msgstr "عند التفعيل، يمكن للطالب الذي لم يسلم الاختبار مراجعة الإجابات الصحيحة بعد انتهاء الاختبار."
+
+msgid "When enabled, students must answer every question before submitting. Timed attempts still submit automatically at the deadline."
+msgstr "عند التفعيل، يجب على الطالب الإجابة عن كل الأسئلة قبل التسليم. تبقى المحاولات الموقوتة تُسلم تلقائياً عند انتهاء الوقت."
+
+msgid "This quiz closed on %(date)s. You did not submit it; the correct answers are shown below."
+msgstr "انتهى هذا الاختبار في %(date)s. لم تسلمه؛ الإجابات الصحيحة معروضة أدناه."
+
+msgid "This quiz is still open. Answers are not available for students who have not submitted it."
+msgstr "هذا الاختبار ما زال مفتوحاً. الإجابات غير متاحة للطلاب الذين لم يسلموه."

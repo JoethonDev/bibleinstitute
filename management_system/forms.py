@@ -5,7 +5,7 @@ import secrets
 
 from django.core.exceptions import ValidationError
 from django.db.models import Q
-from .models import User, Role, Course, AcademicYear, AcademicYearLevel, AttendancePolicy, CourseOffering, Enrollment, Level, QuizType, PromotionRule, HistoricalAcademicSummary, QUIZ_TYPE_CODES, SignupSettings, PublicationStatus, StudentExperienceOverride, StudentExperienceSettings, assign_academic_date
+from .models import User, Role, Course, AcademicYear, AcademicYearLevel, AttendancePolicy, CourseOffering, Enrollment, Level, QuizType, PromotionRule, HistoricalAcademicSummary, QUIZ_TYPE_CODES, SignupSettings, PublicationStatus, StudentExperienceOverride, StudentExperienceSettings, QuizSettings, assign_academic_date
 from .utils.validators import normalize_username, validate_identity_by_type, validate_unique_phone
 from .utils.application_uploads import validate_application_file
 from django.utils.translation import gettext_lazy as _ # Import gettext_lazy
@@ -1785,6 +1785,23 @@ class StudentExperienceSettingsForm(AwModelForm):
         self.fields["mode"].help_text = _(
             "This is the default for students who inherit the global setting. "
             "Use the force action to apply it to every student and ignore per-account overrides."
+        )
+
+
+class QuizSettingsForm(AwModelForm):
+    """Admin control over quiz submission and answer-release policy."""
+
+    class Meta:
+        model = QuizSettings
+        fields = ["release_answers_to_unsolved", "require_all_answers"]
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["release_answers_to_unsolved"].label = _(
+            "Release answers to students who did not submit"
+        )
+        self.fields["require_all_answers"].label = _(
+            "Require every question to be answered"
         )
 
 

@@ -563,6 +563,25 @@ class StudentBannerAdmin(AcademicContentReadOnlyAdmin):
     list_per_page = 50
 
 
+@admin.register(QuizSettings)
+class QuizSettingsAdmin(AdminOnlyModelAdmin):
+    """Editable fallback for the quiz policy; edits go through Quiz Settings."""
+
+    list_display = [
+        "singleton",
+        "release_answers_to_unsolved",
+        "require_all_answers",
+        "updated_at",
+    ]
+    readonly_fields = ["updated_at"]
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
 @admin.register(SignupSettings)
 class SignupSettingsAdmin(AdminOnlyModelAdmin):
     """Editable fallback for the public signup form controls; edits go through Signup Settings."""

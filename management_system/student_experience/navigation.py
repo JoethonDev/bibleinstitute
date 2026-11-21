@@ -5,6 +5,7 @@ from django.utils.translation import pgettext_lazy
 
 _NAV_ITEMS = (
     ("learn", _("Learn"), "courses", "book-open"),
+    ("quizzes", _("Quizzes"), "student-quizzes", "file-check"),
     ("calendar", _("Calendar"), "student-calendar", "calendar"),
     ("support", _("Support"), "student-support", "message"),
     ("offline", pgettext_lazy("student navigation", "Offline"), "offline-library", "download"),
@@ -19,9 +20,12 @@ def student_navigation(
     include_support: bool = True,
     include_offline: bool = True,
 ) -> list[dict[str, object]]:
-    active_key = "learn" if active_page in {
-        "courses", "course", "lesson", "quiz", "graduates", "download",
-    } else active_page
+    if active_page == "quiz":
+        active_key = "quizzes"
+    elif active_page in {"courses", "course", "lesson", "graduates", "download"}:
+        active_key = "learn"
+    else:
+        active_key = active_page
     return [
         {
             "key": key,

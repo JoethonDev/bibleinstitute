@@ -651,8 +651,8 @@ def quiz_submit(request, offering_id, quiz_id):
         grade = submit_answers(quiz.pk, request.user, normalized_answers)
     except PermissionDenied:
         return _error(request, "submission_closed", _("The quiz is closed or already submitted."), 400)
-    except ValidationError:
-        return _error(request, "invalid_request", _("Invalid quiz submission."), 400)
+    except ValidationError as exc:
+        return _error(request, "invalid_request", "; ".join(exc.messages), 400)
     return json_api_response(request, {
         "status": "submitted",
         "grade": {"total_grade": grade.total_grade, "submitted_at": grade.submitted_at},

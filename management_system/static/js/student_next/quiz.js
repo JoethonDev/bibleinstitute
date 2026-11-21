@@ -10,6 +10,8 @@
     const progressNode = document.getElementById("current-question");
     const warningNode = document.getElementById("question-warning");
     const dialog = document.getElementById("unansweredQuestionsFallback");
+    const confirmSubmitButton = dialog ? dialog.querySelector("[data-quiz-confirm]") : null;
+    const requireAll = form.dataset.requireAll === "1";
     let current = 1;
     let confirmedSubmit = false;
     let transitionToken = 0;
@@ -150,16 +152,21 @@
 
     function showSubmitDialog() {
         const missing = questions.filter((questionCard) => !questionIsAnswered(questionCard)).length;
+        const blocked = requireAll && missing > 0;
         const description = document.getElementById("quiz-submit-description");
+        if (confirmSubmitButton) confirmSubmitButton.hidden = blocked;
         if (description) {
             const unanswered = missing === 1
                 ? form.dataset.unansweredSingular
                 : (form.dataset.unansweredPlural || "").replace("__count__", String(missing));
-            description.textContent = missing
-                ? `${unanswered} ${form.dataset.submitWarningText}`
-                : form.dataset.submitConfirmText;
+            description.textContent = blocked
+                ? `${unanswered} ${form.dataset.requireAllText}`
+                : missing
+                    ? `${unanswered} ${form.dataset.submitWarningText}`
+                    : form.dataset.submitConfirmText;
         }
         if (dialog?.showModal) dialog.showModal();
+        else if (blocked) window.alert(form.dataset.requireAllText || "");
         else if (window.confirm(description?.textContent || form.dataset.submitConfirmText)) {
             confirmedSubmit = true;
             form.requestSubmit();

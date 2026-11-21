@@ -232,8 +232,8 @@
                     </div>
 
                     <div class="correct-answer-section sd-correct-answer-section">
-                    {# Only reveal correct answers when student has submitted (exam_taken) or for management. Never for closed_unsolved. #}
-                    {% if mode != "closed_unsolved" and not is_student or mode != "closed_unsolved" and exam_taken %}
+                    {# Reveal answers after submission, for management, or when the institute released them to unsolved students. #}
+                    {% if answers_released or mode != "closed_unsolved" and not is_student or mode != "closed_unsolved" and exam_taken %}
                         {% if question.type == "order_events" %}
                             <div class="sd-answer-reveal">
                                 <label class="fw-semibold mb-2 sd-chip sd-answer-label">

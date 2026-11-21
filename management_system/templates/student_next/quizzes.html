@@ -1,0 +1,91 @@
+{% extends "student_next/base.html" %}
+{% load i18n %}
+{% block title %}{% translate "My Quizzes" %} - {% translate "Bible Institute" %}{% endblock %}
+{% block body %}
+<div class="sn-learning-page">
+  {% include "student_next/partials/alerts.html" %}
+  <header class="sn-page-head">
+    <div class="sn-page-head-main">
+      <div class="sn-eyebrow">{% translate "My Quizzes" %}</div>
+      <h1 class="sn-page-title">{% translate "My Quizzes" %}</h1>
+      <p class="sn-page-desc">{% translate "Your quizzes, grouped by course." %}</p>
+    </div>
+    <div class="sn-page-actions">
+      <a class="sn-btn sn-btn--ghost" href="{% url 'courses' %}"><svg class="sn-ico" aria-hidden="true"><use href="#i-book-open"></use></svg>{% translate "My learning" %}</a>
+    </div>
+  </header>
+
+  <div class="sn-filter-row">
+    <nav class="sn-filter-tabs" role="tablist" aria-label="{% translate 'Quiz status' %}">
+      {% for tab in filter_tabs %}
+      <a role="tab" aria-selected="{{ tab.active|yesno:'true,false' }}" class="{% if tab.active %}is-active{% endif %}" href="{{ tab.url }}">
+        {{ tab.label }} <span>{{ tab.count }}</span>
+      </a>
+      {% endfor %}
+    </nav>
+    <span class="sn-filter-note">
+      {% blocktrans count count=visible_count %}{{ count }} quiz{% plural %}{{ count }} quizzes{% endblocktrans %}
+    </span>
+  </div>
+
+  {% if visible_groups %}
+  <div class="sn-quiz-groups">
+    {% for group in visible_groups %}
+    <section class="sn-quiz-course" aria-label="{{ group.course_name }}">
+      <div class="sn-quiz-course-head">
+        <div>
+          <span class="sn-eyebrow">{{ group.year_name }} - {{ group.level_name }}</span>
+          <h2 dir="auto">{{ group.course_name }}</h2>
+        </div>
+        <span class="sn-year-count">{{ group.quizzes|length }} <span class="sn-sr-only">{% translate "Quizzes" %}</span></span>
+      </div>
+      <div class="sn-quiz-rows">
+        {% for row in group.quizzes %}
+        <a class="sn-quiz-row" href="{{ row.url }}">
+          <span class="sn-quiz-row-icon{% if row.status == 'view' %} is-done{% elif row.status == 'exam' or row.status == 'ready' %} is-open{% endif %}">
+            <svg class="sn-ico" aria-hidden="true"><use href="#{% if row.status == 'view' %}i-check-circle{% elif row.status == 'closed_unsolved' %}i-lock{% else %}i-file-check{% endif %}"></use></svg>
+          </span>
+          <span class="sn-quiz-row-main">
+            <b dir="auto">{{ row.name }}</b>
+            <small dir="auto">
+              {% if row.status == "view" %}
+                {% if row.grade_percent is not None %}{{ row.grade_percent }}% - {% endif %}{% translate "Submitted" %}
+              {% elif row.status == "exam" %}{% translate "In progress" %}
+              {% elif row.status == "ready" %}{% translate "Open now" %}
+              {% elif row.status == "upcoming" %}{% translate "Upcoming" %}
+              {% elif row.status == "closed_unsolved" %}{% if row.window_closed %}{% translate "Closed" %}{% else %}{% translate "Unavailable" %}{% endif %}
+              {% else %}{% translate "Draft" %}{% endif %}
+              {% if row.status != "closed_unsolved" %}{% if row.closing_label %} - {{ row.closing_label }}{% endif %}{% elif row.window_closed %} - {{ row.closing_label }}{% endif %}
+            </small>
+          </span>
+          <span class="sn-quiz-row-side">
+            {% if row.status == "view" %}
+              <span class="sn-pill sn-pill--success"><bdi dir="ltr">{{ row.grade_value }} / {{ row.quiz.total_grade }}</bdi></span>
+            {% elif row.status == "exam" %}
+              <span class="sn-pill sn-pill--gold">{% translate "In progress" %}</span>
+            {% elif row.status == "ready" %}
+              <span class="sn-pill sn-pill--success">{% translate "Open now" %}</span>
+            {% elif row.status == "upcoming" %}
+              <span class="sn-pill sn-pill--teal">{% translate "Upcoming" %}</span>
+            {% elif row.status == "closed_unsolved" %}
+              <span class="sn-pill">{% if row.window_closed %}{% translate "Closed" %}{% else %}{% translate "Unavailable" %}{% endif %}</span>
+            {% else %}
+              <span class="sn-pill sn-pill--warning">{{ row.quiz.get_status_display }}</span>
+            {% endif %}
+            <svg class="sn-ico" aria-hidden="true"><use href="#i-chevron-right"></use></svg>
+          </span>
+        </a>
+        {% endfor %}
+      </div>
+    </section>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="sn-empty">
+    <span class="sn-empty-icon"><svg class="sn-ico" aria-hidden="true"><use href="#i-file-check"></use></svg></span>
+    <h3>{% if selected_status == "completed" %}{% translate "No completed quizzes yet" %}{% else %}{% translate "No pending quizzes" %}{% endif %}</h3>
+    <p>{% translate "Quizzes appear here when they are published for your courses." %}</p>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

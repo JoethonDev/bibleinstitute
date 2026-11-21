@@ -2696,6 +2696,45 @@ class StudentExperienceSettings(models.Model):
         return result
 
 
+class QuizSettings(models.Model):
+    """Institute-wide quiz submission and answer-release policy."""
+
+    singleton = models.CharField(max_length=20, unique=True, default="default", editable=False)
+    release_answers_to_unsolved = models.BooleanField(
+        default=False,
+        help_text=_(
+            "When enabled, a student who did not submit a quiz can review its "
+            "correct answers after the quiz closes."
+        ),
+    )
+    require_all_answers = models.BooleanField(
+        default=True,
+        help_text=_(
+            "When enabled, students must answer every question before submitting. "
+            "Timed attempts still submit automatically at the deadline."
+        ),
+    )
+    updated_at = models.DateTimeField(auto_now=True)
+    updated_by = models.ForeignKey(
+        "User",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="quiz_settings_updates",
+    )
+
+    class Meta:
+        verbose_name = _("Quiz Settings")
+        verbose_name_plural = _("Quiz Settings")
+
+    def __str__(self):
+        return str(_("Quiz Settings"))
+
+    @classmethod
+    def load(cls) -> "QuizSettings":
+        return cls.objects.get_or_create(singleton="default")[0]
+
+
 class AttendanceRecord(models.Model):
     class Action(models.TextChoices):
         ENTRANCE = "entrance", _("Entrance")

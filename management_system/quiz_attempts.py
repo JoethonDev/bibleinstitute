@@ -90,6 +90,27 @@ def normalize_answers(quiz: Quiz, answers: dict) -> dict[str, str]:
     return result
 
 
+def _answer_is_present(value) -> bool:
+    """True for a real response; empty and structured-empty values are blank."""
+    if isinstance(value, str):
+        value = value.strip()
+        if not value or value == "-":
+            return False
+        if value[:1] in "[{":
+            try:
+                value = json.loads(value)
+            except (TypeError, json.JSONDecodeError):
+                return True
+        else:
+            return True
+    return value not in (None, "", [], {})
+
+
+def _has_answered_question(answers: dict) -> bool:
+    """True when at least one stored answer is a real response."""
+    return any(_answer_is_present(value) for value in answers.values())
+
+
 def _submission_rows(quiz: Quiz, user_id: int, answers: dict, questions: list[Question]) -> tuple[list[Submission], Grade]:
     submissions = []
     for question in questions:
@@ -101,7 +122,13 @@ def _submission_rows(quiz: Quiz, user_id: int, answers: dict, questions: list[Qu
 
 
 @transaction.atomic
-def submit_answers(quiz_id: int, user, answers: dict) -> Grade:
+def submit_answers(
+    quiz_id: int,
+    user,
+    answers: dict,
+    *,
+    require_complete: bool = False,
+) -> Grade:
     quiz = Quiz.objects.get(pk=quiz_id)
     grade = Grade.objects.filter(quiz=quiz, user=user).first()
     if grade:
@@ -126,7 +153,17 @@ def submit_answers(quiz_id: int, user, answers: dict) -> Grade:
     if not quiz_window_is_open(opening, closing, current_time):
         raise PermissionDenied(_("Invalid Request, submission is closed!"))
     answers = normalize_answers(quiz, answers)
+    if not _has_answered_question(answers):
+        raise ValidationError(_("Answer at least one question before submitting this quiz."))
     questions = list(Question.objects.filter(quiz=quiz).order_by("pk")[:501])
+    if require_complete and any(
+        not _answer_is_present(answers.get(str(question.pk), ""))
+        for question in questions
+    ):
+        # Every current question must be answered. A question added by a live
+        # editor after the page loaded blocks an early submit; the deadline
+        # path still finalizes the saved answers.
+        raise ValidationError(_("Answer every question before submitting this quiz."))
     submissions, grade = _submission_rows(quiz, user.pk, answers, questions)
     Submission.objects.bulk_create(submissions, batch_size=500)
     grade.save()
@@ -195,7 +232,9 @@ def reconcile_snapshots(quiz_id: int, *, user_id: int | None = None, batch_size:
     # Bulk write a bounded student batch; no queries inside the student loop.
     submissions, grades = [], []
     for snapshot in snapshots:
-        if snapshot.has_grade:
+        if snapshot.has_grade or not _has_answered_question(snapshot.answers):
+            # An opened-but-untouched attempt is not a submission. Drop it so
+            # the student can start again while the quiz window is still open.
             continue
         answers, grade = _submission_rows(quiz, snapshot.user_id, snapshot.answers, questions)
         submissions.extend(answers)

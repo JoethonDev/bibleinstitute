@@ -142,6 +142,9 @@
               {% endif %}
               {% if user.is_authenticated %}
               <li class="nav-item"><a class="nav-link ps-site-nav-link" href="{% url 'courses' %}">{% translate "Courses" %}</a></li>
+              {% if request.user.role.role == "student" or request.user.role.role == "admin" or request.user.role.role == "staff" %}
+              <li class="nav-item"><a class="nav-link ps-site-nav-link" href="{% url 'student-quizzes' %}">{% translate "Quizzes" %}</a></li>
+              {% endif %}
               <li class="nav-item"><a class="nav-link ps-site-nav-link" href="{% url 'download-app' %}">{% translate "Install the app" %}</a></li>
               {% if show_graduation_gallery %}
               <li class="nav-item"><a class="nav-link ps-site-nav-link" href="{% url 'graduates' %}">{% translate "Graduates" %}</a></li>

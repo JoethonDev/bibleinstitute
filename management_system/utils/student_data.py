@@ -39,7 +39,12 @@ from ..models import (
 from .attendance import fully_scanned_attendance_day, pair_attendance_records
 from .lesson_access import lesson_available_filter
 from .progress_merge import unique_seconds
-from .quiz_access import answers_releasable, quiz_attempt_status_from
+from .quiz_access import (
+    answers_releasable,
+    management_quiz_status,
+    quiz_attempt_status_from,
+)
+from .timezones import ensure_aware
 
 from ..quiz_attempts import reconcile_snapshots
 
@@ -405,7 +410,8 @@ def student_quiz_data(
         return None
     grade = Grade.objects.filter(user=user, quiz=quiz).first()
     snapshot = QuizAnswerSnapshot.objects.filter(quiz=quiz, user=user).first()
-    if snapshot is not None and snapshot.deadline_at <= now() and grade is None:
+    current = now()
+    if snapshot is not None and snapshot.deadline_at <= current and grade is None:
 
         reconcile_snapshots(quiz.pk, user_id=user.pk)
         grade = Grade.objects.filter(user=user, quiz=quiz).first()
@@ -414,17 +420,32 @@ def student_quiz_data(
     can_write = not grade and user_can_write_offering_activity(
         user, quiz.course_offering, allow_management=True
     )
-    mode = _quiz_mode(quiz, grade, opening, can_write, snapshot)
-    questions = list(Question.objects.filter(quiz=quiz).order_by("pk")) if grade or mode == "exam" else []
-    # Solved students receive the answer key; closed-and-unsolved students do
-    # not (their payload is built without correct_answer below).
-    show_answers = answers_releasable(grade)
+    mode = _quiz_mode(quiz, grade, opening, can_write, snapshot, current)
+    # Solved students always receive the answer key. Unsolved students receive
+    # it only after the quiz window closes and the institute releases it.
+    show_answers = answers_releasable(
+        grade,
+        mode=mode,
+        window_closed=ensure_aware(opening.closing_date) <= current,
+    )
+    questions = list(Question.objects.filter(quiz=quiz).order_by("pk")) if grade or mode == "exam" or show_answers else []
     if grade:
         submitted = {
             row.question_id: row
             for row in Submission.objects.filter(user=user, question__quiz=quiz).select_related("question")
         }
         question_data = [_submitted_question_payload(question, submitted.get(question.pk), grade, show_answers=show_answers) for question in questions]
+    elif show_answers:
+        question_data = []
+        for question in questions:
+            payload = _question_payload(question, "view")
+            payload.update({
+                "submitted_answer": None,
+                "is_graded": False,
+                "correct_answer": question.correct_answer,
+                "answer_payload": question.get_correct_answer_payload(),
+            })
+            question_data.append(payload)
     else:
         question_data = [_question_payload(question, mode) for question in questions]
     return {
@@ -465,35 +486,37 @@ def _student_course_quiz_rows(
     is_management = include_drafts or bool(
         user.is_authenticated and getattr(getattr(user, "role", None), "role", None) in {"admin", "staff"}
     )
+    current = now()
     if is_management:
         return [
             {
                 "quiz": quiz,
                 "id": quiz.pk,
-                "status": "draft" if quiz.status != PublicationStatus.PUBLISHED else (
-                    "upcoming" if quiz.opening_date and quiz.opening_date > now()
-                    else ("closed_unsolved" if quiz.closing_date and quiz.closing_date <= now() else "ready")
-                ),
+                "status": management_quiz_status(quiz, current),
                 "grade": None,
             }
             for quiz in quizzes
         ]
     grades = {
         row.quiz_id: row
-        for row in Grade.objects.filter(user=user, quiz_id__in=[quiz.pk for quiz in quizzes])
+        for row in Grade.objects.filter(
+            user=user, quiz_id__in=[quiz.pk for quiz in quizzes]
+        ).only("quiz_id", "total_grade")
     }
     openings = {
         row.quiz_id: row
-        for row in QuizStudentOpening.objects.filter(student=user, quiz_id__in=[quiz.pk for quiz in quizzes])
+        for row in QuizStudentOpening.objects.filter(
+            student=user, quiz_id__in=[quiz.pk for quiz in quizzes]
+        ).only("quiz_id", "opening_date", "closing_date")
     }
+    # Only the server deadline is read here; do not load large answer payloads.
     snapshots = {
         row.quiz_id: row
         for row in QuizAnswerSnapshot.objects.filter(
             user=user,
             quiz_id__in=[quiz.pk for quiz in quizzes],
-        )
+        ).only("quiz_id", "deadline_at")
     }
-    current = now()
     can_write = (
         user_can_write_offering_activity(
             user, quizzes[0].course_offering, allow_management=True

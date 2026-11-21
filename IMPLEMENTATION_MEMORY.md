@@ -8,6 +8,101 @@ Earlier detailed evidence is preserved in the
 and the [5 November archive](docs/archive/2026-11-05/history/IMPLEMENTATION_MEMORY.md).
 Historical open/done statements there are superseded by the current disposition.
 
+## Quiz hub, attempt definition and policy toggles (2026-11-21)
+
+Task recorded (2026-11-21): students needed a fast way to find every quiz,
+split into pending and completed and grouped by course, reachable from the
+navigation and from a compact home shortcut without crowding the home page.
+An opened-but-untouched quiz had to stop counting as an attempt; a released
+answer key for students who never submitted had to be optional; and requiring
+every question before submission had to be a default-on toggle.
+
+Implemented:
+
+- New `/quizzes/` route (`student-quizzes`) with `student_quizzes` in
+  `student_experience_views.py`. `student_experience/quizzes.py` owns the
+  bounded index: readable offerings, published quizzes (all statuses for the
+  management preview), one grade/opening/snapshot read per population, and
+  `quiz_attempt_status_from` for every row. Pending groups the
+  open/in-progress/upcoming/closed-unsolved rows by course in action order;
+  completed holds submitted grades with score. `quiz_home_summary` supplies
+  the two home counts.
+- New shell: `student_next/quizzes.html`, a "Quizzes" nav item, the
+  `sn-quiz-shortcuts` pending/completed strip on My learning, and CSS for both
+  surfaces. Legacy shell: `quizzes.html`, a navbar "Quizzes" link and the two
+  shortcut buttons on `course_view.html`.
+- `QuizSettings` singleton (migration `0133_quiz_settings`, depends on
+  `0132`): `release_answers_to_unsolved` (default off) and
+  `require_all_answers` (default on). Admin page
+  `/dashboard/quiz-settings/` (`quiz_settings` view, `QuizSettingsForm`,
+  `quiz_settings.html`, Curriculum nav entry, Django admin fallback) uses
+  `can_manage_academic_setup`.
+- `answers_releasable(grade, mode=...)` now releases the key to a graded
+  student always, and to a closed-and-unsolved student only when the toggle is
+  on. Web quiz detail (new and legacy shells) and the mobile
+  `student_quiz_data` payload use the same rule. The new shell renders a
+  read-only release page; the legacy shell reveals the existing
+  `sd-answer-reveal` block and changes the closed banner.
+- `quiz_attempts._has_answered_question` treats an empty snapshot, `-`, and
+  empty structured JSON as unanswered. `reconcile_snapshots` now discards such
+  snapshots without creating a Grade, and `submit_answers` rejects an empty
+  submission with a translated validation message (caught by `take_exam`).
+  `take_exam` re-resolves the quiz state after reconciliation, so an expired
+  untouched attempt returns to "Start quiz" while the window is still open.
+- `require_all_answers` is passed to both exam forms as `data-require-all` /
+  `data-require-all-text`. `student_next/quiz.js` hides the "Submit anyway"
+  confirm action while unanswered questions remain; the legacy inline
+  submission script does the same for its modal and dialog. Timed auto-submit
+  and server-side reconciliation still grade partial answers, as the setting
+  help text states.
+
+Verification (fresh disposable PostgreSQL 18 `lms_quizreview`, port 55434,
+Redis 56381, full chain through leaf `0133`): `tmp/quiz_index/smoke.py` runs 58
+checks, all pass - settings defaults; release off/on and the closed-window
+rule; server-side completeness rejection; home and index counts; course
+grouping and action ordering; draft exclusion; zero-answer reconciliation
+leaving no Grade and the snapshot deleted; partial snapshot grading; empty
+submit rejected without losing the snapshot; answered submit graded; new/legacy
+pages 200 and rendering the seeded course; home shortcut strip; new exam form
+`data-require-all` 1/0; released-answer page and legacy `sd-answer-reveal`
+gating; opened-untouched expired attempt returning to Start; admin settings page
+read/save; query counts on the seeded page: index 9, home 14, quiz detail 11
+(including auth/session). `manage.py check` 0 issues,
+`makemigrations --check --dry-run` no changes, `audit_text_encoding` 935 files,
+`node --check quiz.js`, `msgfmt -c`, `compileall`, and `git diff --check` pass.
+
+Review pass (2026-11-21): management preview status moved to the shared
+`management_quiz_status`; the index uses `active_enrollment_scope` /
+`can_write_offering_from_scope` instead of duplicating the write predicate;
+the index is capped at 2,000 rows and no longer runs an unused question-count
+query; the batch reads narrow grades to `quiz_id`/`total_grade`, openings to
+their window and snapshots to `deadline_at` so answer payloads never load for a
+list; dates use `format_human_datetime`; unused context keys were removed.
+Answer release now also requires the quiz window itself to be closed, so a
+student whose own attempt expired while peers can still take the quiz never
+receives the key. The smoke was re-run after these edits on the fresh
+disposable database and all 58 checks pass; the review run also caught and
+fixed a `gettext` shadowing bug (`status, _ = ...`) before it reached a page.
+
+Known limits/risks: a real Chromium pass (`tmp/quiz_index/browser_merge.py`)
+checked 18 behaviours: the home shortcut strip, new pending/completed pages,
+release off/on, the exam force-all dialog with its confirm action hidden, no
+horizontal overflow at 390px, the seven-item mobile navigation, the legacy
+quizzes page, the legacy force-all confirm hidden, and the admin settings page.
+The disposable PostgreSQL is not the compose data volume; no migration was
+applied to the compose database. The `release_answers_to_unsolved` toggle
+defaults off so reopening a quiz never leaks its key; enabling it is an
+explicit operator choice. `require_all_answers` is enforced by both the browser
+and the web submission path (the server rejects a partial early submit), while
+timed attempts still finalize partial answers through the
+deadline/reconciliation path. The mobile API does not pass the flag yet, so the
+mobile client keeps its own "submit anyway" confirmation; the mobile app was
+not exercised against this change.
+
+Next safe step: on a running instance, open My learning, use the new Quizzes
+shortcut and nav tab in both shells, then verify the two toggles from
+Curriculum -> Quiz Settings.
+
 ## Prior task record: curriculum dashboard search routing fix
 
 Task recorded (2026-11-16): searching a course, lesson or quiz dashboard sent the

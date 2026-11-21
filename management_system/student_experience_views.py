@@ -1,6 +1,8 @@
-"""Admin actions for the authenticated student experience rollout."""
+"""Student quiz index plus admin controls for the experience rollout."""
 
+from django.conf import settings
 from django.contrib import messages
+from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
 from django.db import transaction
 from django.shortcuts import get_object_or_404, redirect, render
@@ -11,8 +13,24 @@ from django.views.decorators.http import require_POST
 from .forms import StudentExperienceOverrideForm, StudentExperienceSettingsForm
 from .models import StudentExperienceSettings, StudentMode, User
 from .student_experience.mode import resolve_student_mode
+from .student_experience.quizzes import build_quiz_index_context
+from .student_experience.render import render_student_page
 from .utils.decorators import can_manage_academic_setup, capability_required
 from .utils.helpers import generate_breadcrumb, render_page
+
+
+@login_required(login_url=settings.LOGIN_URL)
+def student_quizzes(request):
+    """All readable quizzes grouped by status and course."""
+    context = build_quiz_index_context(request)
+    if resolve_student_mode(request) == StudentMode.NEW:
+        return render_student_page(
+            request,
+            page="quizzes",
+            template="student_next/quizzes.html",
+            context=context,
+        )
+    return render(request, "quizzes.html", context)
 
 
 def _require_student_account(user: User) -> None:

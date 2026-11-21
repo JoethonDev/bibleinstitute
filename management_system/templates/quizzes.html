@@ -1,0 +1,74 @@
+{% extends 'base.html' %}
+{% load i18n %}
+
+{% block body %}
+<div class="sd-page">
+<div class="container py-4 py-lg-5">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
+        <div>
+            <h1 class="mb-1">{% translate "My Quizzes" %}</h1>
+            <p class="ps-muted-text mb-0">{% translate "Your quizzes, grouped by course." %}</p>
+        </div>
+        <a class="sd-btn sd-btn--gold-outline" href="{% url 'courses' %}">{% translate "My learning" %}</a>
+    </div>
+
+    <div class="d-flex flex-wrap gap-2 mb-3">
+        {% for tab in filter_tabs %}
+        <a class="sd-btn {% if tab.active %}sd-btn--gold{% else %}sd-btn--gold-outline{% endif %}" href="{{ tab.url }}"{% if tab.active %} aria-current="page"{% endif %}>{{ tab.label }} ({{ tab.count }})</a>
+        {% endfor %}
+    </div>
+
+    {% for group in visible_groups %}
+    <div class="sd-panel-card mb-3">
+        <div class="card-body">
+            <div class="d-flex justify-content-between align-items-center gap-2 mb-2">
+                <div>
+                    <span class="sd-chip">{{ group.year_name }} - {{ group.level_name }}</span>
+                    <h2 class="h5 mb-0 mt-1" dir="auto">{{ group.course_name }}</h2>
+                </div>
+                <span class="sd-chip">{{ group.quizzes|length }} <span class="visually-hidden">{% translate "Quizzes" %}</span></span>
+            </div>
+            <div class="list-group list-group-flush">
+                {% for row in group.quizzes %}
+                <a class="list-group-item list-group-item-action d-flex justify-content-between align-items-center gap-2" href="{{ row.url }}">
+                    <span class="text-start flex-grow-1">
+                        <strong dir="auto">{{ row.name }}</strong>
+                        <small class="d-block ps-muted-text" dir="auto">
+                            {% if row.status == "view" %}{% translate "Submitted" %}
+                            {% elif row.status == "exam" %}{% translate "In progress" %}
+                            {% elif row.status == "ready" %}{% translate "Open now" %}
+                            {% elif row.status == "upcoming" %}{% translate "Upcoming" %}
+                            {% elif row.status == "closed_unsolved" %}{% if row.window_closed %}{% translate "Closed" %}{% else %}{% translate "Unavailable" %}{% endif %}
+                            {% else %}{% translate "Draft" %}{% endif %}
+                            {% if row.status != "closed_unsolved" %}{% if row.closing_label %} - {{ row.closing_label }}{% endif %}{% elif row.window_closed %} - {{ row.closing_label }}{% endif %}
+                        </small>
+                    </span>
+                    <span class="d-flex align-items-center gap-2 flex-shrink-0">
+                        {% if row.status == "view" %}
+                        <span class="sd-chip"><bdi dir="ltr">{{ row.grade_value }} / {{ row.quiz.total_grade }}</bdi></span>
+                        {% elif row.status == "exam" or row.status == "ready" %}
+                        <span class="sd-chip">{% translate "Open now" %}</span>
+                        {% elif row.status == "upcoming" %}
+                        <span class="sd-chip">{% translate "Upcoming" %}</span>
+                        {% elif row.status == "closed_unsolved" %}
+                        <span class="sd-chip">{% if row.window_closed %}{% translate "Closed" %}{% else %}{% translate "Unavailable" %}{% endif %}</span>
+                        {% else %}
+                        <span class="sd-chip">{{ row.quiz.get_status_display }}</span>
+                        {% endif %}
+                        <i class="fas fa-chevron-{% if request.LANGUAGE_CODE == 'ar' %}left{% else %}right{% endif %}" aria-hidden="true"></i>
+                    </span>
+                </a>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+    {% empty %}
+    <div class="text-center py-5">
+        <i class="fas fa-clipboard-check fa-3x mb-3 sd-empty-icon"></i>
+        <h4 class="ps-muted-text">{% if selected_status == "completed" %}{% translate "No completed quizzes yet" %}{% else %}{% translate "No pending quizzes" %}{% endif %}</h4>
+        <p class="ps-muted-text">{% translate "Quizzes appear here when they are published for your courses." %}</p>
+    </div>
+    {% endfor %}
+</div>
+</div>
+{% endblock %}

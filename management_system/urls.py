@@ -54,6 +54,7 @@ from management_system import portal_views as portal_extra_views
 from management_system.student_experience_views import (
     student_experience_override,
     student_experience_settings,
+    student_quizzes,
 )
 from management_system.support_chat_views import (
     student_support_attachment,
@@ -123,6 +124,7 @@ urlpatterns = [
     path('profile/academic-payment/', profile_academic_payment, name="profile-academic-payment"),
     path('profile/telegram/unlink/', telegram_unlink, name="telegram-unlink"),
     path('courses/', view_courses, name="courses"),
+    path('quizzes/', student_quizzes, name="student-quizzes"),
     path('offerings/<int:offering_id>/', view_course_details, name="course-details"),
     path('offerings/<int:offering_id>/quiz/<int:quiz_id>/start/', quiz_start, name="quiz-start"),
     path('offerings/<int:offering_id>/quiz/<int:quiz_id>/', take_exam, name="quiz-details"),
@@ -309,6 +311,7 @@ urlpatterns = [
     path('signup/', signup, name="signup"),
     path('dashboard/applications/', applications_dashboard, name="applications-dashboard"),
     path('dashboard/signup-settings/', signup_settings, name="signup-settings"),
+    path('dashboard/quiz-settings/', quiz_settings, name="quiz-settings"),
     path('dashboard/student-experience/', student_experience_settings, name="student-experience-settings"),
     path('dashboard/applications/<int:user_id>/', application_review, name="application-review"),
     path('dashboard/applications/<int:user_id>/document/<str:document_type>/', application_document, name="application-document"),
