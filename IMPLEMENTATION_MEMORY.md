@@ -103,6 +103,19 @@ Next safe step: on a running instance, open My learning, use the new Quizzes
 shortcut and nav tab in both shells, then verify the two toggles from
 Curriculum -> Quiz Settings.
 
+## App release management 500 (2026-11-21)
+
+Production `GET /dashboard/app-releases/` raised `NameError: name 'settings' is
+not defined` at `portal_views.app_release_manage` (the new
+`EXPO_PUSH_ACCESS_TOKEN` check). `portal_views.py` used `settings` in the release
+page and the release-delete cleanup without importing it. Added
+`from django.conf import settings`; no other change.
+
+Verified with Ruff `F821` on `portal_views.py`, `compileall`,
+`manage.py check`, and a disposable PostgreSQL/Redis HTTP check: the release
+page, `?new=1` inline form and the `?fragment=form` drawer all return 200 as an
+admin. No migration or data change.
+
 ## Prior task record: curriculum dashboard search routing fix
 
 Task recorded (2026-11-16): searching a course, lesson or quiz dashboard sent the
