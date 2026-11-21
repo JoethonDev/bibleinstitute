@@ -1,3 +1,4 @@
+import hashlib
 import json
 import re
 from logging import getLogger
@@ -16,9 +17,14 @@ SEGMENT_NUMBER_RE = re.compile(r"(?:^|[_-])(?P<number>\d+)\.ts(?:[?#].*)?$", re.
 SEGMENTS_CACHE_TTL_SECONDS = 3600
 
 
+def _segments_cache_key(key: str) -> str:
+    """Hash the storage key so cache backends never see spaces or Arabic text."""
+    return "hls:segments:" + hashlib.sha256(key.encode("utf-8")).hexdigest()
+
+
 def _segments_for_key(cloud_client, bucket_name, key):
     """Return the parsed segment timeline for one manifest key, cached briefly."""
-    cache_key = f"hls:segments:{key}"
+    cache_key = _segments_cache_key(key)
     try:
         cached = cache.get(cache_key)
     except Exception:  # a cache outage must not break progress tracking

@@ -116,6 +116,21 @@ Verified with Ruff `F821` on `portal_views.py`, `compileall`,
 page, `?new=1` inline form and the `?fragment=form` drawer all return 200 as an
 admin. No migration or data change.
 
+## HLS cache-key warning and media-gate 401 (2026-11-21)
+
+The production warning `CacheKeyWarning: Cache key contains characters ...`
+came from `utils/hls_parser._segments_for_key` using the raw R2 manifest key
+(Arabic, spaces, slashes) as the cache key. The key is now
+`hls:segments:<sha256>`; existing entries expire naturally within the one-hour
+TTL. Verified with a pure check (hashed key regex, LocMem set/get emits no
+`CacheKeyWarning`), Ruff, compileall and `manage.py check`.
+
+The `media-gate-refresh` 401 in the same log is the normal three-hour viewing
+session expiry. `progressTracker.refreshMediaGate` handles 401/403 by calling
+`startSession({refresh: true, forceReload: true})`, which creates and signs a
+new session; it is a recovery path, not a playback failure. No code change was
+needed.
+
 ## Prior task record: curriculum dashboard search routing fix
 
 Task recorded (2026-11-16): searching a course, lesson or quiz dashboard sent the
