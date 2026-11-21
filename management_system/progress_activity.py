@@ -429,6 +429,20 @@ def normalize_progress_heartbeat(payload: object) -> dict:
         (active_decimal * 100).to_integral_value(rounding=ROUND_HALF_UP)
     )
     active_seconds = active_centiseconds / 100
+    # The client reports the playback speed it used for this batch. The budget
+    # is earned at that speed (clamped to 1x-2x), so an honest 1x viewer earns
+    # exactly what they watch and a forged 2x claim buys no more than today.
+    raw_playback_rate = payload.get("playback_rate", 1)
+    try:
+        rate_decimal = Decimal(str(raw_playback_rate))
+    except (InvalidOperation, ValueError, TypeError):
+        rate_decimal = Decimal("1")
+    if not rate_decimal.is_finite() or rate_decimal <= 0:
+        rate_decimal = Decimal("1")
+    rate_decimal = min(Decimal("2"), max(Decimal("1"), rate_decimal))
+    playback_rate_centi = int(
+        (rate_decimal * 100).to_integral_value(rounding=ROUND_HALF_UP)
+    )
     max_duration = Decimal(str(getattr(settings, "MEDIA_MAX_DURATION_SECONDS", 3 * 60 * 60)))
     raw_centisecond_ranges = []
     for item in raw_ranges:
@@ -466,6 +480,7 @@ def normalize_progress_heartbeat(payload: object) -> dict:
         "sequence": sequence,
         "ranges": canonical_ranges,
         "active_centiseconds": active_centiseconds,
+        "playback_rate_centi": playback_rate_centi,
         "ended": ended,
     }
     digest = hashlib.sha256(
@@ -477,6 +492,7 @@ def normalize_progress_heartbeat(payload: object) -> dict:
         "ranges": ranges,
         "active_seconds": active_seconds,
         "active_centiseconds": active_centiseconds,
+        "playback_rate": playback_rate_centi / 100,
         "ended": ended,
         "digest": digest,
     }
@@ -487,8 +503,18 @@ def edge_credit_budget_centiseconds(
     window_end,
     earned_consumed_seconds,
     slack_remaining_seconds,
+    playback_rate=None,
 ) -> tuple[int, int]:
-    """Return total earned and currently available credit in centiseconds."""
+    """Return total earned and currently available credit in centiseconds.
+
+    ``playback_rate`` is the highest speed the session has used, clamped to
+    1.00-2.00: the budget accrues at that rate per second of server time.
+    """
+    try:
+        rate_centi = int(round(float(playback_rate if playback_rate is not None else 1) * 100))
+    except (TypeError, ValueError):
+        rate_centi = 100
+    rate_centi = max(100, min(200, rate_centi))
     if started_at is None or window_end is None:
         earned_centiseconds = 0
     else:
@@ -497,7 +523,8 @@ def edge_credit_budget_centiseconds(
             (elapsed.days * 86_400 + elapsed.seconds) * 1_000_000
             + elapsed.microseconds
         )
-        earned_centiseconds = (elapsed_microseconds * 2 + 5_000) // 10_000
+        # microseconds x centi-rate / 1e6 = media centiseconds, rounded half up.
+        earned_centiseconds = (elapsed_microseconds * rate_centi + 500_000) // 1_000_000
     consumed_centiseconds = int(
         (Decimal(str(earned_consumed_seconds)) * 100).to_integral_value(
             rounding=ROUND_HALF_UP,
@@ -708,6 +735,22 @@ def apply_progress_heartbeat(
     if checked_at > replay_until:
         raise ProgressHeartbeatError("expired", _("Session replay window expired."))
 
+    # A report that arrives less than two seconds after the previous one is
+    # deferred, not rejected: nothing is written, the ranges stay with the
+    # client and the same sequence is retried. The budget already caps credit;
+    # this bounds the write load a scripted client can create.
+    if (
+        session.heartbeat_sequence
+        and session.last_heartbeat
+        and (checked_at - session.last_heartbeat) < timedelta(seconds=2)
+    ):
+        current = LectureProgress.objects.filter(
+            student=user,
+            lesson=session.lesson,
+            part_id=session.part_id,
+        ).first()
+        return resync("throttled", current, session.heartbeat_sequence)
+
     try:
         lesson_segments = get_lesson_segments(
             session.lesson,
@@ -806,15 +849,24 @@ def apply_progress_heartbeat(
         saved_before = normalize_ranges(progress.merged_ranges or [])
         already_saved = intersect_ranges(requested_on_timeline, saved_before)
         new_candidates = subtract_ranges(requested_on_timeline, saved_before)
+        # A session keeps the fastest speed it ever reported, so switching to
+        # 2x mid-lecture earns the wider allowance from then on.
+        reported_rate = Decimal(str(heartbeat["playback_rate"]))
+        session_rate = max(
+            Decimal(str(locked_session.edge_credit_rate or 1)), reported_rate
+        )
+        if session_rate > Decimal(str(locked_session.edge_credit_rate or 1)):
+            locked_session.edge_credit_rate = session_rate
         _earned, available_centiseconds = edge_credit_budget_centiseconds(
             locked_session.started_at,
             window_end,
             locked_session.edge_earned_seconds_consumed,
             progress.edge_slack_remaining_seconds,
+            session_rate,
         )
         accepted_ranges, _remaining_by_budget = take_ordered_prefix(
             new_candidates,
-            min(30_000, available_centiseconds) / 100,
+            min(12_000, available_centiseconds) / 100,
         )
         accepted_centiseconds = sum(
             int(Decimal(str(end)) * 100) - int(Decimal(str(start)) * 100)
@@ -825,6 +877,7 @@ def apply_progress_heartbeat(
             window_end,
             locked_session.edge_earned_seconds_consumed,
             progress.edge_slack_remaining_seconds,
+            session_rate,
         )
         consumed_before = int(
             (Decimal(str(locked_session.edge_earned_seconds_consumed)) * 100).to_integral_value(
@@ -972,6 +1025,7 @@ def apply_progress_heartbeat(
             "heartbeat_sequence",
             "activity_cursor_at",
             "edge_earned_seconds_consumed",
+            "edge_credit_rate",
             "last_payload_digest",
             "last_acknowledgement",
             "ended_at",

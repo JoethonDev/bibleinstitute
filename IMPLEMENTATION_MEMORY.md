@@ -4984,3 +4984,55 @@ binding, validator rejection, idempotent finalize, expiry sweep).
 Apply `0127`-`0131` in the release window, run `collectstatic`, start the new
 slot, then confirm `check_media_gate_drift` returns `matched` before switching
 traffic.
+
+## Playback-speed credit model (2026-11-21)
+
+The flat 2x earn rate banked a surplus for a 1x viewer, and that surplus could
+be spent on parts they never watched. The budget now accrues at the speed the
+client reports, clamped to 1.00-2.00:
+
+- `POST` progress payload gains `playback_rate`; `normalize_progress_heartbeat`
+  clamps it to `[1, 2]`, defaults to 1, and folds `playback_rate_centi` into the
+  replay digest.
+- `ViewingSession.edge_credit_rate` stores the fastest speed the session has
+  reported, so switching to 2x mid-lecture widens the allowance from then on.
+- `edge_credit_budget_centiseconds(start, end, consumed, head_start, rate)`
+  earns `rate x elapsed`; `LectureProgress.edge_slack_remaining_seconds` is the
+  one-off head start, now 60 s, shared across sessions of the same part.
+- One report accepts at most 120 s. A report arriving less than 2 s after the
+  previous one returns `status=resync, reason=throttled` with its ranges intact
+  and no write, so the client retries the same sequence.
+- `management_system/static/js/alpine/components/progressTracker.js` sends the
+  media element's `playbackRate`, rounded to two decimals, inside the queued
+  payload.
+
+Migration `0132_viewingsession_edge_credit_rate_and_more` adds
+`edge_credit_rate` and changes the head-start default to 60. Applied to the
+disposable database (leaf `0132`) and to the compose database.
+
+What a student can now do: a 1x viewer can claim exactly the wall-clock time
+they watched, with no accumulating surplus. A 2x viewer is exact. A forged
+`playback_rate=2` still buys at most 2x, which is where the ceiling was before,
+so integrity did not loosen.
+
+Verification on PostgreSQL: `phase08_heartbeat` (11 checks, now including
+"rate 1.00 credited 20 s for 20 s of server time", "a 2x report credits 30 s and
+persists rate 2.00", and "a report inside two seconds is deferred, not lost"),
+`phase08_progress` (budget at 1x = 1000/1500 and at 2x = 2000/1700), attendance
+and direct uploads all pass. `check`, `makemigrations --check` and
+`audit_text_encoding` are clean.
+
+Cloudflare credential: the new zone token was proven against the live zone -
+transform and firewall entrypoints read and written, `rotate_token` published a
+fresh pair, `check_media_gate_drift` returned `matched`, and the live matrix
+returned 200 for the current token, 200 for the previous one and 403 for a stale
+token, the raw bucket key, root and a private prefix. `GET /zones/{id}` returns
+`9109` because the token has no zone-read scope; the application never calls it,
+only `deploy/setup_edge_rules.py` does when it resolves the zone by name.
+
+Mobile needs no compatibility route: the app follows `manifest_url`, which now
+carries `/g/<token>/...`. The removed `/media/seg` and worker-receipt endpoints
+were server-side, not client-called.
+
+Next: push `codex/lms-expansion-aligned` and deploy with the order recorded
+above (migrate, collectstatic, switch, then confirm drift matched).

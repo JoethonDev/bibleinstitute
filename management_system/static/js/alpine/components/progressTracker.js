@@ -936,6 +936,13 @@ function progressTracker() {
             return true;
         },
 
+        currentPlaybackRate() {
+            const media = this.$el?.querySelector?.('video, audio');
+            const rate = Number(media?.playbackRate ?? 1);
+            if (!Number.isFinite(rate) || rate <= 0) return 1;
+            return Math.min(2, Math.max(1, Math.round(rate * 100) / 100));
+        },
+
         buildProgressQueuePending(entry) {
             if (entry.pending || entry.terminal) return entry;
             const ranges = progressQueueNormalizeRanges(entry.bufferedRanges || []);
@@ -953,6 +960,7 @@ function progressTracker() {
                 ranges: requestRanges,
                 ended,
                 active_seconds: activeSeconds,
+                playback_rate: this.currentPlaybackRate(),
                 sequence,
             };
             return {

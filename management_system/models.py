@@ -2789,6 +2789,14 @@ class ViewingSession(models.Model):
         decimal_places=2,
         default=Decimal("0.00"),
     )
+    # Highest playback speed this session reported, clamped to 1.00-2.00. The
+    # budget is earned at this rate, so a 1x viewer earns exactly what they
+    # watch instead of banking a 2x surplus.
+    edge_credit_rate = models.DecimalField(
+        max_digits=3,
+        decimal_places=2,
+        default=Decimal("1.00"),
+    )
     activity_cursor_at = models.DateTimeField(null=True, blank=True)
     last_payload_digest = models.CharField(max_length=64, blank=True, default="")
     last_acknowledgement = models.JSONField(default=dict, blank=True)
@@ -2925,7 +2933,7 @@ class LectureProgress(models.Model):
     edge_slack_remaining_seconds = models.DecimalField(
         max_digits=4,
         decimal_places=2,
-        default=Decimal("15.00"),
+        default=Decimal("60.00"),
     )
 
     class Meta:

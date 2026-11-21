@@ -209,17 +209,26 @@ def main() -> int:
                 checks.append("canonical heartbeat normalization and digest")
 
         edge_budget = getattr(progress_activity, "edge_credit_budget_centiseconds", None)
+        budget_window_start = datetime(2026, 1, 1, tzinfo=timezone.utc)
         if not callable(edge_budget):
             failures.append("server-window edge credit budget calculation is missing")
         elif edge_budget(
-            datetime(2026, 1, 1, tzinfo=timezone.utc),
-            datetime(2026, 1, 1, tzinfo=timezone.utc) + timedelta(seconds=10),
+            budget_window_start,
+            budget_window_start + timedelta(seconds=10),
             "18.00",
             "15.00",
+        ) != (1000, 1500):
+            failures.append("1x credit and shared slack were not budgeted independently")
+        elif edge_budget(
+            budget_window_start,
+            budget_window_start + timedelta(seconds=10),
+            "18.00",
+            "15.00",
+            2.0,
         ) != (2000, 1700):
-            failures.append("earned credit and shared slack were not budgeted independently")
+            failures.append("2x credit did not double the earned allowance")
         else:
-            checks.append("independent earned-credit and shared-slack budget")
+            checks.append("independent earned-credit and shared-slack budget at 1x and 2x")
 
         expired_at = django_timezone.now() - timedelta(days=1)
         fixture_session = SimpleNamespace(session_id="fixture", expires_at=expired_at)
