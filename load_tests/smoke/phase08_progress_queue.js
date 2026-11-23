@@ -141,11 +141,54 @@ storedEntries.set(previousKey, JSON.stringify({
     bufferedActiveSeconds: 0,
     bufferedEnded: false,
 }));
-const queueDispatchCheck = tracker.reconcilePendingProgressQueues().then(() => {
+const queueDispatchCheck = tracker.reconcilePendingProgressQueues().then(async () => {
     assert.equal(dispatched.length, 1);
     assert.equal(dispatched[0].url, '/heartbeat');
     assert.equal(dispatched[0].payload.session_id, 'session-a');
     assert.equal(storedEntries.has(previousKey), false);
+
+    // A session whose ended flag was acknowledged has nothing left to send.
+    // Re-arming bufferedEnded from that ack made the dispatcher reschedule
+    // itself forever (the 2026-11-23 progress-heartbeat flood).
+    const endedKey = context.queueChecks.key('12', 'other-lesson', 'other-part', tracker.sessionId);
+    storedEntries.set(endedKey, JSON.stringify({
+        version: 1,
+        key: endedKey,
+        studentId: '12',
+        lessonId: 'other-lesson',
+        partId: 'other-part',
+        sessionId: tracker.sessionId,
+        nextSequence: 4,
+        pending: null,
+        bufferedRanges: [],
+        bufferedActiveSeconds: 0,
+        bufferedEnded: true,
+        terminal: false,
+        closed: false,
+    }));
+    let endedPosts = 0;
+    context.fetch = async (url, request) => {
+        endedPosts += 1;
+        const body = JSON.parse(request.body);
+        assert.equal(body.ended, true);
+        assert.equal(body.ranges.length, 0);
+        return {
+            ok: true,
+            json: async () => ({
+                status: 'ok',
+                session_id: body.session_id,
+                sequence: body.sequence,
+                accepted_ranges: [],
+                already_saved_ranges: [],
+                credited_active_seconds: 0,
+                percent: 40,
+            }),
+        };
+    };
+    const moreWork = await tracker.dispatchProgressQueueLocked(endedKey);
+    assert.equal(moreWork, false, 'an acknowledged end must not report more work');
+    assert.equal(endedPosts, 1, 'the ended heartbeat must be sent once, not replayed');
+    assert.equal(storedEntries.has(endedKey), false, 'the closed queue entry must be removed');
     console.log('Phase 8 browser queue contract checks passed.');
 }).catch(error => {
     console.error(error);

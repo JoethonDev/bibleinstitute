@@ -722,6 +722,26 @@ def apply_progress_heartbeat(
         ).first()
         return resync("sequence_gap", current, session.heartbeat_sequence)
 
+    # An already-ended session that replays the ended flag with nothing to save
+    # has no work left. Answer terminally so the client stops retrying instead
+    # of hammering this endpoint until the seven-day replay window closes.
+    if (
+        heartbeat["ended"]
+        and session.ended_at is not None
+        and not requested_ranges
+        and not heartbeat["active_centiseconds"]
+    ):
+        return ProgressHeartbeatResult(
+            percent=0,
+            completed=False,
+            status="rejected",
+            session_id=session_id,
+            sequence=sequence,
+            reason="session_ended",
+            terminal=True,
+            last_sequence=int(session.heartbeat_sequence or 0),
+        )
+
     checked_at = timezone.now()
     initial_window_end = min(
         value for value in (

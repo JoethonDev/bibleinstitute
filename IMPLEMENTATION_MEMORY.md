@@ -8,6 +8,64 @@ Earlier detailed evidence is preserved in the
 and the [5 November archive](docs/archive/2026-11-05/history/IMPLEMENTATION_MEMORY.md).
 Historical open/done statements there are superseded by the current disposition.
 
+## Runaway progress-heartbeat retry loop (2026-11-23)
+
+Reported: `app-lms-app-blue-1` was saturated; three gunicorn workers at ~30-35%
+CPU, recycling on `--max-requests 2000` about every 1-2 minutes, from ~40
+`POST /api/progress/heartbeat/` per second. Ten stuck sessions kept resending
+`ended: true` with an incrementing sequence for days.
+
+Verified cause, client side `progressTracker.js`: `buildProgressQueuePending`
+cleared `bufferedEnded` when it built the ended payload, then the acknowledgement
+handler set `latest.bufferedEnded = latest.bufferedEnded || reconciled.ended`.
+`reconciled.ended` is `Boolean(payload.ended)`, so every acknowledged end
+re-armed the flag; `closed` requires `!bufferedEnded` and could never become
+true, `progressQueueHasWork` stayed true, and `dispatchProgressQueue` rescheduled
+itself with `setTimeout(..., 0)` for as long as the page stayed open. Each round
+carried a fresh sequence, so it was not an exact replay.
+
+Verified cause, server side `progress_activity.apply_progress_heartbeat`: only
+`credit_watch_sample` (live sessions) refreshed `last_heartbeat`, so the
+two-second throttle never applied to an ended session; `ended_at` only bounded
+the seven-day replay window, and every empty ended replay was accepted as `ok`
+with a sequence bump.
+
+Fixes:
+
+- `progressTracker.js`: removed the acknowledgement line that re-armed
+  `bufferedEnded`, so an acknowledged end closes the entry and removes it from
+  the queue. The reschedule delay is now `PROGRESS_QUEUE_RETRY_DELAY_MS` (1000)
+  instead of 0, so any future stuck queue retries at most once per second
+  instead of at network speed.
+- `progress_activity.py`: a heartbeat that repeats `ended` on an already ended
+  session with no ranges and no active seconds returns
+  `status=rejected, reason=session_ended, terminal=True`, which the client
+  already treats as terminal. Late flushes that still carry ranges are accepted
+  inside the seven-day window as before. This also stops tabs still running the
+  old JavaScript as soon as they send their next replay.
+- `load_tests/smoke/phase08_progress_queue.js`: new assertion that an
+  acknowledged ended entry reports no more work, posts once and is removed.
+  Proven red on the old code (5 posts, entry kept, work remained) and green now.
+- `load_tests/smoke/phase08_heartbeat.py`: two new checks (empty ended replay is
+  refused terminally; a late flush with ranges is still accepted) and a repair:
+  the tool seeded `hls:segments:<raw key>` while `hls_parser` hashes the cache
+  key, so it was failing on a cache miss before this unit.
+
+Verification: disposable PostgreSQL 18 + Redis 7.4 containers
+(`lms-phase08-hb` on 55435, `lms-phase08-redis` on 56385), full migration chain
+to `0133`. `phase08_heartbeat` 13/13 checks pass, `phase08_progress
+--contract-only` 15/15. `manage.py check` clean, `makemigrations --check` no
+changes, `audit_text_encoding` 935 files, `node --check` on both changed JS
+files, `git diff --check` clean. Host Django is 5.2.17, not the 5.1.4 target.
+
+Known limit: an acknowledged end now shows the existing "this session can no
+longer accept it" notice to a tab running the old JavaScript. Ranges the server
+reports as outside the media timeline are still retried until the page closes,
+now capped at one request per second.
+
+Next safe step: deploy, then confirm `/api/progress/heartbeat/` request rate
+falls within a minute of the switch as old tabs receive the terminal answer.
+
 ## Quiz hub, attempt definition and policy toggles (2026-11-21)
 
 Task recorded (2026-11-21): students needed a fast way to find every quiz,

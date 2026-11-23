@@ -45,6 +45,7 @@ from management_system.models import (
     ViewingSession,
 )
 from management_system.progress_activity import apply_progress_heartbeat
+from management_system.utils.hls_parser import _segments_cache_key
 
 MEDIA_KEY = "phase08/heartbeat/playlist.m3u8"
 PART_ID = "part-video"
@@ -139,7 +140,7 @@ def main() -> int:
     suffix = uuid.uuid4().hex[:10]
     with transaction.atomic():
         user, lesson = build_fixture(suffix)
-        cache.set(f"hls:segments:{MEDIA_KEY}", TIMELINE, 3600)
+        cache.set(_segments_cache_key(MEDIA_KEY), TIMELINE, 3600)
         session = create_viewing_session(
             user,
             lesson,
@@ -274,6 +275,55 @@ def main() -> int:
         else:
             checks.append("sequence gap resyncs")
 
+        # Ending the session once is accepted; a client that keeps resending the
+        # empty ended flag afterwards must be refused terminally, otherwise it
+        # can replay forever inside the seven-day window.
+        age_heartbeat()
+        ended = apply_progress_heartbeat(
+            user=user,
+            payload=payload(session.session_id, 3, [], 0, ended=True),
+            cloud_client=None,
+            bucket_name="unused",
+        )
+        if ended.status != "ok":
+            failures.append(f"ended heartbeat: status={ended.status} reason={ended.reason}")
+        age_heartbeat()
+        ended_replay = apply_progress_heartbeat(
+            user=user,
+            payload=payload(session.session_id, 4, [], 0, ended=True),
+            cloud_client=None,
+            bucket_name="unused",
+        )
+        if (
+            ended_replay.status != "rejected"
+            or not ended_replay.terminal
+            or ended_replay.reason != "session_ended"
+        ):
+            failures.append(
+                "empty ended replay: status={status} reason={reason} terminal={terminal}".format(
+                    status=ended_replay.status,
+                    reason=ended_replay.reason,
+                    terminal=ended_replay.terminal,
+                )
+            )
+        else:
+            checks.append("an empty ended replay is refused terminally")
+
+        # The guard is only for empty replays: a late flush with real ranges
+        # after the session ended is still reconciled inside the window.
+        late_flush = apply_progress_heartbeat(
+            user=user,
+            payload=payload(session.session_id, 4, [[40, 50]], 0, ended=False),
+            cloud_client=None,
+            bucket_name="unused",
+        )
+        if late_flush.status != "ok":
+            failures.append(
+                f"late ended flush: status={late_flush.status} reason={late_flush.reason}"
+            )
+        else:
+            checks.append("a late flush with ranges is still accepted after the end")
+
         # Same elapsed time, but the client says it played at 2x: the allowance
         # doubles, so the whole 30 s claim fits instead of the 20 s above.
         lesson_fast = Lesson.objects.create(
@@ -332,7 +382,7 @@ def main() -> int:
 
         transaction.set_rollback(True)
 
-    cache.delete(f"hls:segments:{MEDIA_KEY}")
+    cache.delete(_segments_cache_key(MEDIA_KEY))
     if User.objects.filter(username=f"hb{suffix}").count():
         failures.append("check did not roll back its fixtures")
 

@@ -3,6 +3,10 @@ const PROGRESS_QUEUE_PREFIX = 'lms:progress:v1';
 const PROGRESS_QUEUE_MAX_ENTRIES = 100;
 const PROGRESS_QUEUE_MAX_BYTES = 1024 * 1024;
 const PROGRESS_QUEUE_MAX_RANGES = 200;
+// A queue that still has work after an ack must not retry in a tight loop: a
+// server resync (throttled, budget-exhausted ranges) would otherwise turn into
+// a request storm. One retry per second is enough for a 200-range backlog.
+const PROGRESS_QUEUE_RETRY_DELAY_MS = 1000;
 const MAX_MEDIA_RECOVERY_RETRIES = 5;
 const MEDIA_RECOVERY_BASE_DELAY_MS = 2000;
 const MEDIA_RECOVERY_MAX_DELAY_MS = 15000;
@@ -1026,7 +1030,7 @@ function progressTracker() {
                 delete this.queueDispatching[key];
             }
             if (moreWork && !options.keepalive) {
-                window.setTimeout(() => this.dispatchProgressQueue(key), 0);
+                window.setTimeout(() => this.dispatchProgressQueue(key), PROGRESS_QUEUE_RETRY_DELAY_MS);
             }
         },
 
@@ -1104,7 +1108,10 @@ function progressTracker() {
                 Math.max(0, Number(latest.bufferedActiveSeconds) || 0)
                 + reconciled.remainingActiveSeconds
             ) * 100) / 100;
-            latest.bufferedEnded = Boolean(latest.bufferedEnded || reconciled.ended);
+            // buildProgressQueuePending already cleared bufferedEnded when it
+            // shipped the ended flag. Re-setting it from the ack made every
+            // acknowledged end look like fresh work, so the reschedule below
+            // re-sent an empty ended heartbeat forever.
             latest.closed = Boolean(latest.closed || (
                 reconciled.ended
                 && !latest.bufferedRanges.length
